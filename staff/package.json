@@ -1,0 +1,24 @@
+{
+  "name": "cup-staff",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CUP Staff Panel (Phase 11) - barista-facing customer identification, mobile-first, separate from the Admin Panel and the customer Mini App.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "jsqr": "^1.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CUP POS widget — Poster simulator</title>
+<style>
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; margin: 0; background: #e9e6df; color: #111; }
+  .sim { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px; max-width: 1200px; }
+  .panel { background: #fff; border-radius: 10px; padding: 12px 14px; border: 1px solid #d0cbc0; margin-bottom: 12px; }
+  .panel h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #6f6a63; }
+  button, select, input { font: inherit; padding: 6px 10px; margin: 2px 2px 2px 0; }
+  button { cursor: pointer; }
+  .pos { position: relative; background: #2b2b2b; color: #fff; border-radius: 12px; min-height: 420px; padding: 14px; }
+  .pos h2 { margin: 0 0 6px; font-size: 16px; }
+  .icons button { background: #444; color: #fff; border: 1px solid #777; }
+  .toast-zone { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
+  .toast { background: #fff; color: #111; border-left: 5px solid #d84b1f; border-radius: 8px; padding: 10px 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.35); max-width: 320px; }
+  .toast b { display: block; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 20; }
+  .overlay.open { display: flex; }
+  .popup { background: #fff; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  .popup-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #eee; font-weight: 600; }
+  .popup-body { flex: 1; overflow: auto; }
+  pre { background: #111; color: #cfd; padding: 8px; border-radius: 8px; max-height: 220px; overflow: auto; font-size: 11px; margin: 0; }
+  .bad { color: #b00020; font-weight: 700; }
+  .good { color: #1b7f3a; font-weight: 700; }
+  code { background: #eee; padding: 0 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="sim">
+  <div>
+    <div class="panel">
+      <h3>Order &amp; customer (the register)</h3>
+      <div>Order id: <b id="orderId">-</b> · Customer on order: <b id="orderClient">none</b></div>
+      <div>
+        <select id="clientSel"></select>
+        <button id="setClient">Add to order</button>
+        <button id="removeClient">Remove customer</button>
+      </div>
+      <div>
+        <button id="newOrder">New order</button> <button id="openExisting">Open existing order (with selected customer)</button>
+        <label><input type="checkbox" id="onOrder" checked /> on order screen</label>
+      </div>
+      <div class="icons"><button id="iconOrder">App icon (order)</button> <button id="iconFunctions">App icon (functions)</button></div>
+    </div>
+    <div class="panel">
+      <h3>Environment</h3>
+      <label><input type="checkbox" id="mobile" /> mobile (android) — scanBarcode available</label><br />
+      barcode the scanner returns: <input id="barcode" value="CUP-" size="14" />
+    </div>
+    <div class="panel">
+      <h3>CUP / Poster-server behaviour</h3>
+      <select id="mode">
+        <option value="signed">signed request (normal)</option>
+        <option value="down">CUP backend down</option>
+        <option value="timeout">CUP timeout</option>
+        <option value="unsigned">unsigned request</option>
+        <option value="badsig">invalid signature</option>
+        <option value="stale">expired timestamp</option>
+        <option value="wrongaccount">wrong Poster account</option>
+      </select>
+      <button id="applyMode">Apply</button><br />
+      extra latency (ms): <input id="latency" value="0" size="5" />
+      slow client id / ms: <input id="slowId" value="" size="5" placeholder="id" /> <input id="slowMs" value="3000" size="5" /> <button id="applySlow">Apply</button>
+    </div>
+    <div class="panel"><h3>Checks</h3><div id="checks" style="font-size:13px"></div></div>
+  </div>
+  <div>
+    <div class="pos">
+      <h2>Poster POS (simulated) — <span id="acct"></span></h2>
+      <div style="font-size:13px;color:#bbb">Sales continue here whatever CUP does. The widget only adds an icon, a notification and a popup.</div>
+      <div id="iconsHere" class="icons" style="margin-top:10px"></div>
+      <div class="toast-zone" id="toasts"></div>
+      <div style="margin-top:14px"><b>Poster API calls made by the widget</b><pre id="log"></pre></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="popup" id="popup">
+    <div class="popup-bar"><span id="popupTitle">CUP</span><button id="popupClose">✕</button></div>
+    <div class="popup-body"><div id="app-container"></div></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const clients = {
+    2: { id: 2, firstname: 'Шохкадам', lastname: '', phone: '+998 XX XXX XX XX', cardNumber: '' },
+    9001: { id: 9001, firstname: 'Fixture', lastname: 'Reward', phone: '+998 90 111 11 11' },
+    9002: { id: 9002, firstname: 'Fixture', lastname: 'New', phone: '+998 90 222 22 22' },
+    9003: { id: 9003, firstname: 'Fixture', lastname: 'Progress', phone: '+998 90 333 33 33' },
+    9004: { id: 9004, firstname: 'Poster', lastname: 'Only', phone: '+998 90 444 44 44' },
+  };
+  // Poster does not document the event payloads: ?payload=empty sends events with NO data (the widget must read the active order); ?active=off makes orders.getActive() fail.
+  const QS = new URLSearchParams(location.search); const pl = (d) => (QS.get('payload') === 'empty' ? undefined : d);
+  const state = { orderId: 1000000000001, clientId: 0, onOrderScreen: true, popup: false, mobile: QS.get('mobile') === '1' }; // ?mobile=1 boots as an Android register (device type is fixed for a session)
+  const handlers = {};
+  const log = [];
+  const S = (window.__sim = { log, forbidden: [], blocking: [], popups: [], notifications: [], requests: 0, state });
+  const $ = (id) => document.getElementById(id);
+  const note = (m) => { log.push(new Date().toISOString().slice(11, 23) + '  ' + m); $('log').textContent = log.slice(-60).join('\n'); $('log').scrollTop = 1e9; };
+  const trap = (name) => (...a) => { S.forbidden.push(name); note('!!! FORBIDDEN CALL ' + name); return Promise.resolve(false); };
+  const emit = (ev, data) => (handlers[ev] || []).forEach((h) => { try { h(data); } catch (e) { note('handler error ' + e); } });
+  const order = () => ({ id: state.orderId, clientId: state.clientId || 0, products: { 3: { count: 2 } }, total: 600 });
+
+  window.Poster = {
+    settings: { accountUrl: 'iwyoqar', spotId: 1, spotTabletId: 1 },
+    get environment() { return { android: state.mobile, iOS: false, windows: false, desktop: !state.mobile }; },
+    on(ev, h) {
+      if (/^before/.test(ev)) { S.blocking.push(ev); note('!!! BLOCKING EVENT SUBSCRIBED ' + ev); }
+      (handlers[ev] = handlers[ev] || []).push(h); note('on(' + ev + ')');
+    },
+    users: { getActiveUser: () => { note('users.getActiveUser'); return Promise.resolve({ id: 4, name: 'Barista Demo' }); } },
+    orders: {
+      getActive: () => { note('orders.getActive'); return QS.get('active') === 'off' ? Promise.reject(new Error('getActive unavailable')) : Promise.resolve(state.onOrderScreen ? { order: order() } : {}); },
+      addProduct: trap('orders.addProduct'), changeProductCount: trap('orders.changeProductCount'), setOrderClient: trap('orders.setOrderClient'),
+      setOrderBonus: trap('orders.setOrderBonus'), setOrderComment: trap('orders.setOrderComment'), create: trap('orders.create'), closeOrder: trap('orders.closeOrder'), printReceipt: trap('orders.printReceipt'), setOrderClientTrap: trap('x'),
+    },
+    clients: {
+      get: (id) => { note('clients.get(' + id + ')'); return new Promise((r) => setTimeout(() => r(clients[id] || false), 50)); },
+      find: ({ searchVal }) => {
+        note('clients.find');
+        const v = String(searchVal).replace(/\D/g, '');
+        const found = Object.values(clients).filter((c) => (v.length >= 6 && String(c.phone).replace(/\D/g, '').includes(v)) || (c.firstname + ' ' + c.lastname).toLowerCase().includes(String(searchVal).toLowerCase()));
+        return Promise.resolve({ foundClients: found, foundByCard: [] });
+      },
+      create: trap('clients.create'),
+    },
+    interface: {
+      popup: (o) => { note('interface.popup ' + o.width + 'x' + o.height); S.popups.push(o); $('popup').style.width = o.width + 'px'; $('popup').style.height = o.height + 'px'; $('popupTitle').textContent = o.title; $('overlay').classList.add('open'); state.popup = true; },
+      closePopup: () => { note('interface.closePopup'); $('overlay').classList.remove('open'); state.popup = false; },
+      showApplicationIconAt: (p) => { note('showApplicationIconAt ' + JSON.stringify(p)); $('iconsHere').innerHTML = Object.entries(p).map(([k, v]) => '<button data-place="' + k + '">' + v + ' (' + k + ')</button>').join(' '); },
+      showNotification: (n) => { note('showNotification: ' + n.message); S.notifications.push(n); const el = document.createElement('div'); el.className = 'toast'; el.innerHTML = '<b></b><span></span>'; el.children[0].textContent = n.title; el.children[1].textContent = n.message; el.onclick = () => { el.remove(); emit('notificationClick', {}); }; $('toasts').appendChild(el); return Promise.resolve({ id: Date.now() }); },
+      scanBarcode: () => { note('interface.scanBarcode'); return Promise.resolve({ barcode: $('barcode').value }); },
+    },
+    makeRequest: (url, options, cb) => {
+      S.requests += 1; note('makeRequest GET ' + url.replace(/^https?:\/\/[^/]+/, '').replace(/(code|phone)=[^&]+/, '$1=***'));
+      fetch('/__poster/makeRequest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url, options }) }).then((r) => r.json()).then((a) => cb(a)).catch(() => cb(false));
+    },
+    makeApiRequest: trap('makeApiRequest'),
+  };
+
+  function renderOrder() {
+    $('orderId').textContent = state.orderId; $('orderClient').textContent = state.clientId ? state.clientId + ' — ' + (clients[state.clientId] ? clients[state.clientId].firstname : '?') : 'none';
+  }
+  $('clientSel').innerHTML = Object.values(clients).map((c) => '<option value="' + c.id + '">' + c.id + ' — ' + c.firstname + ' ' + c.lastname + '</option>').join('');
+  $('acct').textContent = 'account iwyoqar · spot 1 · register 1';
+  $('setClient').onclick = () => { state.clientId = Number($('clientSel').value); renderOrder(); note('(register) customer ' + state.clientId + ' added to order'); emit('orderClientChange', pl({ clientId: state.clientId, orderId: state.orderId })); };
+  $('removeClient').onclick = () => { state.clientId = 0; renderOrder(); note('(register) customer removed'); emit('orderClientChange', pl({ clientId: 0, orderId: state.orderId })); };
+  $('openExisting').onclick = () => { state.orderId += 1; state.clientId = Number($('clientSel').value); renderOrder(); note('(register) opened existing order ' + state.orderId + ' with customer ' + state.clientId); emit('orderOpen', pl({ order: order() })); };
+  $('newOrder').onclick = () => { state.orderId += 1; state.clientId = 0; renderOrder(); note('(register) new order ' + state.orderId); emit('orderOpen', pl({ order: order() })); };
+  $('onOrder').onchange = (e) => { state.onOrderScreen = e.target.checked; };
+  $('iconOrder').onclick = () => emit('applicationIconClicked', { place: 'order', order: order() });
+  $('iconFunctions').onclick = () => emit('applicationIconClicked', { place: 'functions' });
+  $('iconsHere').onclick = (e) => { const p = e.target.getAttribute && e.target.getAttribute('data-place'); if (p) emit('applicationIconClicked', p === 'order' ? { place: 'order', order: order() } : { place: 'functions' }); };
+  $('popupClose').onclick = () => window.Poster.interface.closePopup();
+  $('mobile').checked = state.mobile;
+  $('mobile').onchange = () => { QS.set('mobile', '1'); if (!$('mobile').checked) QS.delete('mobile'); location.search = QS.toString() ? '?' + QS.toString() : ''; }; // the widget reads the device type once at start, like on a real register
+  const post = (b) => fetch('/__sim/mode', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
+  $('applyMode').onclick = () => post({ mode: $('mode').value, latencyMs: $('latency').value });
+  $('applySlow').onclick = () => post({ slowClients: $('slowId').value ? { [$('slowId').value]: Number($('slowMs').value) } : {} });
+  function checks() {
+    const f = S.forbidden.length, b = S.blocking.length;
+    $('checks').innerHTML = 'Forbidden API calls: <span class="' + (f ? 'bad' : 'good') + '">' + f + '</span><br>Blocking (before*) subscriptions: <span class="' + (b ? 'bad' : 'good') + '">' + b + '</span><br>CUP requests: ' + S.requests + '<br>Popups: ' + S.popups.length + ' · Notifications: ' + S.notifications.length;
+  }
+  setInterval(checks, 500); renderOrder(); checks();
+  // load the REAL built widget bundle only after Poster exists — exactly what the register does
+  const s = document.createElement('script'); s.src = '/bundle.js?' + Date.now(); document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

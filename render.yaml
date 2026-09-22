@@ -1,0 +1,68 @@
+# Phase 24 — Render Blueprint for the CUP backend. Prepared for deployment; NOT deployed by this file existing (Render only acts on this when
+# the repo is connected as a Blueprint in the Render dashboard, or via `render blueprint launch`/`render deploy` — neither was run this phase).
+#
+# Database: intentionally NOT a Render-managed Postgres (`type: pserv`/`databases:` block) — the project uses an external Supabase Postgres
+# instance instead, so DATABASE_URL below is `sync: false` (set manually in the Render dashboard to the Supabase connection string, never
+# committed here). See PROJECT_STATE.md's Phase 24 section for the exact Supabase setup and connection-string shape.
+#
+# Build/start use the PostgreSQL-targeted scripts (package.json's `render:build` / `render:start`), which generate prisma/postgres/schema.prisma
+# from the single source-of-truth prisma/schema.prisma and run `prisma migrate deploy` against THAT schema — the local SQLite dev schema and
+# migrations (prisma/schema.prisma, prisma/migrations/) are never touched by this flow.
+services:
+  - type: web
+    name: cup-backend
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    buildCommand: npm run render:build
+    startCommand: npm run render:start
+    healthCheckPath: /health
+    autoDeploy: false # Phase 24 explicitly does not deploy; flip this on only when the team is ready to.
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000" # Render's own convention; the app reads PORT from env either way (env.schema.ts), so this is not hardcoded in code.
+      - key: DATABASE_URL
+        sync: false # Supabase connection string (pooled, port 6543, ?pgbouncer=true) — set manually in the Render dashboard. NEVER commit this.
+      - key: POSTER_API_BASE_URL
+        value: https://joinposter.com/api
+      - key: POSTER_API_TOKEN
+        sync: false
+      - key: POSTER_DEFAULT_SPOT_ID
+        value: "1"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true # a fresh random secret Render generates once and stores; not shared with the local dev JWT_SECRET
+      - key: ADMIN_JWT_SECRET
+        generateValue: true
+      - key: STAFF_JWT_SECRET
+        generateValue: true
+      - key: MINI_APP_URL
+        sync: false # the deployed Mini App's real HTTPS URL, once it has one
+      - key: POSTER_SYNC_ENABLED
+        value: "false" # operator interlock — left OFF; turn on only with the same explicit approval this project has always required
+      - key: POSTER_APPLICATION_SECRET
+        sync: false
+      - key: POSTER_ACCOUNT
+        sync: false
+      - key: POS_WIDGET_ENABLED
+        value: "false"
+      - key: POS_WIDGET_ACCOUNT
+        sync: false
+      - key: POS_WIDGET_PUBLIC_URL
+        sync: false # set to this Render service's own public URL once deployed
+      - key: POS_REWARD_REDEMPTION_ENABLED
+        value: "false" # left OFF by this phase, per explicit instruction — do not flip without separate authorization
+      - key: POS_PROMOTION_REDEMPTION_ENABLED
+        value: "false" # left OFF by this phase, per explicit instruction — do not flip without separate authorization
+      - key: REWARD_CHECKOUT_ENABLED
+        value: "false"
+      - key: CRM_AUTOMATION_SEND_ENABLED
+        value: "false"
+      - key: ADMIN_BOOTSTRAP_EMAIL
+        sync: false
+      - key: ADMIN_BOOTSTRAP_PASSWORD
+        sync: false

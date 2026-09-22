@@ -1,0 +1,12 @@
+{
+  "response": [
+    {
+      "product_id": "3",
+      "product_name": "Капучино 250 мл",
+      "menu_category_id": "1",
+      "price": {
+        "1": "300"
+      }
+    }
+  ]
+}

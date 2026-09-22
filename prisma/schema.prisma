@@ -1,0 +1,1171 @@
+// CUP schema. Phase 0 models + Phase 1 additions (see docs/PHASE-1-DESIGN.md section 6).
+//
+// Portability rules (see docs/PHASE-0-PLAN.md):
+// - No Prisma `enum` — unsupported on the sqlite connector. Status fields are `String`,
+//   validated against shared TS unions in src/common/enums/.
+// - No `Decimal` — unsupported on the sqlite connector. All money is `Int` minor units.
+// - No sqlite-specific SQL anywhere in this schema.
+//
+// Phase 1.1 note: Order.branchId is nullable for now, not backfilled in this migration.
+// Branch rows don't exist yet (BranchService/sync is Phase 1.2), and backfilling existing
+// Phase 0 orders (including a real Poster order from the smoke test) against a placeholder
+// Branch felt riskier than deferring the decision until real Branch data exists. Revisit
+// making it required once Phase 1.5 (checkout integration) actually populates it.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id                         String                      @id @default(cuid())
+  posterClientId             String?                     @unique
+  // Phase 11: the PUBLIC identity code shown as QR/barcode (e.g. CUP-7K4M9X2P). Random, non-sequential
+  // and independent of id / telegram id / phone. Nullable only so the migration is purely additive —
+  // every customer is backfilled (see LoyaltyCodeService) and new customers get one at creation.
+  loyaltyCode                String?                     @unique
+  displayName                String?
+  phone                      String?
+  // Phase 12: the customer's own birthday (date only, stored as UTC midnight). Additive and nullable; set once by the
+  // customer, used only to derive birthday-reward ELIGIBILITY.
+  birthDate                  DateTime?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  orders                     Order[]
+  telegramAccount            TelegramAccount?
+  cart                       Cart?
+  loyaltyAccount             LoyaltyAccount?
+  campaignRecipients         CampaignRecipient[]
+  automationExecutions       AutomationExecution[]
+  promotionRedemptions       PromotionRedemption[]
+  rewardRedemptions          RewardRedemption[]
+  rewardRedemptionAttempts   RewardRedemptionAttempt[] // Phase 22: POS-originated redemption attempts (a separate lifecycle from RewardRedemption — see that model's comment)
+  promotionRedemptionAttempts PromotionRedemptionAttempt[] // Phase 23: POS-originated redemption attempts (a separate lifecycle from PromotionRedemption — see that model's comment)
+  posterImportedTransactions PosterImportedTransaction[]
+  loyaltyAccruals            LoyaltyAccrual[]
+  cashbackTransactions       CashbackTransaction[]
+  customerAchievements       CustomerAchievement[]
+  loyaltyLevelUps            LoyaltyLevelUp[]
+  birthdayRewardClaims       BirthdayRewardClaim[]
+  referralsMade              Referral[]                  @relation("ReferrerRel")
+  referralReceived           Referral?                   @relation("ReferredRel")
+  referralCode               ReferralCode?
+  referralRewards            ReferralReward[]
+
+  @@map("customers")
+}
+
+// Telegram is a communication/distribution channel, not the source of truth for customer
+// identity — it links TO a Customer, it does not replace one. See docs/PHASE-1-DESIGN.md
+// section 6. One Telegram account per customer for Phase 1 (1:1).
+model TelegramAccount {
+  id             String   @id @default(cuid())
+  customerId     String   @unique
+  customer       Customer @relation(fields: [customerId], references: [id])
+  telegramUserId String   @unique // stored as String (same convention as posterProductId
+  // etc.) — Telegram user ids are 64-bit and risk precision loss as a JS number.
+  chatId         String // where the bot DMs this customer.
+  username       String?
+  firstName      String?
+  lastName       String?
+  languageCode   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("telegram_accounts")
+}
+
+// CUP-managed for Phase 1 (see docs/PHASE-1-DESIGN.md section 19): not auto-synced from
+// Poster's access.getSpots until that endpoint's real shape is verified live (Phase 1.2).
+model Branch {
+  id                         String                      @id @default(cuid())
+  posterSpotId               Int                         @unique // same Int convention as Order.posterSpotId
+  name                       String
+  address                    String?
+  isActive                   Boolean                     @default(true)
+  syncedAt                   DateTime                    @default(now())
+  orders                     Order[]
+  carts                      Cart[]
+  staffMembers               StaffMember[]
+  posterImportedTransactions PosterImportedTransaction[]
+
+  @@map("branches")
+}
+
+// One cart per customer, mutated in place — not a history of past carts. See
+// docs/PHASE-1-DESIGN.md section 6 for why no price is snapshotted on CartItem.
+model Cart {
+  id         String     @id @default(cuid())
+  customerId String     @unique
+  customer   Customer   @relation(fields: [customerId], references: [id])
+  branchId   String?
+  branch     Branch?    @relation(fields: [branchId], references: [id])
+  items      CartItem[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  // Phase 1.5: DB-backed checkout lock. Two DIFFERENT Idempotency-Keys checking out the SAME
+  // cart concurrently is a race Phase 0's per-key idempotency machinery cannot catch on its
+  // own (it only protects a single key against itself). Set null again on a definite outcome
+  // (success or definite failure). Reclaimable after IDEMPOTENCY_STALE_IN_PROGRESS_MS, but
+  // — CORRECTED after discovering this was not sufficient on its own — staleness alone NEVER
+  // authorizes a reclaim: CartService checks checkoutIdempotencyKey's actual resolution status
+  // via OrdersService first, and refuses (CheckoutRequiresManualReconciliationError) if it's
+  // still "uncertain" or "in_progress", exactly the case a time-only self-heal would have
+  // silently reopened into a second real Poster order. See cart.service.ts.
+  checkoutLockedAt       DateTime?
+  // The Idempotency-Key associated with the current (or most recent) checkoutLockedAt claim —
+  // this is what makes a stale-lock reclaim able to ask "was the previous attempt actually
+  // resolved?" instead of just "has enough time passed?".
+  checkoutIdempotencyKey String?
+
+  // Phase 8: the customer's CURRENT reward selection for their next checkout — deliberately
+  // plain scalar columns on Cart (same pattern as branchId), not a join table, since a cart has
+  // at most one selected reward at a time. Neither field is trusted at checkout time: CartService
+  // re-resolves and re-validates eligibility fresh, inside the checkout lock, every time (spec:
+  // "never trust client-provided ... progress"). Storing the selection here is purely a UX
+  // convenience (so it survives across GET /cart calls) — the actual authority is always
+  // RewardEligibilityService evaluated live.
+  rewardProgramId String?
+  rewardProductId String?
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  addedAt   DateTime @default(now())
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+model Category {
+  id               String          @id @default(cuid())
+  posterCategoryId String          @unique
+  name             String
+  sortOrder        Int             @default(0)
+  isActive         Boolean         @default(true)
+  syncedAt         DateTime        @default(now())
+  products         Product[]
+  // Phase 8: a RewardProgram (e.g. "Coffee 5+1") references its qualifying category here —
+  // never a hardcoded category id/name. No `onDelete` override: the database blocks a hard
+  // delete of a Category a RewardProgram still references (moot in practice, same as Product —
+  // categories are only ever soft-deactivated during catalog sync, never hard-deleted).
+  rewardPrograms   RewardProgram[]
+
+  @@map("categories")
+}
+
+model Product {
+  id                  String                          @id @default(cuid())
+  posterProductId     String                          @unique
+  categoryId          String
+  category            Category                        @relation(fields: [categoryId], references: [id])
+  name                String
+  priceMinor          Int
+  isActive            Boolean                         @default(true)
+  syncedAt            DateTime                        @default(now())
+  orderItems          OrderItem[]
+  cartItems           CartItem[]
+  // Phase 7: a FREE_PRODUCT promotion references a Product by id — no `onDelete` override
+  // means the database blocks a hard delete of a Product a Promotion still references (moot in
+  // practice, since Products are only ever soft-deleted via isActive:false during catalog sync,
+  // never hard-deleted — see catalog.repository.ts).
+  promotions          Promotion[]
+  posterImportedItems PosterImportedTransactionItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id                    String                    @id @default(cuid())
+  customerId            String
+  customer              Customer                  @relation(fields: [customerId], references: [id])
+  posterSpotId          Int
+  posterIncomingOrderId String?                   @unique
+  status                String
+  totalMinor            Int
+  idempotencyKey        String                    @unique
+  items                 OrderItem[]
+  idempotencyRecord     IdempotencyKey?
+  branchId              String? // Phase 1.1: nullable, not backfilled — see note at top of file.
+  branch                Branch?                   @relation(fields: [branchId], references: [id])
+  statusNotifications   OrderStatusNotification[]
+  loyaltyTransactions   LoyaltyTransaction[]
+  promotionRedemptions  PromotionRedemption[]
+  rewardRedemptions     RewardRedemption[]
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@map("orders")
+}
+
+// Phase 1.9: DB-backed idempotency for Telegram order-status notifications. The unique
+// constraint on (orderId, orderStatus) IS the atomic claim — see
+// src/modules/notifications/order-notification.service.ts. Whichever caller's create() wins
+// that constraint owns sending this one notification for this one transition; every other
+// caller's create() fails immediately with no Telegram call ever attempted. This holds even
+// under concurrent poll ticks or, in a future multi-instance deployment, separate processes —
+// no separate distributed lock is needed.
+//
+// deliveryState is the Telegram SEND lifecycle, deliberately separate from orderStatus (the
+// CUP OrderStatus this notification announces): 'pending' (claimed, send not yet confirmed),
+// 'sent', or 'failed' (caught send error, eligible for a bounded retry — see
+// order-notification.service.ts's MAX_ATTEMPTS). A 'pending' row is NEVER auto-retried, even
+// if stale: retrying it risks a duplicate message if the original send actually succeeded but
+// the process crashed before markSent() ran. This project prioritizes never double-notifying a
+// customer over guaranteeing delivery in that narrow crash window — a deliberate, documented
+// tradeoff, not an oversight.
+model OrderStatusNotification {
+  id            String    @id @default(cuid())
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id])
+  orderStatus   String
+  deliveryState String    @default("pending")
+  attempts      Int       @default(0)
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([orderId, orderStatus])
+  @@map("order_status_notifications")
+}
+
+model OrderItem {
+  id              String  @id @default(cuid())
+  orderId         String
+  order           Order   @relation(fields: [orderId], references: [id])
+  productId       String
+  product         Product @relation(fields: [productId], references: [id])
+  posterProductId String
+  quantity        Int
+  unitPriceMinor  Int
+  totalPriceMinor Int
+  // Phase 8: the ONLY authority on whether this line is a free reward item — set once, at
+  // order creation, from which array (regular `items` vs `rewardItems`) OrdersService resolved
+  // it from. Deliberately NOT inferred from unitPriceMinor==0 (spec: "Do not infer this from
+  // price alone. A normal coffee could theoretically have a zero price in the future.") — a
+  // reward-qualifying-quantity query filters on this flag, never on price. See
+  // reward-progress.service.ts.
+  isRewardItem    Boolean @default(false)
+
+  @@map("order_items")
+}
+
+model IdempotencyKey {
+  key              String   @id
+  scope            String
+  requestHash      String
+  status           String
+  responseSnapshot String?
+  orderId          String?  @unique
+  order            Order?   @relation(fields: [orderId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("idempotency_keys")
+}
+
+// Phase 3: Admin identity is completely separate from Customer/TelegramAccount — an Admin row
+// has no relation to either. Sessions are signed with ADMIN_JWT_SECRET (distinct from
+// customer JWT_SECRET), so a customer token cannot verify against admin routes even if replayed
+// there, and vice versa. role is a plain String, not a Prisma enum (sqlite connector doesn't
+// support them — see the portability note at the top of this file), validated against a TS
+// union in code (src/modules/admin-auth/admin.types.ts).
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("ADMIN")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admins")
+}
+
+// Phase 3: a generic, reusable key/value configuration store — the foundation Part 19 asks for
+// future modules (marketing.*, campaign.*, referral.*, business.*, ...) to reuse without ANY
+// further schema changes. valueType records how `value` (always stored as text) should be
+// parsed back — see src/modules/settings/settings.service.ts's typed getters/setters, which are
+// the only code allowed to read/write this table. updatedBy is a plain Admin.id reference, not
+// a hard foreign key: a deleted Admin must never cascade into losing settings history.
+model Setting {
+  key       String   @id
+  value     String
+  valueType String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("settings")
+}
+
+// Phase 3: one account per Customer, created lazily on first loyalty access (never
+// pre-created for existing customers — see LoyaltyService.ensureAccount and Part 18). balance/
+// lifetimeEarned/lifetimeSpent are integer points, never floating-point (same "no float money"
+// principle this project already applies to minor-unit currency amounts). balance is a
+// maintained running total; LoyaltyTransaction below is the authoritative historical ledger it
+// is derived from — see that model's comment for the append-only principle.
+model LoyaltyAccount {
+  id             String               @id @default(cuid())
+  customerId     String               @unique
+  customer       Customer             @relation(fields: [customerId], references: [id])
+  balance        Int                  @default(0)
+  lifetimeEarned Int                  @default(0)
+  lifetimeSpent  Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  transactions   LoyaltyTransaction[]
+
+  @@map("loyalty_accounts")
+}
+
+// Append-only ledger (Part 7): a past transaction is NEVER edited to correct a balance — a
+// correction is always a new ADJUSTMENT row. type is a plain String (sqlite has no Prisma enum
+// support), validated against a TS union — see loyalty-transaction-type.ts. orderId is nullable
+// and unrelated to Order's own idempotencyKey/status machinery: it only exists so a future
+// EARN transaction can be traced back to the order that generated it (see Part 8 — no code
+// path creates an EARN transaction yet).
+model LoyaltyTransaction {
+  id               String         @id @default(cuid())
+  loyaltyAccountId String
+  loyaltyAccount   LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id])
+  type             String
+  points           Int
+  balanceAfter     Int
+  orderId          String?
+  order            Order?         @relation(fields: [orderId], references: [id])
+  description      String?
+  createdAt        DateTime       @default(now())
+
+  @@map("loyalty_transactions")
+}
+
+// Phase 5: a segment is a SAVED FILTER DEFINITION, never a snapshot of customer IDs — matching
+// customers are always computed dynamically at read time from current Order/LoyaltyAccount data
+// (see src/modules/segments/segment-evaluator.ts). Relational SegmentCondition (not a JSON
+// column) matches this project's established convention of explicit typed columns over JSON
+// blobs (Setting.value, OrderItem, CartItem are all the same pattern) and keeps validation
+// straightforward — a condition's `field`/`operator` are always validated against an explicit
+// code allowlist (segment-condition-allowlist.ts) before being persisted, never trusted as
+// free-form input at evaluation time.
+//
+// createdBy/updatedBy are plain Admin.id references, not hard foreign keys — same pattern as
+// Setting.updatedBy: deleting an Admin must never cascade into losing a segment.
+model Segment {
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  logic       String // 'AND' | 'OR' — plain String, same no-Prisma-enum convention (SQLite).
+  isActive    Boolean            @default(true)
+  createdBy   String?
+  updatedBy   String?
+  conditions  SegmentCondition[]
+  // Phase 6: a Campaign references a Segment (never copies its conditions — see Campaign's own
+  // comment). No `onDelete` override here means the default FK-enforced behavior applies: a
+  // Segment currently referenced by any Campaign cannot be deleted at the database level.
+  // SegmentsService.delete() catches that constraint failure and converts it into a clean 409
+  // rather than letting a raw Prisma error reach the API — see its comment for why this check
+  // only exists as of Phase 6 (Segment had no incoming references before Campaign existed).
+  campaigns   Campaign[]
+  automations Automation[]
+  // Phase 7: a Promotion may optionally reference a Segment as its audience — same "database
+  // blocks the delete, SegmentsService.delete() converts that into a 409" protection as
+  // Campaign above; no code changes were needed there since it already catches ANY foreign-key
+  // violation generically, not one specific to Campaign.
+  promotions  Promotion[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@map("segments")
+}
+
+// value is always stored as text (same convention as Setting.value) — its expected type
+// (number/date/string) is fully determined by `field` via the code allowlist, so no separate
+// valueType column is needed here (unlike the fully-generic Setting table, a segment condition
+// field's type is fixed, not admin-defined). onDelete: Cascade — a condition has no independent
+// meaning once its segment is deleted.
+model SegmentCondition {
+  id        String   @id @default(cuid())
+  segmentId String
+  segment   Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  field     String
+  operator  String
+  value     String
+  createdAt DateTime @default(now())
+
+  @@map("segment_conditions")
+}
+
+// Phase 6: a Campaign is manually created and manually sent by an admin — no scheduling, no
+// recurrence, no automation (see docs on this phase's explicit scope boundary). It REFERENCES a
+// Segment by id rather than copying its conditions, so the audience stays fully dynamic right up
+// until the moment of send — see CampaignRecipient below for the frozen snapshot that protects
+// an in-flight send from a segment definition that keeps changing underneath it.
+//
+// channel is fixed to "telegram" for Phase 6 (plain String, same no-Prisma-enum convention as
+// everywhere else in this schema — SQLite has no enum support) — Telegram is the only channel
+// this phase supports, so the column exists for future extensibility, not present-day choice.
+//
+// status is a small, deliberately bounded lifecycle: draft -> sending -> completed, with
+// "failed" reserved ONLY for a genuine campaign-execution failure (e.g. an exception during
+// audience resolution before any recipients could be created) — a campaign is NOT marked
+// "failed" merely because some individual recipients failed to receive their message; that
+// information lives on CampaignRecipient instead. See campaigns.service.ts for the exact state
+// machine and the atomic draft->sending claim that prevents a double-send.
+model Campaign {
+  id          String              @id @default(cuid())
+  name        String
+  description String?
+  segmentId   String
+  segment     Segment             @relation(fields: [segmentId], references: [id])
+  channel     String              @default("telegram")
+  status      String              @default("draft")
+  messageText String
+  createdBy   String?
+  updatedBy   String?
+  recipients  CampaignRecipient[]
+  automations Automation[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@map("campaigns")
+}
+
+// The FROZEN audience snapshot for ONE specific send operation — deliberately never created
+// when a campaign is merely drafted (see Campaign.status default "draft"), only when an admin
+// explicitly confirms send (CampaignAudienceService.freezeAudience, called from
+// CampaignsService.send() immediately after the atomic draft->sending claim succeeds). Phase 6's
+// intended model is exactly one send per campaign — there is no "resend" feature — so
+// (campaignId, customerId) is unique: a customer can never appear twice in one campaign's
+// recipient set.
+//
+// telegramAccountId is a soft reference (not a hard foreign key), same pattern as
+// Segment.createdBy/Setting.updatedBy — recorded for traceability on an eligible ('pending')
+// row, left null on a 'skipped' row (no usable Telegram destination was found; see errorCode for
+// which reason). chatId itself is deliberately NOT stored here: CampaignAudienceService already
+// holds it in memory at freeze time and hands it straight to CampaignMessagingService for the
+// send that follows in the same request, so persisting a second, potentially-stale copy of a
+// contact address alongside a permanent delivery-history record was avoidable.
+//
+// status: 'pending' (not yet attempted, or attempted with an UNCERTAIN outcome — see
+// campaign-messaging.service.ts's comment on why an uncertain send is never auto-retried, the
+// same "prefer at-most-once over risking a duplicate" tradeoff schema.prisma already documents
+// for OrderStatusNotification), 'sent', 'failed' (a definite, caught send error), or 'skipped'
+// (no eligible Telegram destination — never even attempted).
+model CampaignRecipient {
+  id                String    @id @default(cuid())
+  campaignId        String
+  campaign          Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customerId        String
+  customer          Customer  @relation(fields: [customerId], references: [id])
+  telegramAccountId String?
+  status            String    @default("pending")
+  telegramMessageId String?
+  attempts          Int       @default(0)
+  errorCode         String?
+  sentAt            DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([campaignId, customerId])
+  @@map("campaign_recipients")
+}
+
+// Phase 7: a Promotion is a saved, admin-authored benefit definition — never customer IDs, never
+// a copy of a Segment's conditions. Its audience stays fully dynamic (re-evaluated against the
+// referenced Segment at eligibility-check time) right up until PromotionRedemption freezes one
+// specific customer's use of it — the exact same "definition vs. frozen event" split Phase 6
+// already established for Campaign/CampaignRecipient.
+//
+// segmentId is optional: null means globally targeted (subject to whatever other eligibility
+// rules apply — validity window, usage limit), matching this phase's explicit instruction. No
+// `onDelete` override on the segment relation — same FK-blocks-the-delete protection as
+// Campaign.segmentId, already handled generically by SegmentsService.delete().
+//
+// benefitType is a plain String (not a Prisma enum — SQLite has no enum support, same
+// portability rule as every other status/type column in this schema), validated against the
+// PROMOTION_BENEFIT_TYPES allowlist in code (promotion-benefit-allowlist.ts) — never trusted
+// as free-form input. Exactly which of benefitValue/benefitProductId/benefitQuantity are
+// required is fully determined by benefitType; see that allowlist for the per-type rules.
+//
+// isActive defaults to false: a newly created Promotion is inert until an admin explicitly
+// activates it (spec's Admin UI: "Draft/inactive -> Activate"), separate from its startsAt/endsAt
+// validity window — both must independently hold for a redemption to be eligible.
+model Promotion {
+  id                    String                @id @default(cuid())
+  name                  String
+  description           String?
+  segmentId             String?
+  segment               Segment?              @relation(fields: [segmentId], references: [id])
+  benefitType           String
+  benefitValue          Int?
+  benefitProductId      String?
+  benefitProduct        Product?              @relation(fields: [benefitProductId], references: [id])
+  benefitQuantity       Int?
+  startsAt              DateTime
+  endsAt                DateTime?
+  isActive              Boolean               @default(false)
+  usageLimitPerCustomer Int?
+  createdBy             String?
+  updatedBy             String?
+  redemptions           PromotionRedemption[]
+  redemptionAttempts    PromotionRedemptionAttempt[] // Phase 23
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@map("promotions")
+}
+
+// A redemption is a business EVENT, not configuration — one row per actual use of a promotion by
+// a customer. usageIndex is the 1-based sequence number of this redemption within
+// (promotionId, customerId): combined with the unique constraint below, it is what makes usage-
+// limit enforcement race-safe (see promotion-redemption.service.ts) — two concurrent redemption
+// attempts can never be assigned the same usageIndex, so they can never both succeed past a
+// limit, without needing a SELECT-then-INSERT to be atomic on its own. This generalizes cleanly
+// to usageLimitPerCustomer values of 1, N, or unlimited (null) with exactly one mechanism.
+//
+// benefitType/benefitValue/benefitProductId/benefitProductName/benefitQuantity are a SNAPSHOT of
+// the benefit actually redeemed, copied from the Promotion at redemption time — deliberately
+// duplicated columns rather than a JSON blob, matching this project's stated preference for
+// explicit typed columns over JSON (see the Segment model's comment). If the Promotion's own
+// definition changes afterward (value, product, etc.), this historical record must NOT change
+// with it. benefitProductId here is intentionally NOT a hard foreign key (no `@relation`) — a
+// product referenced by an old redemption may later be deactivated, and this record must remain
+// a valid, readable historical fact regardless; benefitProductName is what makes it
+// self-describing even if the product row is looked up and found inactive or renamed.
+//
+// orderId is a real, nullable relation: Phase 7 does not yet wire redemption into real checkout
+// (see promotion-redemption.service.ts), so most redemptions created during this phase's manual
+// verification will have orderId: null — the column exists for the future integration boundary
+// the spec describes, not because anything in this phase populates it end-to-end.
+model PromotionRedemption {
+  id                 String    @id @default(cuid())
+  promotionId        String
+  promotion          Promotion @relation(fields: [promotionId], references: [id])
+  customerId         String
+  customer           Customer  @relation(fields: [customerId], references: [id])
+  orderId            String?
+  order              Order?    @relation(fields: [orderId], references: [id])
+  usageIndex         Int
+  benefitType        String
+  benefitValue       Int?
+  benefitProductId   String?
+  benefitProductName String?
+  benefitQuantity    Int?
+  redeemedAt         DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+
+  @@unique([promotionId, customerId, usageIndex])
+  @@map("promotion_redemptions")
+}
+
+// Phase 8: a RewardProgram is a DIFFERENT concept from Promotion, deliberately kept as its own
+// model rather than bolted onto Promotion's benefitType allowlist (spec: "Keep these concepts
+// clear... Do not force every reward into [an existing model it doesn't fit]"). A Promotion's
+// audience is a Segment and its benefit is a fixed, admin-chosen value; a RewardProgram's
+// "audience" is implicitly every customer (eligibility is entirely self-derived from the
+// customer's OWN qualifying purchase history) and its benefit unlocks cyclically as that history
+// accumulates. Forcing this into Promotion would mean bolting qualifyingCategoryId/buyQuantity
+// fields onto a model where they're meaningless for the other three benefit types.
+//
+// type is a plain String (not a Prisma enum, same portability rule as everywhere else in this
+// schema), validated against an allowlist in code (reward-program-allowlist.ts) — only
+// 'BUY_X_GET_Y' exists today. qualifyingCategoryId doubles as BOTH "which products count toward
+// progress" AND "which products the customer may choose as their free reward" — matching the
+// spec's own Coffee 5+1 example exactly (any active Coffee-category product qualifies both
+// ways); a future reward type could split these into two fields without touching this one.
+//
+// isActive defaults to false, same "admin explicitly activates" pattern as Promotion.
+model RewardProgram {
+  id                   String             @id @default(cuid())
+  name                 String
+  description          String?
+  type                 String
+  qualifyingCategoryId String
+  qualifyingCategory   Category           @relation(fields: [qualifyingCategoryId], references: [id])
+  buyQuantity          Int
+  rewardQuantity       Int
+  isActive             Boolean            @default(false)
+  startsAt             DateTime
+  endsAt               DateTime?
+  createdBy            String?
+  updatedBy            String?
+  redemptions          RewardRedemption[]
+  redemptionAttempts   RewardRedemptionAttempt[] // Phase 22
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@map("reward_programs")
+}
+
+// The ONE persisted reward event — deliberately the ONLY thing persisted about reward state at
+// all. "Earning" a reward credit is NEVER written as its own row: it is always DERIVED at read
+// time as floor(qualifyingPurchasedQuantity / buyQuantity) — see reward-progress.service.ts —
+// specifically per the spec's "do NOT create a cached progress field... prefer deriving progress
+// from qualifying paid order items" instruction. availableRewards is therefore always:
+//   floor(qualifyingPurchasedQuantity / buyQuantity) - count(RewardRedemption for this program+customer)
+// redemptionIndex + the unique constraint below is the SAME race-safety mechanism as
+// PromotionRedemption.usageIndex (see that model's comment) — defense-in-depth here, since in
+// practice the ONLY call path that creates a row (checkout, via reward-redemption.service.ts) is
+// already serialized per-customer by Cart's own checkoutLockedAt lock; the DB constraint is what
+// makes that guarantee absolute rather than merely "true because nothing else calls this yet."
+//
+// rewardProductId/rewardProductName/buyQuantitySnapshot/qualifyingCategoryName are a SNAPSHOT,
+// same "duplicated typed columns, never a JSON blob, never recalculated from current config"
+// pattern as PromotionRedemption's benefit snapshot — if the program's buyQuantity or qualifying
+// category changes later, this historical record must not change with it.
+//
+// orderId is required in practice (a reward redemption always happens as part of a real
+// checkout — see reward-redemption.service.ts's module comment on why there is no standalone
+// public redeem endpoint), but left nullable at the schema level for the same forward-
+// compatibility reason PromotionRedemption.orderId is nullable.
+model RewardRedemption {
+  id                     String        @id @default(cuid())
+  rewardProgramId        String
+  rewardProgram          RewardProgram @relation(fields: [rewardProgramId], references: [id])
+  customerId             String
+  customer               Customer      @relation(fields: [customerId], references: [id])
+  orderId                String?
+  order                  Order?        @relation(fields: [orderId], references: [id])
+  redemptionIndex        Int
+  rewardProductId        String?
+  rewardProductName      String?
+  rewardQuantity         Int
+  buyQuantitySnapshot    Int
+  qualifyingCategoryName String?
+  redeemedAt             DateTime      @default(now())
+  createdAt              DateTime      @default(now())
+
+  @@unique([rewardProgramId, customerId, redemptionIndex])
+  @@map("reward_redemptions")
+}
+
+// Phase 22 — the lifecycle of ONE attempt to redeem a reward on a LIVE Poster POS order, from the widget. Deliberately separate from RewardRedemption:
+// RewardRedemption.orderId refers to a CUP Order (created by CUP's own checkout, Phase 8) and that meaning is never overloaded — a POS-originated
+// redemption has no CUP order at all, only a Poster order id reported by the widget (posterOrderId, an UNVERIFIED claim until independently checked — see
+// docs/PHASE-22-AUDIT.md §8). rewardProductId/Name are snapshots, not a Product relation, mirroring RewardRedemption's own convention (a redeemed
+// product can be renamed or deactivated later without corrupting history). redemptionId is likewise a plain, unenforced pointer to the RewardRedemption
+// row created only once status reaches REDEEMED — never before. employeeIdentifier is audit metadata only (Poster's users.getActiveUser(), client-supplied,
+// never a security boundary — see docs/PHASE-22-AUDIT.md §8/§16).
+//
+// status: REQUESTED -> VALIDATING -> POSTER_MUTATING -> POSTER_CONFIRMED -> REDEEMED, or FAILED (Poster explicitly rejected, OR no verified Poster
+// mutation mechanism exists yet — see failureReason), or UNKNOWN (ambiguous Poster result — network/timeout/malformed; NEVER auto-retried, NEVER treated
+// as REDEEMED). attemptId is the widget-supplied idempotency key: a repeat POST with the same key must return the SAME row, never create a second one or
+// mutate Poster twice — see pos-widget-reward-redemption.repository.ts.
+model RewardRedemptionAttempt {
+  id                 String    @id @default(cuid())
+  attemptId          String    @unique
+  customerId         String
+  customer           Customer      @relation(fields: [customerId], references: [id])
+  rewardProgramId    String
+  rewardProgram      RewardProgram @relation(fields: [rewardProgramId], references: [id])
+  rewardProductId    String?
+  rewardProductName  String?
+  posterAccount      String
+  posterSpotId       String?
+  posterTabletId     String?
+  posterOrderId      String
+  employeeIdentifier String?
+  status             String
+  failureReason      String?
+  redemptionId       String?   @unique
+  // Phase 22.2 — ONE POSTER ORDER = MAXIMUM ONE REWARD REDEMPTION. Set to `posterOrderId`'s own value ONLY when this row is marked REDEEMED, left
+  // null every other time (a nullable String @unique in SQLite: NULLs never collide with each other, only two actual REDEEMED rows for the SAME
+  // posterOrderId would). This is the DB-level backstop for the rule — the application-level check (findRedeemedForPosterOrderTx /
+  // findUnresolvedForPosterOrderTx, both run inside the same short "claim" transaction as the customer+program concurrency guard) is what actually
+  // stops a second attempt from ever reaching the Poster mutation in the first place; this column is defense in depth if that check is ever bypassed.
+  redeemedForPosterOrderId String? @unique
+  requestedAt        DateTime  @default(now())
+  confirmedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([rewardProgramId, customerId, status])
+  @@index([posterOrderId, status])
+  @@map("reward_redemption_attempts")
+}
+
+// Phase 23 — mirrors RewardRedemptionAttempt exactly, for promotions. A separate table from PromotionRedemption on purpose: PromotionRedemption.orderId
+// refers to a CUP Order (nullable already, but never a Poster order id); a POS-originated attempt has no CUP order at all. `benefitType` is snapshotted
+// at request time (not re-read from Promotion later) so an attempt's own audit trail never silently changes meaning if the promotion is edited afterward.
+//
+// status: REQUESTED -> POSTER_MUTATING -> REDEEMED, or FAILED (Poster explicitly rejected, ineligible, already redeemed for this order, or the benefit
+// type has no verified-safe Poster mutation — see failureReason), or UNKNOWN (ambiguous Poster result; NEVER auto-retried, NEVER treated as REDEEMED).
+// attemptId is the widget-supplied idempotency key, same discipline as RewardRedemptionAttempt.
+model PromotionRedemptionAttempt {
+  id                 String    @id @default(cuid())
+  attemptId          String    @unique
+  customerId         String
+  customer           Customer  @relation(fields: [customerId], references: [id])
+  promotionId        String
+  promotion          Promotion @relation(fields: [promotionId], references: [id])
+  promotionName      String?
+  benefitType        String
+  posterAccount      String
+  posterSpotId       String?
+  posterTabletId     String?
+  posterOrderId      String
+  employeeIdentifier String?
+  status             String
+  failureReason      String?
+  redemptionId       String?   @unique
+  // Phase 23 — ONE POSTER ORDER = MAXIMUM ONE PROMOTION REDEMPTION (mirrors Phase 22.3's redeemedForPosterOrderId exactly, and is a SEPARATE invariant
+  // from it — a reward and a promotion may each be redeemed once on the same order; this column only tracks promotions against each other).
+  redeemedForPosterOrderId String? @unique
+  requestedAt        DateTime  @default(now())
+  confirmedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([promotionId, customerId, status])
+  @@index([posterOrderId, status])
+  @@map("promotion_redemption_attempts")
+}
+
+// Phase 11: barista accounts. Deliberately NOT rows of Admin — AdminAuthGuard authorises any Admin row
+// without checking role, so a staff row there would silently be an admin. Staff have their own table,
+// their own JWT secret/audience and their own guard. There is no public signup: rows are created only
+// by an authenticated Admin (admin/staff endpoints).
+model StaffMember {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  displayName  String
+  branchId     String?
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("staff_members")
+}
+
+// Phase 11: lightweight audit of staff/admin actions on customer identity. One row per real
+// lookup/search/link/regenerate — never per UI render. Stores NO raw QR text, phone, token or initData:
+// only who (actorType STAFF|ADMIN + actorId), what (action), outcome, and which customer/branch.
+model StaffScanEvent {
+  id         String   @id @default(cuid())
+  actorType  String
+  actorId    String
+  action     String
+  result     String
+  customerId String?
+  branchId   String?
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@index([actorId, createdAt])
+  @@map("staff_scan_events")
+}
+
+// Phase 11.2: ordinary Poster POS sales, imported READ-ONLY from Poster as a record of customer activity.
+// Deliberately NOT an Order: Order means "an order CUP placed" (checkout, idempotency, notifications); a POS
+// sale is externally originated and must never inherit those semantics or appear as a CUP order. Nothing here
+// feeds loyalty or reward calculation yet (Phase 11.3). The Poster transaction id is the ONLY dedupe authority
+// (unique index); rows are never created from heuristics.
+//
+// status: IMPORTED = every line resolved; UNRESOLVED = attributable to a customer/branch but at least one line
+// could not be resolved (unmapped product, modifier, fractional quantity) — kept for audit, excluded from any
+// future qualification. No refund/void status exists because Poster's behaviour for those is not verified.
+model PosterImportedTransaction {
+  id                  String                          @id @default(cuid())
+  posterTransactionId String                          @unique
+  posterClientId      String
+  customerId          String
+  customer            Customer                        @relation(fields: [customerId], references: [id])
+  branchId            String
+  branch              Branch                          @relation(fields: [branchId], references: [id])
+  posterSpotId        Int
+  status              String
+  unresolvedReason    String?
+  posterStatus        String
+  posterPayType       String
+  occurredAt          DateTime
+  totalMinor          Int
+  paidMinor           Int
+  source              String                          @default("POS")
+  importedAt          DateTime                        @default(now())
+  createdAt           DateTime                        @default(now())
+  updatedAt           DateTime                        @updatedAt
+  items               PosterImportedTransactionItem[]
+
+  @@index([customerId, status])
+  @@map("poster_imported_transactions")
+}
+
+// One row per Poster transaction line. posterProductPriceMinor / posterPayedSumMinor are Poster's own numbers,
+// converted only by the money adapter; for the lines observed so far product_price equals the LINE total
+// (e.g. 9 x 300 -> 2700) — that is an observation, not documented Poster semantics, so no unit price is derived.
+model PosterImportedTransactionItem {
+  id                      String                    @id @default(cuid())
+  transactionId           String
+  transaction             PosterImportedTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  lineIndex               Int
+  posterProductId         String
+  productId               String?
+  product                 Product?                  @relation(fields: [productId], references: [id])
+  quantity                Int
+  posterProductPriceMinor Int
+  posterPayedSumMinor     Int
+
+  @@unique([transactionId, lineIndex])
+  @@map("poster_imported_transaction_items")
+}
+
+// Cache of the documented CUP-order -> Poster-transaction link (incomingOrders.getIncomingOrder.transaction_id).
+// Only non-null links are stored; a link, once known, never changes. This is a separate table on purpose: existing
+// Order rows are never modified.
+model PosterIncomingOrderLink {
+  id                    String   @id @default(cuid())
+  posterIncomingOrderId String   @unique
+  posterTransactionId   String   @unique
+  resolvedAt            DateTime @default(now())
+
+  @@map("poster_incoming_order_links")
+}
+
+// =====================================================================================================================
+// Phase 12 — Loyalty 2.0 (ADDITIVE ONLY). Nothing here alters an existing table's meaning. Level, XP, streak and
+// achievement PROGRESS are always derived from canonical purchases (CUP orders + IMPORTED POS); only the money-like and
+// event records below are persisted, each behind a unique constraint that makes it exactly-once.
+// =====================================================================================================================
+
+// Admin-configurable membership levels. A customer's level is DERIVED (highest active level whose minLifetimeSpend is <=
+// their lifetime spend) — never assigned. Rates are integers: cashbackRateBps is basis points (250 = 2.50%),
+// pointMultiplierPercent is a percent (150 = x1.5), so no float is ever persisted.
+model LoyaltyLevel {
+  id                     String   @id @default(cuid())
+  code                   String   @unique
+  name                   String
+  color                  String
+  icon                   String
+  minLifetimeSpend       Int
+  cashbackRateBps        Int      @default(0)
+  pointMultiplierPercent Int      @default(100)
+  prioritySupport        Boolean  @default(false)
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("loyalty_levels")
+}
+
+// One row per qualifying purchase that Loyalty 2.0 has processed (the exactly-once marker: unique (sourceType, sourceId)),
+// snapshotting the rules used at that moment. A purchase that earns nothing still gets a row so it is never re-processed.
+model LoyaltyAccrual {
+  id              String   @id @default(cuid())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  sourceType      String
+  sourceId        String
+  occurredAt      DateTime
+  amountMinor     Int
+  levelCode       String?
+  pointsAwarded   Int      @default(0)
+  cashbackMinor   Int      @default(0)
+  cashbackRateBps Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@unique([sourceType, sourceId])
+  @@index([customerId, occurredAt])
+  @@map("loyalty_accruals")
+}
+
+// Cashback wallet ledger (append-only). balance / lifetimeEarned / lifetimeSpent are aggregates of this table — there is no
+// cached wallet row. sourceType+sourceId is unique so a purchase can be credited once; SPEND rows (a future checkout
+// integration) carry no source and are not constrained.
+model CashbackTransaction {
+  id           String   @id @default(cuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  type         String
+  amountMinor  Int
+  balanceAfter Int
+  sourceType   String?
+  sourceId     String?
+  levelCode    String?
+  rateBps      Int?
+  description  String?
+  createdAt    DateTime @default(now())
+
+  @@unique([sourceType, sourceId])
+  @@index([customerId, createdAt])
+  @@map("cashback_transactions")
+}
+
+// Configurable achievement definitions. conditionType is validated against an allowlist (see loyalty2 module);
+// categoryId is only used by CATEGORY_UNITS and is chosen in Admin — never hardcoded.
+model Achievement {
+  id             String                @id @default(cuid())
+  code           String                @unique
+  name           String
+  description    String
+  icon           String
+  conditionType  String
+  conditionValue Int
+  conditionParam Int?
+  categoryId     String?
+  rewardPoints   Int                   @default(0)
+  isActive       Boolean               @default(true)
+  sortOrder      Int                   @default(0)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  unlocks        CustomerAchievement[]
+
+  @@map("achievements")
+}
+
+model CustomerAchievement {
+  id            String      @id @default(cuid())
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  unlockedAt    DateTime    @default(now())
+  pointsAwarded Int         @default(0)
+
+  @@unique([customerId, achievementId])
+  @@map("customer_achievements")
+}
+
+// LEVEL_UP history event — one per (customer, level) ever reached; the name is a snapshot.
+model LoyaltyLevelUp {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  levelCode  String
+  levelName  String
+  reachedAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, levelCode])
+  @@map("loyalty_level_ups")
+}
+
+// One birthday reward per customer per calendar year. Foundation: eligibility is derived; recording a claim is an internal
+// service call only (no customer/admin endpoint grants it yet).
+model BirthdayRewardClaim {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  year       Int
+  points     Int      @default(0)
+  claimedAt  DateTime @default(now())
+
+  @@unique([customerId, year])
+  @@map("birthday_reward_claims")
+}
+
+// Phase 14 — Referral System. Phase 12 created this table as an unused foundation (referrer, referred, status, createdAt); Phase 14
+// EXTENDS it additively (every new column is nullable, so the migration is plain ALTER TABLE ADD COLUMN — nothing is rebuilt or dropped).
+// One row per REFERRED customer (referredCustomerId is unique: the first valid attribution wins and can never be overwritten). A row is
+// created only by a valid /start ref_<code> attribution — never for a click, a rejected attempt or a repeated /start.
+// status is a plain validated string: ATTRIBUTED -> REGISTERED -> QUALIFIED -> REWARDED, or a terminal EXPIRED / REJECTED / INVALID
+// (closedAt + closeReason). The legacy default "PENDING" is never written by Phase 14 code. status is a projection: the ReferralReward rows
+// are the proof of what was actually granted.
+model Referral {
+  id                    String           @id @default(cuid())
+  referrerCustomerId    String
+  referrer              Customer         @relation("ReferrerRel", fields: [referrerCustomerId], references: [id])
+  referredCustomerId    String           @unique
+  referred              Customer         @relation("ReferredRel", fields: [referredCustomerId], references: [id])
+  status                String           @default("PENDING")
+  createdAt             DateTime         @default(now())
+  // Phase 14 (all nullable — see above)
+  referralCode          String? // the public code body the friend arrived with (audit)
+  attributedAt          DateTime?
+  registeredAt          DateTime?
+  qualifiedAt           DateTime?
+  rewardedAt            DateTime?
+  closedAt              DateTime?
+  closeReason           String?
+  qualifyingPurchaseKey String? // "CUP_ORDER:<orderId>" | "POS:<transactionId>" — the purchase that qualified it
+  qualifyingAmountMinor Int?
+  checkedAt             DateTime? // last time the qualification job looked at it (round-robin fairness for the bounded batch)
+  updatedAt             DateTime?        @updatedAt
+  rewards               ReferralReward[]
+
+  @@index([referrerCustomerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, checkedAt])
+  @@map("referrals")
+}
+
+// A customer's PUBLIC referral code (e.g. REF-7K4M9X2P shown; only the 8-character body is stored). Random (crypto.randomInt), non-sequential
+// and independent of Customer.id, the Telegram id, the phone and the Poster id. Deliberately NOT the loyaltyCode: that one is scanned by staff
+// at the till, so it must never be shared publicly. Created lazily on the customer's first request while the program is on.
+model ReferralCode {
+  id         String   @id @default(cuid())
+  customerId String   @unique
+  customer   Customer @relation(fields: [customerId], references: [id])
+  code       String   @unique
+  createdAt  DateTime @default(now())
+
+  @@map("referral_codes")
+}
+
+// The independent proof of one reward decision for one beneficiary of one referral. (referralId, beneficiary) is unique, so a reward can
+// never be decided twice however many workers race. GRANTED rows link to the LoyaltyTransaction that was written in the SAME transaction
+// (the existing points ledger — no parallel ledger). ordinal numbers a referrer's GRANTED rewards 1..N; unique (customerId, beneficiary,
+// ordinal) is what makes maxSuccessfulReferrals race-proof across DIFFERENT referrals of the same referrer.
+model ReferralReward {
+  id                   String   @id @default(cuid())
+  referralId           String
+  referral             Referral @relation(fields: [referralId], references: [id])
+  beneficiary          String // REFERRER | REFERRED
+  customerId           String
+  customer             Customer @relation(fields: [customerId], references: [id])
+  rewardType           String // POINTS (CASHBACK is reserved, not yet supported)
+  status               String // GRANTED | SKIPPED
+  skipReason           String?
+  points               Int      @default(0)
+  loyaltyTransactionId String?  @unique
+  ordinal              Int?
+  createdAt            DateTime @default(now())
+
+  @@unique([referralId, beneficiary])
+  @@unique([customerId, beneficiary, ordinal])
+  @@index([customerId])
+  @@map("referral_rewards")
+}
+
+// =====================================================================================================================
+// Phase 13 — CRM Automation (ADDITIVE ONLY). An Automation is WHEN / WHY / WHO / HOW OFTEN; the Campaign it references stays
+// WHAT MESSAGE / WHICH CHANNEL. Nothing here alters an existing table's meaning.
+// =====================================================================================================================
+
+// status / triggerType are plain validated strings (no Prisma enums — SQLite convention). triggerConfig is strictly validated JSON
+// text (zod, per trigger type) on every write and again on every load. eventCursor is this automation's consumer offset over
+// the canonical purchase / cart / customer streams; lastRunKey is the compare-and-set claim for once-per-day / once-per-schedule
+// work (birthday scan, scheduled segment run) so two runners can never both perform it.
+model Automation {
+  id                  String               @id @default(cuid())
+  name                String
+  description         String?
+  status              String               @default("DRAFT")
+  triggerType         String
+  triggerConfig       String
+  campaignId          String
+  campaign            Campaign             @relation(fields: [campaignId], references: [id])
+  segmentId           String?
+  segment             Segment?             @relation(fields: [segmentId], references: [id], onDelete: Restrict)
+  cooldownHours       Int                  @default(24)
+  maxSendsPerCustomer Int?
+  activatedAt         DateTime?
+  eventCursor         String?
+  lastRunKey          String?
+  lastRunAt           DateTime?
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  executions          AutomationExecution[]
+
+  @@map("automations")
+}
+
+// One row per (automation, trigger key): the DECISION record AND the send queue. The unique (automationId, triggerKey) is what
+// makes a trigger fire at most once. PENDING = decided to send, waiting (quiet hours / delay / gate); SENT / FAILED = a send was
+// attempted (Telegram only ever confirms acceptance); SKIPPED carries a reason. claimedAt is the atomic claim so two runners
+// never process the same row.
+model AutomationExecution {
+  id                String     @id @default(cuid())
+  automationId      String
+  automation        Automation @relation(fields: [automationId], references: [id])
+  customerId        String
+  customer          Customer   @relation(fields: [customerId], references: [id])
+  campaignId        String
+  triggerKey        String
+  status            String     @default("PENDING")
+  reason            String?
+  notBeforeAt       DateTime?
+  claimedAt         DateTime?
+  telegramMessageId String?
+  errorCode         String?
+  createdAt         DateTime   @default(now())
+  decidedAt         DateTime?
+  sentAt            DateTime?
+
+  @@unique([automationId, triggerKey])
+  @@index([status, notBeforeAt])
+  @@index([customerId, createdAt])
+  @@index([automationId, createdAt])
+  @@map("automation_executions")
+}
+
+// Reservation ledger for cooldown + frequency cap: ordinal 1, 2, 3... per (automation, customer). Reserving the NEXT ordinal is a
+// unique insert, so two concurrent sends for the same customer serialize in the database (the loser retries, sees the winner's
+// slot and is skipped). Attempted sends count; previews, skips and validation failures never create a slot.
+model AutomationSendSlot {
+  id           String   @id @default(cuid())
+  automationId String
+  customerId   String
+  ordinal      Int
+  executionId  String   @unique
+  createdAt    DateTime @default(now())
+
+  @@unique([automationId, customerId, ordinal])
+  @@index([customerId, createdAt])
+  @@map("automation_send_slots")
+}
+
+// Reservation ledger for the GLOBAL per-customer daily cap across all automations: slot 1..dailyLimit per (customer, business
+// day). The unique constraint is the cap under concurrency.
+model CrmDailySlot {
+  id          String   @id @default(cuid())
+  customerId  String
+  dayKey      String
+  slot        Int
+  executionId String   @unique
+  createdAt   DateTime @default(now())
+
+  @@unique([customerId, dayKey, slot])
+  @@map("crm_daily_slots")
+}
+
+// =====================================================================================================================
+// Phase 20 — Poster webhook continuous sync (ADDITIVE ONLY). A webhook is only a HINT that a Poster entity changed (the documented payload carries
+// no transaction data): one row per DISTINCT delivery, deduplicated by (object, object_id, action, time) because Poster documents no event id and
+// retries the same delivery up to 15 times. Rows are the durable queue the background processor works from; the imported transaction itself still
+// lives in poster_imported_transactions and is always re-read from Poster's API.
+// =====================================================================================================================
+model PosterWebhookEvent {
+  id              String    @id @default(cuid())
+  dedupeKey       String    @unique // "<object>:<object_id>:<action>:<time>"
+  object          String
+  objectId        String
+  action          String
+  eventAt         DateTime // Poster's `time` (Unix seconds)
+  account         String? // Poster's `account` (a public account name, not a secret)
+  status          String    @default("QUEUED") // QUEUED | PROCESSING | DONE | DEAD
+  deliveries      Int       @default(1) // how many times Poster delivered this same event
+  attempts        Int       @default(0) // FAILED processing attempts (a deliberate deferral is not an attempt)
+  nextAttemptAt   DateTime  @default(now())
+  lockedAt        DateTime? // processing lease start (a stale lease is reclaimed after a crash)
+  outcome         String?
+  lastError       String?
+  receivedAt      DateTime  @default(now())
+  lastDeliveredAt DateTime  @default(now())
+  processedAt     DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([object, objectId])
+  @@index([receivedAt])
+  @@map("poster_webhook_events")
+}

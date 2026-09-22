@@ -1,0 +1,20 @@
+{
+  "response": [
+    {
+      "spot_id": "1",
+      "name": null,
+      "spot_name": "iwyoqar",
+      "spot_adress": "",
+      "region_id": null,
+      "lat": null,
+      "lng": null,
+      "storages": [
+        {
+          "storage_id": 1,
+          "storage_name": "Склад 1",
+          "storage_adress": ""
+        }
+      ]
+    }
+  ]
+}
