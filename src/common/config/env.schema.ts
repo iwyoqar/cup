@@ -70,7 +70,7 @@ export const envSchema = z.object({
   POSTER_APPLICATION_SECRET: z.string().min(8).optional(),
   POSTER_ACCOUNT: z.string().trim().min(1).max(64).optional(),
   POSTER_SYNC_TICK_MS: z.coerce.number().int().min(1000).default(15000),
-  POSTER_RECONCILE_INTERVAL_MS: z.coerce.number().int().min(60000).default(600000),
+  POSTER_RECONCILE_INTERVAL_MS: z.coerce.number().int().min(60000).default(60000),
   // The reconciliation is CHECKPOINT-based (Settings key poster.sync.reconcileCheckpoint): it resumes from the last successfully reconciled moment, however long CUP
   // was down. LOOKBACK_DAYS is only the INITIAL checkpoint (how far back the very first run looks when no checkpoint exists yet). OVERLAP_MINUTES is the safety margin
   // each pass re-reads BEFORE the checkpoint (clock skew, receipts that reach Poster's API a little late); re-reading is harmless because imports are idempotent.
