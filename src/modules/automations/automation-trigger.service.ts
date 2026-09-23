@@ -120,11 +120,13 @@ export class AutomationTriggerService {
     const { events, prevT, lastT } = await this.streamBatch(cursor, ctx);
     if (events.length === 0) return EMPTY;
     const ids = [...new Set(events.map((e) => e.customerId))];
-    // Credits EARNED (floor(units / buyQuantity)) by the end of this batch minus those already earned before it — redemptions never reduce earned
-    // credits, so redeeming does not create or hide an unlock. The count uses the reward engine's own qualifying-unit definition.
+    // Credits EARNED (floor(visits / buyQuantity)) by the end of this batch minus those already earned before it — redemptions never reduce earned
+    // credits, so redeeming does not create or hide an unlock. Must use the SAME qualifying-VISIT definition as RewardProgressService.getProgress
+    // (countQualifyingOccasions — owner decision 2026-09-24: distinct qualifying orders/transactions, never summed item quantity), or this trigger
+    // could fire "reward unlocked" at a different threshold than the reward engine itself actually grants at.
     const [before, upTo] = await Promise.all([
-      this.rewardProgress.sumQualifyingQuantityForCustomers(ids, program.qualifyingCategoryId, new Date(prevT)),
-      this.rewardProgress.sumQualifyingQuantityForCustomers(ids, program.qualifyingCategoryId, new Date(lastT)),
+      this.rewardProgress.countQualifyingOccasionsForCustomers(ids, program.qualifyingCategoryId, new Date(prevT)),
+      this.rewardProgress.countQualifyingOccasionsForCustomers(ids, program.qualifyingCategoryId, new Date(lastT)),
     ]);
     const out: TriggerCandidate[] = [];
     for (const id of ids) {

@@ -5,21 +5,24 @@ import { RewardProgramRecord, RewardProgress } from './reward-program.types';
 
 // The ONE place reward progress is computed — no cached "progress" field anywhere (spec's
 // explicit instruction). Both qualifyingCount and availableRewards are pure functions of two
-// bounded numbers: total qualifying units ever purchased (RewardProgressRepository — since Phase
-// 11.3 the SUM of qualifying CUP order items and qualifying imported Poster POS items, two
-// local aggregate queries, one purchase history and one balance) and total redemptions ever
-// recorded (RewardRedemptionsRepository, one count query) — never a per-order-item loop, never
-// N+1, never a Poster call. POS refunds/returns are not modelled (Poster behaviour unverified).
+// bounded numbers: total qualifying VISITS ever made (RewardProgressRepository.countQualifyingOccasions
+// — since 2026-09-24, one CUP order or one imported Poster POS transaction with at least one
+// qualifying line item counts as ONE, regardless of how many qualifying items or what quantity that
+// visit contains; owner decision — buying 5 coffees in a single visit must not by itself complete a
+// "5 visits" cycle) and total redemptions ever recorded (RewardRedemptionsRepository, one count
+// query) — never a per-order-item loop, never N+1, never a Poster call. POS refunds/returns are not
+// modelled (Poster behaviour unverified).
 //
 // The math (verified against every example in the spec):
 //   totalEarned      = floor(totalQualifying / buyQuantity)
 //   availableRewards = max(0, totalEarned - redeemedCount)
 //   qualifyingCount  = totalQualifying % buyQuantity
-// A redemption never deletes or alters past OrderItem rows — "the cycle resetting" falls out
-// entirely from redeemedCount increasing, with no separate reset step required. E.g. 10
-// qualifying units, buyQuantity 5, 1 prior redemption -> totalEarned=2, availableRewards=1,
-// qualifyingCount=0 (the two already-complete cycles are fully absorbed into
-// totalEarned/availableRewards, never double-counted into qualifyingCount).
+// (totalQualifying here is a count of qualifying VISITS, not units — see above.) A redemption never
+// deletes or alters past Order/PosterImportedTransaction rows — "the cycle resetting" falls out
+// entirely from redeemedCount increasing, with no separate reset step required. E.g. 10 qualifying
+// visits, buyQuantity 5, 1 prior redemption -> totalEarned=2, availableRewards=1, qualifyingCount=0
+// (the two already-complete cycles are fully absorbed into totalEarned/availableRewards, never
+// double-counted into qualifyingCount).
 @Injectable()
 export class RewardProgressService {
   constructor(
@@ -35,7 +38,7 @@ export class RewardProgressService {
     for (let i = 0; i < customerIds.length; i += CHUNK) {
       const ids = customerIds.slice(i, i + CHUNK);
       const [qualifying, redeemed] = await Promise.all([
-        this.progressRepository.sumQualifyingQuantityForCustomers(ids, program.qualifyingCategoryId),
+        this.progressRepository.countQualifyingOccasionsForCustomers(ids, program.qualifyingCategoryId),
         this.redemptionsRepository.countsForCustomers(program.id, ids),
       ]);
       for (const id of ids) {
@@ -48,8 +51,11 @@ export class RewardProgressService {
   }
 
   async getProgress(program: RewardProgramRecord, customerId: string): Promise<RewardProgress> {
+    // Owner decision (2026-09-24): counts distinct qualifying VISITS (one CUP order or one imported POS
+    // transaction with at least one qualifying item = 1), never the summed item quantity within a visit
+    // — see countQualifyingOccasions's own comment in reward-progress.repository.ts.
     const [totalQualifying, redeemedCount] = await Promise.all([
-      this.progressRepository.sumQualifyingQuantity(customerId, program.qualifyingCategoryId),
+      this.progressRepository.countQualifyingOccasions(customerId, program.qualifyingCategoryId),
       this.redemptionsRepository.countForCustomer(program.id, customerId),
     ]);
     const totalEarned = Math.floor(totalQualifying / program.buyQuantity);

@@ -46,6 +46,74 @@ export class RewardProgressRepository {
     return this.sumQualifyingQuantityWith(tx, customerId, categoryId);
   }
 
+  // Owner decision (2026-09-24): the "5+1"-style BUY_X_GET_Y reward counts DISTINCT qualifying
+  // PURCHASES (one CUP order = 1, one imported POS transaction = 1), never the summed item quantity
+  // within a purchase — buying 5 coffees in a single visit must NOT by itself complete a "5 visits"
+  // cycle; only 5 separate qualifying visits do. This is a DIFFERENT counting rule from
+  // sumQualifyingQuantity above, which stays exactly as-is for its other consumers (Loyalty2's
+  // CATEGORY_UNITS achievement, the LOYALTY_MILESTONE lifetimeCoffeeQuantity metric — both genuinely
+  // mean "total units/coffees ever bought", not "number of visits"). Only reward-progress.service.ts,
+  // reward-redemption.service.ts's re-check, and automation-trigger.service.ts's REWARD_UNLOCKED
+  // trigger (which must match the reward engine's own math) use this.
+  countQualifyingOccasions(customerId: string, categoryId: string): Promise<number> {
+    return this.countQualifyingOccasionsWith(this.prisma, customerId, categoryId);
+  }
+
+  countQualifyingOccasionsTx(tx: Db, customerId: string, categoryId: string): Promise<number> {
+    return this.countQualifyingOccasionsWith(tx, customerId, categoryId);
+  }
+
+  // Bulk variant, same "1 per qualifying order/transaction" rule as countQualifyingOccasions, with the
+  // same optional `upTo` cursor semantics as sumQualifyingQuantityForCustomers.
+  async countQualifyingOccasionsForCustomers(customerIds: string[], categoryId: string, upTo?: Date): Promise<Map<string, number>> {
+    const result = new Map<string, number>(customerIds.map((id) => [id, 0]));
+    if (customerIds.length === 0) return result;
+    const [cupOrders, posTransactions] = await Promise.all([
+      this.prisma.order.findMany({
+        where: {
+          customerId: { in: customerIds },
+          status: { in: [...CUSTOMER_METRICS_ORDER_STATUSES] },
+          ...(upTo ? { createdAt: { lte: upTo } } : {}),
+          items: { some: { isRewardItem: false, product: { categoryId } } },
+        },
+        select: { customerId: true },
+      }),
+      this.prisma.posterImportedTransaction.findMany({
+        where: {
+          customerId: { in: customerIds },
+          status: IMPORTED_POS_STATUS,
+          paidMinor: { gt: 0 },
+          ...(upTo ? { importedAt: { lte: upTo } } : {}),
+          items: { some: { quantity: { gt: 0 }, posterPayedSumMinor: { gt: 0 }, product: { categoryId } } },
+        },
+        select: { customerId: true },
+      }),
+    ]);
+    for (const o of cupOrders) result.set(o.customerId, (result.get(o.customerId) ?? 0) + 1);
+    for (const t of posTransactions) result.set(t.customerId, (result.get(t.customerId) ?? 0) + 1);
+    return result;
+  }
+
+  // A qualifying order/transaction is one that has AT LEAST ONE qualifying line — filtered with the
+  // exact same predicates sumCupQuantity/sumImportedPosQuantity use per-line, just counting the
+  // parent row once (via `some`) instead of summing every matching line's quantity.
+  private async countQualifyingOccasionsWith(db: Db, customerId: string, categoryId: string): Promise<number> {
+    const [cupCount, posCount] = await Promise.all([
+      db.order.count({
+        where: { customerId, status: { in: [...CUSTOMER_METRICS_ORDER_STATUSES] }, items: { some: { isRewardItem: false, product: { categoryId } } } },
+      }),
+      db.posterImportedTransaction.count({
+        where: {
+          customerId,
+          status: IMPORTED_POS_STATUS,
+          paidMinor: { gt: 0 },
+          items: { some: { quantity: { gt: 0 }, posterPayedSumMinor: { gt: 0 }, product: { categoryId } } },
+        },
+      }),
+    ]);
+    return cupCount + posCount;
+  }
+
   private async sumQualifyingQuantityWith(db: Db, customerId: string, categoryId: string): Promise<number> {
     const [cup, pos] = await Promise.all([this.sumCupQuantity(db, customerId, categoryId), this.sumImportedPosQuantity(db, customerId, categoryId)]);
     return cup + pos;

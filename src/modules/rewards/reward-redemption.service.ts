@@ -131,8 +131,11 @@ export class RewardRedemptionService {
   // Order at all) can pass `null` and still record which RewardRedemption it produced. Existing callers (orders.service.ts) are unaffected: they still pass
   // a real CUP order id and simply do not use the now-available return value.
   async createRedemptionRecord(tx: PrismaTransactionClient, reward: ResolvedCheckoutReward, customerId: string, orderId: string | null): Promise<string> {
+    // Owner decision (2026-09-24): counts distinct qualifying visits, not summed item quantity —
+    // MUST use the same counting rule as RewardProgressService.getProgress, or this re-check could
+    // refuse (or wrongly allow) a redemption the customer-facing progress display already promised.
     const [totalQualifying, currentCount] = await Promise.all([
-      this.progressRepository.sumQualifyingQuantityTx(tx, customerId, reward.qualifyingCategoryId),
+      this.progressRepository.countQualifyingOccasionsTx(tx, customerId, reward.qualifyingCategoryId),
       this.redemptionsRepository.countForCustomerTx(tx, reward.programId, customerId),
     ]);
     const totalEarned = Math.floor(totalQualifying / reward.buyQuantitySnapshot);
