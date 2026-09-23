@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { PosterWebhookService } from './poster-webhook.service';
 
@@ -7,6 +7,13 @@ import { PosterWebhookService } from './poster-webhook.service';
 @Controller('webhooks')
 export class PosterWebhookController {
   constructor(private readonly webhook: PosterWebhookService) {}
+
+  // Poster's dashboard "Check" button GETs this exact URL before accepting it as a webhook target — it only ever
+  // verifies reachability (200), never delivers a real event this way. Real events always arrive as POST.
+  @Get('poster')
+  check() {
+    return { status: 'ok' };
+  }
 
   @Post('poster')
   @HttpCode(200)
