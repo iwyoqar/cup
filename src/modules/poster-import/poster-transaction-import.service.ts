@@ -360,7 +360,13 @@ export class PosterTransactionImportService {
       if (tx.posterStatus !== '2') { skip('NOT_CLOSED'); continue; }
       if (tx.posterPayType === '0' || tx.paidMinor <= 0 || tx.totalMinor <= 0) { skip('NOT_A_PAID_SALE'); continue; }
       if (tx.posterClientId === null) { skip('NO_CLIENT'); continue; }
-      if (now - tx.occurredAt.getTime() < settleMs) { skip('TOO_RECENT'); continue; }
+      // Owner decision (2026-09-24): the settling wait exists ONLY to give Poster time to report a CUP-created order's
+      // receipt link before this receipt might otherwise be imported as a bare POS sale and double-counted (see the
+      // CUP_ORIGINATED check above and the APPLICATION_ID_UNLINKED skip below). Poster stamps EVERY receipt created
+      // through CUP's own incoming-order API with application_id (UNDOCUMENTED, but consistently observed) — a receipt
+      // without it could never be a CUP order in the first place, so there is nothing for it to be confused with and no
+      // reason to wait at all. Only an application_id-bearing receipt still needs the wait.
+      if (hasApplicationId(raw) && now - tx.occurredAt.getTime() < settleMs) { skip('TOO_RECENT'); continue; }
 
       if (!customer) { skip('CLIENT_NOT_LINKED'); continue; }
       if (!branch) { skip('BRANCH_NOT_MAPPED'); continue; }
