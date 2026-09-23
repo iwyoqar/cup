@@ -42,6 +42,12 @@ export interface PosterProduct {
   // every product to fail category lookup on the first real catalog sync — caught cleanly by
   // the per-product skip/report handling, not a crash. Corrected against the real payload.
   menu_category_id: string;
+  // VERIFIED live (2026-09-23): Poster reports this directly on the product even when
+  // menu_category_id is "0" (its own sentinel for "unfiled / on the register's Top screen quick-access
+  // grid, not under any category tab") — every such product carries the literal value "Top screen".
+  // catalog.service.ts uses it as a fallback category name so these products are never silently
+  // dropped from CUP's catalog. See CatalogService.sync() for the incident this fixes.
+  category_name: string;
   // VERIFIED live: keyed by spot_id (string), e.g. {"1": "300"} — the original assumption
   // about this structure was correct.
   price: Record<string, string>;
