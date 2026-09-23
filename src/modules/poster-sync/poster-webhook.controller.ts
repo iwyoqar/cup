@@ -9,14 +9,24 @@ export class PosterWebhookController {
   constructor(private readonly webhook: PosterWebhookService) {}
 
   // Poster's dashboard "Check" button GETs this exact URL before accepting it as a webhook target — it only ever
-  // verifies reachability, never delivers a real event this way (real events always arrive as POST).
-  // EXPERIMENTAL (2026-09-23): {"status":"accept"} — the one documented acknowledgement shape (en/web/webhooks.md)
-  // — did NOT make Poster's dashboard Check pass, despite the GET itself verified fast/correct (200, clean TLS
-  // chain). Trying {"status":"200"} as an undocumented probe at the operator's explicit request; revert to
-  // "accept" (or drop this route entirely) if this doesn't help either — it has no documentation support.
+  // verifies reachability, never delivers a real event this way (real events always arrive as POST). The body
+  // matches the ONE documented acknowledgement shape ({"status":"accept"} — en/web/webhooks.md).
+  //
+  // KNOWN ISSUE (2026-09-23, unresolved, not a CUP bug): Poster's dashboard "Check" button still shows a red X
+  // against this endpoint even though it was independently verified healthy — GET/HEAD both return a clean,
+  // fast 200 with this exact body, and the TLS chain is valid (openssl s_client: Verify return code 0). An
+  // undocumented {"status":"200"} probe was also tried live and did not help either. The problem is on Poster's
+  // side (its own Check feature, or something about how its check reaches this host) — do not "fix" this again
+  // by guessing more response shapes without new evidence. POSTER_SYNC_ENABLED's reconciliation loop (see
+  // poster-reconcile.service.ts) is the fully-working fallback in the meantime: every closed receipt is picked
+  // up within POSTER_RECONCILE_INTERVAL_MS regardless of whether any webhook ever arrives, so nothing is lost —
+  // only near-real-time delivery is missing. Revisit only if Poster support identifies a real cause, or if
+  // POSTER_APPLICATION_SECRET/the account's webhook entity selection turn out to be misconfigured on Poster's
+  // side (unverified — the dashboard would not let "Receive webhooks by" register a selection during this
+  // investigation either, a separate symptom that was never resolved).
   @Get('poster')
   check() {
-    return { status: '200' };
+    return { status: 'accept' };
   }
 
   @Post('poster')
