@@ -1,5 +1,31 @@
 # Changelog
 
+## Fix — real POS purchases no longer wait 10 minutes to appear in reward progress (2026-09-24)
+
+Root cause: `POSTER_IMPORT_SETTLE_SECONDS` (10 min) was applied to EVERY closed receipt uniformly, but it only ever protected against one specific race — a CUP Mini App checkout receipt being imported as a bare POS sale before Poster reports its `incoming_order.transaction_id` link back (see `TOO_RECENT`'s own original comment: "a settling delay... it only gives Poster time to report the receipt link of a CUP-created order first"). A receipt rung up directly at the register was never at risk of that race, yet waited the same 10 minutes for no reason.
+
+Fixed: the wait now only applies to receipts carrying Poster's `application_id` marker (undocumented, but consistently observed — verified live against 78 real transactions: every known CUP-order receipt has it, every register-rung receipt does not). A receipt without it skips straight to the normal closed/paid/client-linked checks — no wait at all.
+
+Not changed: `POSTER_RECONCILE_INTERVAL_MS`'s 60-second floor (`env.schema.ts`, `min(60000)`) — deliberately left in place. The reconciliation loop re-scans a multi-day Poster window every tick; running it every few seconds would put continuous heavy load on Poster's API for a purely cosmetic latency gain, with a real risk of the account being rate-limited. Real observed latency for a POS-native purchase is now bounded by the reconciliation tick alone: 0–60 seconds (previously up to ~11 minutes). Sub-minute, near-instant delivery would need working Poster webhooks, which remain blocked on Poster's own side (Phase 27.1, parked).
+
+`npx tsc --noEmit` and `npm run build` both clean.
+
+## Behavior change — "5+1"-style rewards now count VISITS, not units (2026-09-24)
+
+Owner decision: a customer buying 5 coffees in a single visit must NOT by itself complete a "5 visits, 6th free" cycle — only 5 separate qualifying purchases do, matching the classic punch-card model. One CUP order or one imported Poster POS transaction, containing at least one qualifying-category item, now counts as exactly 1 toward the threshold regardless of how many qualifying items or what quantity that visit contains (2 different coffees in the same receipt still count as 1 visit, per the owner's explicit choice).
+
+Added `RewardProgressRepository.countQualifyingOccasions(ForCustomers/Tx)` (`reward-progress.repository.ts`) alongside the existing `sumQualifyingQuantity*` methods, which are kept unchanged and still mean "total units ever bought" — Loyalty2's `CATEGORY_UNITS` achievement and the CRM `LOYALTY_MILESTONE` "lifetimeCoffeeQuantity" metric still need that original meaning and were deliberately left untouched. Switched to the new occasion-counting method: `RewardProgressService.getProgress`/`getAvailableForCustomers` (customer-facing progress/eligibility), `RewardRedemptionService.createRedemptionRecord`'s transaction-consistent re-check (must match the same rule the progress display promised), and `automation-trigger.service.ts`'s `REWARD_UNLOCKED` trigger (must match the reward engine's own math or CRM messages would fire at the wrong threshold).
+
+Verified against real local data: an existing customer's totals genuinely differ under the two rules (58 summed units vs. 14 qualifying visits), confirming the new query runs correctly against real purchase history. `npx tsc --noEmit` and `npm run build` both clean.
+
+## Bug fix — 24 of 29 products missing from CUP's catalog (2026-09-23)
+
+Root cause: these products all carry `menu_category_id: "0"` from Poster's `menu.getProducts` — Poster's own sentinel for "on the register's Top screen quick-access grid, filed under no category tab", not a data error (Poster reports the literal `category_name: "Top screen"` directly on each). `CatalogService.sync()` treated an unresolvable category as a skip, so all 24 (both Cappuccino sizes, Latte, Flat White, Raf, Mocha, Cortado, iced drinks, pastries, water, add-ons) were silently absent from `Product` — never importable, never reward-eligible, never visible in CUP.
+
+Fixed: `sync()` now creates a real fallback `Category` for any `menu_category_id` not covered by Poster's category list, named from the product's own `category_name` (never invented). `PosterProduct` gained the `category_name` field. Verified live: 29/29 products now sync (previously 5/29). Continuous sync (`CatalogSyncJob`, every 5 min, already running since Phase 0) needed no changes — production self-heals on its next tick after deploy.
+
+Owner decision applied same day: 16 of the 24 (Cappuccino x2, Latte x2, Flat White, Raf, Mocha, Cortado, iced Americano/Latte, Cold Brew, Espresso Tonic, Affogato, Pourover, guest Espresso, extra Espresso shot) are real coffee drinks and are explicitly filed into the real "Кофе" category (`TOP_SCREEN_COFFEE_PRODUCT_IDS` in `catalog.service.ts`, a named/reviewable list, not name-inference) — they now count toward the "5+1" reward. The remaining 8 (water, pastries, milk/syrup add-ons) stay under "Top screen" and do not. Verified live: "Кофе" now has 20 active products, 29/29 total still sync.
+
 ## Phase 27.1 — production Poster webhook verification (2026-09-23)
 
 Audited and live-verified the Phase 20 webhook/reconciliation pipeline against the real production account. No architectural or code defect found — reconciliation is healthy and is the fully-working sync path today (checkpoint advancing every 60s, `ok: true`, `caughtUp: true`, nothing lost). Webhook delivery has never fired because the URL was never saved on Poster's own dashboard; attempting to save it hit an unresolved Poster-side blocker (dashboard "Check" fails even though the endpoint is independently verified healthy — 200 responses, valid TLS chain, documented response body). Two response-body experiments (`{"status":"accept"}` matching docs, then an undocumented `{"status":"200"}` probe at the owner's request) were tried live and neither changed the outcome; reverted to the documented value. Parked — `POSTER_SYNC_ENABLED` stays on, reconciliation continues as the primary mechanism in practice. Re-audited duplicate-safety guarantees (webhook dedupeKey, import pre-check, `posterTransactionId` unique constraint) — all three confirmed intact and unchanged.
