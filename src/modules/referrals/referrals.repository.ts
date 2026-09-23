@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Db, PrismaService } from '../../common/prisma/prisma.service';
+import { epochMsCastSql, epochMsParam } from '../../common/prisma/sql-dialect';
 import { CUSTOMER_METRICS_ORDER_STATUSES } from '../customer-metrics/customer-metrics-order-statuses';
 import { PENDING_STATUSES, REFERRAL_EVENT_TYPES, ReferralEvent, ReferralEventType, ReferralStatus } from './referral.types';
 
@@ -77,7 +78,7 @@ export class ReferralsRepository {
   // (`expiredBeforeMs`, null = the window never expires). Least-recently-checked first (never-checked first), so a full batch can never starve the rest.
   // The purchase predicate is the canonical one (CUSTOMER_METRICS_ORDER_STATUSES orders + IMPORTED POS rows) used everywhere else.
   async pendingCandidateIds(expiredBeforeMs: number | null, limit: number): Promise<string[]> {
-    const expired = expiredBeforeMs === null ? Prisma.empty : Prisma.sql`OR COALESCE(r."attributedAt", r."createdAt") < ${expiredBeforeMs}`;
+    const expired = expiredBeforeMs === null ? Prisma.empty : Prisma.sql`OR COALESCE(r."attributedAt", r."createdAt") < ${epochMsParam(expiredBeforeMs)}`;
     const rows = await this.prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
       SELECT r."id" AS id FROM "referrals" r
       WHERE r."status" IN (${Prisma.join([...PENDING_STATUSES])})
@@ -229,13 +230,13 @@ export class ReferralsRepository {
     const after = cursor ? Prisma.sql`AND (t > ${cursor.t} OR (t = ${cursor.t} AND (type > ${cursor.type} OR (type = ${cursor.type} AND id > ${cursor.id}))))` : Prisma.empty;
     const rows = await this.prisma.$queryRaw<{ t: bigint | number; type: string; id: string; referrer: string; referred: string }[]>(Prisma.sql`
       SELECT t, type, id, referrer, referred FROM (
-        SELECT CAST("attributedAt" AS INTEGER) AS t, 'REFERRAL_ATTRIBUTED' AS type, "id" AS id, "referrerCustomerId" AS referrer, "referredCustomerId" AS referred FROM "referrals" WHERE "attributedAt" IS NOT NULL
+        SELECT ${epochMsCastSql('"attributedAt"')} AS t, 'REFERRAL_ATTRIBUTED' AS type, "id" AS id, "referrerCustomerId" AS referrer, "referredCustomerId" AS referred FROM "referrals" WHERE "attributedAt" IS NOT NULL
         UNION ALL
-        SELECT CAST("registeredAt" AS INTEGER), 'REFERRAL_REGISTERED', "id", "referrerCustomerId", "referredCustomerId" FROM "referrals" WHERE "registeredAt" IS NOT NULL
+        SELECT ${epochMsCastSql('"registeredAt"')}, 'REFERRAL_REGISTERED', "id", "referrerCustomerId", "referredCustomerId" FROM "referrals" WHERE "registeredAt" IS NOT NULL
         UNION ALL
-        SELECT CAST("qualifiedAt" AS INTEGER), 'REFERRAL_QUALIFIED', "id", "referrerCustomerId", "referredCustomerId" FROM "referrals" WHERE "qualifiedAt" IS NOT NULL
+        SELECT ${epochMsCastSql('"qualifiedAt"')}, 'REFERRAL_QUALIFIED', "id", "referrerCustomerId", "referredCustomerId" FROM "referrals" WHERE "qualifiedAt" IS NOT NULL
         UNION ALL
-        SELECT CAST("rewardedAt" AS INTEGER), 'REFERRAL_REWARDED', "id", "referrerCustomerId", "referredCustomerId" FROM "referrals" WHERE "rewardedAt" IS NOT NULL
+        SELECT ${epochMsCastSql('"rewardedAt"')}, 'REFERRAL_REWARDED', "id", "referrerCustomerId", "referredCustomerId" FROM "referrals" WHERE "rewardedAt" IS NOT NULL
       ) WHERE t >= ${sinceMs} ${after} ORDER BY t, type, id LIMIT ${limit}`);
     return rows
       .filter((r) => (REFERRAL_EVENT_TYPES as readonly string[]).includes(r.type))

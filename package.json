@@ -17,6 +17,7 @@
     "render:build": "npm ci && npm run prisma:generate:prod && tsc -p tsconfig.json",
     "render:start": "npm run prisma:migrate:prod && node dist/src/main.js",
     "seed": "ts-node prisma/seed.ts",
+    "admin:reset-password": "ts-node prisma/reset-admin-password.ts",
     "pretest": "node test/prepare-test-db.js",
     "test": "jest --runInBand",
     "test:unit": "jest --runInBand --testPathPattern=test/unit",

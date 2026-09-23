@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { epochMsCastSql } from '../../common/prisma/sql-dialect';
 import { CUSTOMER_METRICS_ORDER_STATUSES } from '../customer-metrics/customer-metrics-order-statuses';
 import { CustomerAggregate } from './growth-intelligence.rules';
 
@@ -44,10 +45,10 @@ export class GrowthIntelligenceRepository {
       { c: string; purchases: bigint | number; revenue: bigint | number | null; firstAt: bigint | number; lastAt: bigint | number; secondAt: bigint | number | null; highValueAt: bigint | number | null; lbPurchases: bigint | number | null; lbRevenue: bigint | number | null }[]
     >(Prisma.sql`
       WITH p AS (
-        SELECT "customerId" AS c, CAST("createdAt" AS INTEGER) AS t, "totalMinor" AS a
+        SELECT "customerId" AS c, ${epochMsCastSql('"createdAt"')} AS t, "totalMinor" AS a
           FROM "orders" WHERE "status" IN (${Prisma.join(ORDER_STATUSES)}) ${branch('"branchId"')} ${idFilter('"customerId"')}
         UNION ALL
-        SELECT "customerId", CAST("occurredAt" AS INTEGER), "totalMinor"
+        SELECT "customerId", ${epochMsCastSql('"occurredAt"')}, "totalMinor"
           FROM "poster_imported_transactions" WHERE "status" = 'IMPORTED' ${branch('"branchId"')} ${idFilter('"customerId"')}
       ), r AS (
         SELECT c, t, a,
