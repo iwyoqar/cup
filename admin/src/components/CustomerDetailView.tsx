@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchCustomer360, fetchCustomerActivity, regenerateLoyaltyCode } from '../lib/adminCustomers';
+import { deactivateCustomer, fetchCustomer360, fetchCustomerActivity, regenerateLoyaltyCode } from '../lib/adminCustomers';
 import { ApiError } from '../lib/api';
+import { errorMessage } from '../lib/errors';
 import { LIFECYCLE_LABELS, OPPORTUNITY_LABELS, SIGNAL_LABELS } from '../lib/adminGrowth';
 import { formatDate, formatDateTime, formatSom } from '../lib/format';
 import { REASON_LABELS } from '../lib/adminAutomations';
 import { AdminCustomer360, CustomerActivityItem } from '../lib/types';
+import { ConfirmDialog } from '../ui';
 
 interface CustomerDetailViewProps {
   customerId: string;
   onBack: () => void;
+  /** Phase 26: called after a successful deactivation, so the caller can navigate away and refresh its own list. */
+  onDeactivated?: () => void;
 }
 
 const NO_BRANCH = 'Filial aniqlanmagan';
@@ -22,12 +26,31 @@ function friendlyError(err: unknown): string {
 
 // Phase 11.4 — unified Customer 360. Every figure (totals, breakdown, favorite branch, reward progress, segments,
 // promotions, activity order) is calculated by the server; this page only formats and lays out what it receives.
-export function CustomerDetailView({ customerId, onBack }: CustomerDetailViewProps) {
+export function CustomerDetailView({ customerId, onBack, onDeactivated }: CustomerDetailViewProps) {
   const [data, setData] = useState<AdminCustomer360 | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+
+  // Phase 26: soft delete only (Customer.isActive = false) — no order/loyalty/reward/referral
+  // history, and no Poster mapping, is ever touched or reversed.
+  const handleDeactivate = async () => {
+    setDeactivating(true);
+    setDeactivateError(null);
+    try {
+      await deactivateCustomer(customerId);
+      setConfirmingDeactivate(false);
+      onDeactivated?.();
+    } catch (err) {
+      setDeactivateError(errorMessage(err, "Mijozni o'chirib bo'lmadi. Qayta urinib ko'ring."));
+    } finally {
+      setDeactivating(false);
+    }
+  };
 
   // Phase 11: never automatic — the admin must confirm, and the old code (and any QR already shown or
   // printed) stops working immediately.
@@ -320,14 +343,33 @@ export function CustomerDetailView({ customerId, onBack }: CustomerDetailViewPro
               <span>CUP code</span>
               <span className="c360__code">{data.identity.loyaltyCode ?? '—'}</span>
             </div>
-            <div>
+            <div className="row" style={{ gap: 8 }}>
               <button className="button-secondary" disabled={regenerating} onClick={handleRegenerate} type="button">
                 {regenerating ? 'Regenerating...' : 'Regenerate code'}
+              </button>
+              <button className="button-secondary" onClick={() => setConfirmingDeactivate(true)} type="button">
+                Deactivate customer
               </button>
             </div>
             {actionError && <p className="error-text">{actionError}</p>}
           </section>
         </>
+      )}
+
+      {confirmingDeactivate && (
+        <ConfirmDialog
+          busy={deactivating}
+          confirmLabel="Deactivate"
+          error={deactivateError}
+          message="This customer will be removed from the active customer list and search. Their historical orders, loyalty activity and any linked Poster identity are retained — this cannot be undone from the Admin panel."
+          onCancel={() => {
+            setConfirmingDeactivate(false);
+            setDeactivateError(null);
+          }}
+          onConfirm={handleDeactivate}
+          tone="danger"
+          title="Deactivate this customer?"
+        />
       )}
     </div>
   );

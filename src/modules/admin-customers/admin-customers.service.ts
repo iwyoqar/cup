@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { OrderStatus } from '../../common/enums/order-status';
 import { maskPhone } from '../../common/util/mask-phone';
 import { CustomerMetricsService } from '../customer-metrics/customer-metrics.service';
+import { CustomersRepository } from '../customers/customers.repository';
 import { LoyaltyCodeService } from '../customers/loyalty-code.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { AutomationsService } from '../automations/automations.service';
@@ -121,6 +122,7 @@ const RECENT_ACTIVITY_LIMIT = 10;
 export class AdminCustomersService {
   constructor(
     private readonly repository: AdminCustomersRepository,
+    private readonly customersRepository: CustomersRepository,
     private readonly loyaltyService: LoyaltyService,
     private readonly customerMetricsService: CustomerMetricsService,
     private readonly loyaltyCodeService: LoyaltyCodeService,
@@ -290,5 +292,25 @@ export class AdminCustomersService {
     const loyaltyCode = await this.loyaltyCodeService.regenerate(customerId);
     await this.staffRepository.recordEvent({ actorType: 'ADMIN', actorId: adminId, action: 'CODE_REGENERATED', result: 'OK', customerId });
     return { loyaltyCode };
+  }
+
+  // Phase 26: soft delete only — exactly one column changes (Customer.isActive), nothing related
+  // (orders, loyalty, redemptions, referrals, the Poster mapping, audit history) is ever touched,
+  // deleted or reversed. Idempotent: deactivating an already-inactive customer is a 409, not a
+  // silent no-op, so the Admin UI can tell the difference between "just deactivated" and "nothing
+  // happened" — mirrors the explicit-outcome style already used by staff-customers.service.ts's
+  // Poster linking.
+  async deactivateCustomer(customerId: string, adminId: string): Promise<{ id: string; isActive: false } | null> {
+    const customer = await this.repository.findCustomerById(customerId);
+    if (!customer) {
+      return null;
+    }
+    const changed = await this.customersRepository.deactivate(customerId);
+    if (!changed) {
+      await this.staffRepository.recordEvent({ actorType: 'ADMIN', actorId: adminId, action: 'CUSTOMER_DEACTIVATED', result: 'ALREADY_INACTIVE', customerId });
+      throw new ConflictException('This customer is already deactivated.');
+    }
+    await this.staffRepository.recordEvent({ actorType: 'ADMIN', actorId: adminId, action: 'CUSTOMER_DEACTIVATED', result: 'OK', customerId });
+    return { id: customerId, isActive: false };
   }
 }

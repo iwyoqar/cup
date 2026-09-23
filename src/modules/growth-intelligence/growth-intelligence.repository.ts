@@ -89,8 +89,9 @@ export class GrowthIntelligenceRepository {
   }
 
   // Customers that have a birthday on file (a date-only value the customer set themselves). Bounded by the customers who chose to set one.
+  // Phase 26: isActive: true — a deactivated customer no longer generates a BIRTHDAY_UPCOMING signal/opportunity.
   async birthdays(ids?: string[]): Promise<{ customerId: string; birthDate: Date }[]> {
-    const rows = await this.prisma.customer.findMany({ where: { birthDate: { not: null }, ...(ids && ids.length <= MAX_IN ? { id: { in: ids } } : {}) }, select: { id: true, birthDate: true } });
+    const rows = await this.prisma.customer.findMany({ where: { isActive: true, birthDate: { not: null }, ...(ids && ids.length <= MAX_IN ? { id: { in: ids } } : {}) }, select: { id: true, birthDate: true } });
     return rows.map((r) => ({ customerId: r.id, birthDate: r.birthDate as Date }));
   }
 

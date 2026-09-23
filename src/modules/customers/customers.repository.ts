@@ -30,12 +30,20 @@ export class CustomersRepository {
   // --- Phase 11: identity code ------------------------------------------------------------------
 
   // Phase 21 (POS widget): the explicit Poster mapping, read-only. posterClientId is UNIQUE, so at most one customer.
+  // Phase 26: findUnique cannot take a compound filter beyond the unique field itself while staying a
+  // findUnique, so this deliberately drops to findFirst — still at most one row (posterClientId is
+  // still @unique), now also requiring isActive so a deactivated customer never resolves as "found"
+  // to the POS widget or POS-originated reward/promotion redemption (see PosWidgetOverviewService,
+  // PosWidgetRewardRedemptionService, PosWidgetPromotionRedemptionService — all three read this).
   findByPosterClientId(posterClientId: string) {
-    return this.prisma.customer.findUnique({ where: { posterClientId }, select: { id: true, displayName: true, phone: true, loyaltyCode: true, posterClientId: true } });
+    return this.prisma.customer.findFirst({ where: { posterClientId, isActive: true }, select: { id: true, displayName: true, phone: true, loyaltyCode: true, posterClientId: true } });
   }
 
+  // Phase 26: same findFirst-with-isActive reasoning as findByPosterClientId above. Used by Staff
+  // Panel's QR/code lookup and the POS widget's code-based resolution — a deactivated customer's
+  // code must not resolve as active in either place.
   findByLoyaltyCode(loyaltyCode: string) {
-    return this.prisma.customer.findUnique({ where: { loyaltyCode }, include: { telegramAccount: true } });
+    return this.prisma.customer.findFirst({ where: { loyaltyCode, isActive: true }, include: { telegramAccount: true } });
   }
 
   findIdsWithoutLoyaltyCode() {
@@ -57,6 +65,8 @@ export class CustomersRepository {
   // --- Phase 11: staff search + Poster mapping --------------------------------------------------
 
   // Minimal projection only. Bounded (take) and never a full customer dump.
+  // Phase 26: isActive: true added to the AND (outside the OR) — a deactivated customer must never
+  // surface through Staff Panel search or the POS widget's phone-based resolution (both call this).
   searchForStaff(where: { phoneVariants?: string[]; nameContains?: string }, take: number) {
     const or: object[] = [];
     if (where.phoneVariants?.length) or.push({ phone: { in: where.phoneVariants } });
@@ -65,7 +75,7 @@ export class CustomersRepository {
       or.push({ telegramAccount: { is: { username: { contains: where.nameContains } } } });
     }
     return this.prisma.customer.findMany({
-      where: { OR: or },
+      where: { isActive: true, OR: or },
       select: { id: true, displayName: true, phone: true, loyaltyCode: true, telegramAccount: { select: { username: true } } },
       orderBy: { createdAt: 'desc' },
       take,
@@ -82,5 +92,25 @@ export class CustomersRepository {
 
   findLoyaltyCodeById(customerId: string) {
     return this.prisma.customer.findUnique({ where: { id: customerId }, select: { loyaltyCode: true } });
+  }
+
+  // --- Phase 26: deactivation (soft delete) ------------------------------------------------------
+
+  // Idempotent: deactivating an already-inactive customer just returns false, never throws or
+  // double-logs. No related row (orders, loyalty, redemptions, referrals, Poster mapping, ...) is
+  // ever touched — deactivation is exactly one column on Customer, nothing else.
+  async deactivate(customerId: string): Promise<boolean> {
+    const result = await this.prisma.customer.updateMany({ where: { id: customerId, isActive: true }, data: { isActive: false } });
+    return result.count === 1;
+  }
+
+  // Phase 26: used only by TelegramIdentityService when a returning Telegram user's existing
+  // customer was deactivated — an explicit, logged reactivation, never a silent side effect of an
+  // ordinary read. See resolveOrCreateTelegramCustomer for why this is the only safe option given
+  // TelegramAccount's 1:1 unique constraints (a second Customer for the same Telegram identity is
+  // not representable in the current schema).
+  async reactivate(customerId: string): Promise<boolean> {
+    const result = await this.prisma.customer.updateMany({ where: { id: customerId, isActive: false }, data: { isActive: true } });
+    return result.count === 1;
   }
 }

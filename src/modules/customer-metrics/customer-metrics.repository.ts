@@ -67,7 +67,11 @@ export class CustomerMetricsRepository {
     return this.prisma.branch.findMany({ select: { id: true, name: true } });
   }
 
+  // Phase 26: the base "universe of customers" query for segment matching and promotion audience
+  // selection (see SegmentsService, PromotionAudienceService) — isActive: true means a deactivated
+  // customer can never be selected into a new segment/promotion/campaign audience, without needing
+  // to touch the condition-evaluation logic itself downstream.
   findAllCustomerIds() {
-    return this.prisma.customer.findMany({ select: { id: true } });
+    return this.prisma.customer.findMany({ where: { isActive: true }, select: { id: true } });
   }
 }

@@ -14,6 +14,13 @@ export function regenerateLoyaltyCode(customerId: string): Promise<{ loyaltyCode
   return apiRequest<{ loyaltyCode: string }>(`/admin/customers/${customerId}/loyalty-code/regenerate`, { method: 'POST', body: { confirm: true } });
 }
 
+// Phase 26: soft delete only — the server rejects the call without { confirm: true }. Historical
+// orders/loyalty/redemptions/referrals are never touched; the customer just stops appearing as an
+// active CUP customer (Admin list/search, Telegram, POS widget, Staff Panel).
+export function deactivateCustomer(customerId: string): Promise<{ id: string; isActive: false }> {
+  return apiRequest<{ id: string; isActive: false }>(`/admin/customers/${customerId}/deactivate`, { method: 'POST', body: { confirm: true } });
+}
+
 export function fetchCustomer360(customerId: string): Promise<AdminCustomer360> {
   return apiRequest<AdminCustomer360>(`/admin/customers/${customerId}`);
 }

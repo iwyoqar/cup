@@ -29,6 +29,12 @@ datasource db {
 
 model Customer {
   id                         String                      @id @default(cuid())
+  // Phase 26 — soft-delete/deactivation, same convention as Branch/Product/StaffMember/etc.
+  // (@default(true) everywhere else in this schema). No related row is ever deleted when a
+  // customer is deactivated — nothing on this model has onDelete: Cascade, so a hard delete is
+  // already blocked by the database for any customer with real history; this flag is the only
+  // safe removal mechanism. See CustomersRepository.deactivate / admin-customers.controller.ts.
+  isActive                   Boolean                     @default(true)
   posterClientId             String?                     @unique
   // Phase 11: the PUBLIC identity code shown as QR/barcode (e.g. CUP-7K4M9X2P). Random, non-sequential
   // and independent of id / telegram id / phone. Nullable only so the migration is purely additive —

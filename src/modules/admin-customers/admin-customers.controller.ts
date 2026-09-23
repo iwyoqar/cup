@@ -58,4 +58,22 @@ export class AdminCustomersController {
     }
     return result;
   }
+
+  // Phase 26: soft delete only (Customer.isActive = false) — never a hard delete, never touches
+  // related history. Never automatic: requires an explicit { confirm: true }, same convention as
+  // loyalty-code/regenerate above. Admin role required (not just any authenticated admin session).
+  @Post(':id/deactivate')
+  async deactivate(@Param('id') id: string, @Body() body: { confirm?: unknown }, @CurrentAdmin() admin: { id: string; role: string }) {
+    if (!isAdminRole(admin.role)) {
+      throw new ForbiddenException('Admin role required.');
+    }
+    if (body?.confirm !== true) {
+      throw new BadRequestException('Deactivating a customer removes them from the active customer list — send { "confirm": true } to proceed.');
+    }
+    const result = await this.adminCustomersService.deactivateCustomer(id, admin.id);
+    if (!result) {
+      throw new NotFoundException('Customer not found.');
+    }
+    return result;
+  }
 }

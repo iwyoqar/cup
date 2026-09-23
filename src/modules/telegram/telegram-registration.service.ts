@@ -45,6 +45,16 @@ export class TelegramRegistrationService {
     startPayload?: string,
   ): Promise<{ customer: { id: string; phone: string | null }; isRegistered: boolean; referral: AttributionOutcome }> {
     const { customer } = await this.telegramIdentityService.resolveOrCreateCustomer(profile);
+    // Phase 26: TelegramAccount is a unique 1:1 mapping to Customer (both `customerId` and
+    // `telegramUserId` are @unique), so a deactivated customer's SAME TelegramAccount row is what
+    // resolveOrCreateCustomer finds again here — there is no schema-valid way to give this Telegram
+    // identity a second, fresh Customer instead. Reactivation is therefore the only safe option
+    // (never silent — logged), done here on /start specifically because that is the concrete
+    // "customer tries to register again" moment, not on every unrelated Bot interaction.
+    if (!customer.isActive) {
+      await this.customersRepository.reactivate(customer.id);
+      this.logger.warn(`Reactivated previously-deactivated customer ${customer.id} on /start.`);
+    }
     const referral = startPayload ? await this.referralAttribution.attributeFromStart(customer, startPayload) : 'NONE';
     return { customer, isRegistered: Boolean(customer.phone), referral };
   }

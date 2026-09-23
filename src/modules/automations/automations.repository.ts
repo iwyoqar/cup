@@ -289,10 +289,11 @@ export class AutomationsRepository {
   }
 
   // Birthday candidates: customers with a birthDate whose (UTC) month-day is in `monthDays`, ordered by id, after `afterId`, bounded.
+  // Phase 26: "isActive" excludes deactivated customers — never a new BIRTHDAY automation trigger for them.
   async birthdayCustomers(monthDays: string[], afterId: string | null, limit: number): Promise<{ id: string; birthDate: Date }[]> {
     const rows = await this.prisma.$queryRaw<{ id: string; birthDate: bigint | number }[]>(Prisma.sql`
       SELECT "id" AS id, ${epochMsCastSql('"birthDate"')} AS birthDate FROM "customers"
-      WHERE "birthDate" IS NOT NULL AND ${monthDaySql('"birthDate"')} IN (${Prisma.join(monthDays)})
+      WHERE "isActive" = true AND "birthDate" IS NOT NULL AND ${monthDaySql('"birthDate"')} IN (${Prisma.join(monthDays)})
       ${afterId ? Prisma.sql`AND "id" > ${afterId}` : Prisma.empty} ORDER BY "id" LIMIT ${limit}`);
     return rows.map((r) => ({ id: r.id, birthDate: new Date(num(r.birthDate)) }));
   }

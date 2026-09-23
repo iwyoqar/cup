@@ -20,9 +20,13 @@ export class AdminCustomersRepository {
   // that shared service because it's scoped by a specific page of customer IDs (from the
   // search+pagination query just above it), a genuinely different access pattern from "compute
   // for a known list of customers" (Customer 360) or "compute for every customer" (segments).
+  // Phase 26: isActive: true excludes deactivated customers from the normal Admin list/search by
+  // default — findCustomerById (Customer 360 detail) below is deliberately NOT filtered, so a
+  // deactivated customer's historical profile stays reachable by direct id (e.g. from an audit
+  // event or a Poster confirmation), just not discoverable through the ordinary list anymore.
   async findManyWithMetrics(options: { search?: string; cursor?: string; take: number }) {
     const customers = await this.prisma.customer.findMany({
-      where: buildSearchWhere(options.search),
+      where: { isActive: true, ...buildSearchWhere(options.search) },
       orderBy: { createdAt: 'desc' },
       take: options.take,
       ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),

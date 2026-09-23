@@ -18,9 +18,11 @@ import { AdminCustomersService } from './admin-customers.service';
 import { CustomerActivityRepository } from './customer-activity.repository';
 import { CustomerActivityService } from './customer-activity.service';
 
-// Deliberately does NOT import CustomersModule or OrdersModule — the customer list/search query
-// is self-contained in AdminCustomersRepository via direct Prisma access, the same "each
-// repository owns its own queries" pattern used throughout. Order-derived metrics/
+// Deliberately does NOT import OrdersModule — the customer list/search query is self-contained in
+// AdminCustomersRepository via direct Prisma access, the same "each repository owns its own
+// queries" pattern used throughout. CustomersModule IS imported (Phase 26) so AdminCustomersService
+// can call CustomersRepository.deactivate() for the new deactivation endpoint — everything else
+// customer-related here still goes through AdminCustomersRepository's own queries. Order-derived metrics/
 // favoriteBranch/recentOrders now come from the shared CustomerMetricsModule (Phase 5: one
 // canonical definition, reused by segment matching too — see that module's comment). Loyalty
 // balance still comes from LoyaltyService's read-only getAccountSnapshot() — never the
