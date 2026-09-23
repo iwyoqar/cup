@@ -1,6 +1,17 @@
 # CUP Coffee — Project State
 
-Last updated: 2026-09-22 (Phase 24: production readiness — code-complete and PostgreSQL-compatible, NOT deployed).
+Last updated: 2026-09-23 (Phase 27.1: production Poster webhook verification — reconciliation confirmed working, webhook delivery blocked, cause unresolved on Poster's side).
+
+## Phase 27.1 — Production Poster Webhook Verification: RECONCILIATION HEALTHY, WEBHOOK DELIVERY BLOCKED (unresolved, parked)
+
+Audited the full webhook pipeline (receiver signature/dedupe, durable queue, processor, transaction reconciliation) against the real production Poster account and code — no code defect found; the implementation matches Phase 20's design exactly (see that section below). Live findings:
+
+- **Reconciliation (the fallback path) is genuinely healthy in production**: `/admin/poster/sync-status` shows the checkpoint advancing every `POSTER_RECONCILE_INTERVAL_MS` (now 60 000 — see Phase 24.1), `ok: true`, `caughtUp: true`. Every closed Poster receipt is picked up within about a minute regardless of webhooks — nothing is lost.
+- **Webhook delivery has never fired** (`received24h: 0`, `lastReceivedAt: null`) because the webhook URL was never actually saved on Poster's side — confirmed directly by the owner, not assumed.
+- **Attempting to configure it hit a real, unresolved blocker on Poster's own platform**: Poster's dashboard "Check" button for `GET /webhooks/poster` fails (red X) even though the endpoint was independently verified healthy from outside Poster — clean fast `200` responses to both GET and HEAD, a valid TLS certificate chain (`openssl s_client`: `Verify return code: 0`), and a response body matching the one documented acknowledgement shape (`{"status":"accept"}`, `en/web/webhooks.md`). An undocumented `{"status":"200"}` probe was also tried live at the owner's request and did not help either (reverted — no doc support for it). The "Receive webhooks by" entity dropdown on Poster's page also would not register a selection during this investigation, a second, related symptom that was never resolved. Full trail: `src/modules/poster-sync/poster-webhook.controller.ts`'s own comment.
+- **Conclusion:** the blocker is on Poster's platform (its own Check feature, or something about how its check reaches this host) — not a CUP defect. Do not re-attempt this by guessing new response shapes without new evidence from Poster support.
+- **Duplicate safety re-confirmed by code audit (unchanged from Phase 20):** three independent layers — the webhook `dedupeKey` unique constraint (a Poster retry only bumps `deliveries`), the import engine's pre-write `findExisting` check, and `PosterImportedTransaction.posterTransactionId`'s own unique constraint as the final backstop (a race is caught and retagged `ALREADY_IMPORTED`, never duplicated) — so loyalty accrual, rewards and analytics revenue can never double-count regardless of how many times an event or a reconciliation pass revisits the same receipt.
+- **Parked, not disabled:** `POSTER_SYNC_ENABLED` stays on; reconciliation keeps running as the primary mechanism in practice until webhook setup is revisited (e.g. with Poster support's help). No code changes were needed beyond the response-body experiments above (net effect: unchanged from before this phase, after the revert).
 
 ## Phase 24 — Production Readiness: CODE-COMPLETE, NOT DEPLOYED
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 27.1 — production Poster webhook verification (2026-09-23)
+
+Audited and live-verified the Phase 20 webhook/reconciliation pipeline against the real production account. No architectural or code defect found — reconciliation is healthy and is the fully-working sync path today (checkpoint advancing every 60s, `ok: true`, `caughtUp: true`, nothing lost). Webhook delivery has never fired because the URL was never saved on Poster's own dashboard; attempting to save it hit an unresolved Poster-side blocker (dashboard "Check" fails even though the endpoint is independently verified healthy — 200 responses, valid TLS chain, documented response body). Two response-body experiments (`{"status":"accept"}` matching docs, then an undocumented `{"status":"200"}` probe at the owner's request) were tried live and neither changed the outcome; reverted to the documented value. Parked — `POSTER_SYNC_ENABLED` stays on, reconciliation continues as the primary mechanism in practice. Re-audited duplicate-safety guarantees (webhook dedupeKey, import pre-check, `posterTransactionId` unique constraint) — all three confirmed intact and unchanged.
+
+`src/modules/poster-sync/poster-webhook.controller.ts` — only net change is an expanded comment documenting what was ruled out, so this isn't reinvestigated from scratch later.
+
 ## Phase 24.1 — branch-intelligence / automations made PostgreSQL-compatible, code-complete (not deployed) (2026-09-22)
 
 Second pass on the same day: resolves the two blockers the first Phase 24 pass explicitly flagged instead of fixing.
