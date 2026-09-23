@@ -91,6 +91,13 @@ export const posterProbe = (): Record<string, unknown> => {
 export const isMobile = (): boolean => !!(poster()?.environment?.android || poster()?.environment?.iOS);
 
 const REQUEST_TIMEOUT_MS = 8000;
+// Phase 27.2 — VERIFIED LIVE (2026-09-23): a real reward redemption confirmed REDEEMED server-side in 4.2s, but the round trip through Poster's own
+// proxy on top of that occasionally exceeds REQUEST_TIMEOUT_MS, so the widget reported a transport timeout to the barista even though the backend had
+// already succeeded (mutation + RewardRedemption both correct; the money/data were never wrong, only what the barista saw). Root cause: applyToOrder()
+// makes up to THREE sequential Poster REST calls (list open transactions, add the product, re-verify), each with its own PosterService-side 10s budget
+// — a worst case near 30s, well past this file's original single-hop GET timeout. The redeem/promote calls get their own longer budget; the plain GET
+// overview call (genuinely one hop) keeps the original, tighter one.
+const REDEEM_REQUEST_TIMEOUT_MS = 35000;
 
 // Poster documents `makeRequest`'s `result` only as "Response body" (its sibling `makeApiRequest` is the one documented to JSON.parse the response), so the real POS may hand
 // over the parsed object OR the raw JSON text. Both are accepted; anything else is "not readable" (undefined), never a crash. Content is never logged, only its shape.
@@ -151,7 +158,12 @@ function callPoster(url: string, options: { method?: 'get' | 'post'; headers?: s
       window.clearTimeout(timer);
       resolve(r);
     };
-    const timer = window.setTimeout(() => done({ kind: 'ERROR', error: 'TIMEOUT' }), REQUEST_TIMEOUT_MS + 2000);
+    // Phase 27.2 — REAL BUG FOUND LIVE: this independent watchdog was hardcoded to the single (short) REQUEST_TIMEOUT_MS + 2000 regardless of what
+    // `options.timeout` actually asked Poster for, so a redeem call (already given a longer budget above) could still be given up on LOCALLY well before
+    // that budget elapsed — exactly what happened during live verification: the backend confirmed REDEEMED in 4.2s, but the full round trip through
+    // Poster's own proxy pushed just past this timer's old fixed 10s, so the widget reported a transport timeout for an attempt that had already
+    // succeeded. Now derived from the SAME timeout the caller actually requested, plus the same 2s margin for Poster's own callback overhead.
+    const timer = window.setTimeout(() => done({ kind: 'ERROR', error: 'TIMEOUT' }), (options.timeout ?? REQUEST_TIMEOUT_MS) + 2000);
     try {
       p.makeRequest(url, options, (answer) => done(settleAnswer(answer)));
     } catch {
@@ -165,9 +177,11 @@ export function cupGet(url: string): Promise<CupResponse> {
   return callPoster(url, { method: 'get', headers: ['Accept: application/json'], timeout: REQUEST_TIMEOUT_MS });
 }
 
-// Phase 22 — a POST to the CUP backend THROUGH Poster, for the one write call this bundle makes (rewards/redeem). Same signed proxy, same response
-// handling; the ONLY difference from cupGet is `method: 'post'` and a JSON `data` body. Whether Poster's real POST signs that body the way our backend
-// expects is UNVERIFIED (docs/PHASE-22-AUDIT.md §7) — this function does not and cannot change that; it only sends the documented shape.
+// Phase 22 — a POST to the CUP backend THROUGH Poster, for the write calls this bundle makes (rewards/redeem, promotions/redeem). Same signed proxy,
+// same response handling; the ONLY difference from cupGet is `method: 'post'`, a JSON `data` body, and — Phase 27.2 — a longer client-side timeout
+// (REDEEM_REQUEST_TIMEOUT_MS, see its own comment above), since these two calls are the only ones that trigger a real, multi-hop Poster mutation on our
+// backend. Whether Poster's real POST signs that body the way our backend expects is UNVERIFIED (docs/PHASE-22-AUDIT.md §7) — this function does not and
+// cannot change that; it only sends the documented shape.
 export function cupPost(url: string, data: unknown): Promise<CupResponse> {
-  return callPoster(url, { method: 'post', headers: ['Accept: application/json', 'Content-Type: application/json'], data, timeout: REQUEST_TIMEOUT_MS });
+  return callPoster(url, { method: 'post', headers: ['Accept: application/json', 'Content-Type: application/json'], data, timeout: REDEEM_REQUEST_TIMEOUT_MS });
 }
