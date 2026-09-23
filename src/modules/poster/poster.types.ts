@@ -179,3 +179,17 @@ export interface PosterIncomingOrderLinkInfo {
   incoming_order_id: string | number;
   transaction_id?: string | number | null;
 }
+
+// Phase 25 — clients.createClient. CONFIRMED against official docs (github.com/joinposter/docs,
+// en/web/clients/createClient.md) AND against a real live create on the development account
+// (2026-09-23, disposable test phone +998900000001 -> client_id 3): response is a bare number
+// (the created client_id), matching the docs example ({"response":4082}) exactly. Poster's docs
+// table doesn't mark any field required, but the live account rejected a create missing either
+// `client_name` (error 34: "client_name is empty") or `client_groups_id_client` (error 34: "The
+// field «Customer group» must be completed") — both are treated as required here, contrary to
+// the docs table, because that's what the real account actually enforces.
+export interface CreatePosterClientInput {
+  phone: string;
+  client_name: string;
+  client_groups_id_client: number;
+}

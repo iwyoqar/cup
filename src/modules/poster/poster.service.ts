@@ -4,6 +4,7 @@ import { PosterAmbiguousError, PosterDefiniteError } from './poster.errors';
 import {
   AddTransactionProductInput,
   AddTransactionProductRawResponse,
+  CreatePosterClientInput,
   CreatePosterOrderInput,
   CreatePosterOrderRawResponse,
   PosterApiErrorEnvelope,
@@ -27,6 +28,12 @@ export type PosterCreateOrderOutcome =
 // bespoke one-off.
 export type PosterAddTransactionProductOutcome =
   | { kind: 'success'; transactionProductId: number }
+  | { kind: 'definite_failure'; reason: string }
+  | { kind: 'ambiguous_failure'; reason: string };
+
+// Phase 25 — a third real Poster mutation, same definite-vs-ambiguous discipline as the two above.
+export type PosterCreateClientOutcome =
+  | { kind: 'success'; clientId: string }
   | { kind: 'definite_failure'; reason: string }
   | { kind: 'ambiguous_failure'; reason: string };
 
@@ -54,6 +61,26 @@ export class PosterService {
   async getClientsByPhone(internationalPhone: string): Promise<PosterClient[]> {
     const raw = await this.get<unknown>('clients.getClients', { phone: internationalPhone });
     return Array.isArray(raw) ? (raw as PosterClient[]) : [];
+  }
+
+  // Phase 25 — VERIFIED live (2026-09-23) against the real development account: response is the
+  // created client_id as a bare number, unwrapped by execute() the same way as every other Poster
+  // method. See poster.types.ts for the fields the live account actually requires.
+  async createClient(input: CreatePosterClientInput): Promise<PosterCreateClientOutcome> {
+    try {
+      const raw = await this.post<unknown>('clients.createClient', input);
+      if (typeof raw !== 'number' && typeof raw !== 'string') {
+        return { kind: 'ambiguous_failure', reason: `Unexpected createClient response shape: ${JSON.stringify(raw)}` };
+      }
+      return { kind: 'success', clientId: String(raw) };
+    } catch (err) {
+      if (err instanceof PosterDefiniteError) {
+        return { kind: 'definite_failure', reason: err.message };
+      }
+      const reason = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`createClient ambiguous outcome: ${reason}`);
+      return { kind: 'ambiguous_failure', reason };
+    }
   }
 
   // Phase 11.2 — READ-ONLY. Closed receipts (status=2) with their product lines for an inclusive account-date range

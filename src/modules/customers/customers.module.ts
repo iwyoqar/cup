@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { PosterModule } from '../poster/poster.module';
 import { TelegramAccountsModule } from '../telegram-accounts/telegram-accounts.module';
 import { CustomersController } from './customers.controller';
 import { CustomersRepository } from './customers.repository';
@@ -18,10 +19,13 @@ import { LoyaltyCodeService } from './loyalty-code.service';
 // itself a dependency of AuthModule, so a plain import was enough there. Here it genuinely
 // isn't — forwardRef() on both sides (see auth.module.ts) is Nest's documented mechanism for
 // exactly this mutual-dependency shape.
+// Phase 25: PosterModule imported so CustomersService can call PosterClientsService for the
+// automatic Telegram-registration link (CustomersService.linkToPoster). PosterModule has no
+// imports of its own, so this introduces no cycle.
 @Module({
-  imports: [TelegramAccountsModule, forwardRef(() => AuthModule)],
+  imports: [TelegramAccountsModule, forwardRef(() => AuthModule), PosterModule],
   controllers: [CustomersController],
   providers: [CustomersRepository, CustomersService, LoyaltyCodeService],
-  exports: [CustomersRepository, LoyaltyCodeService],
+  exports: [CustomersRepository, CustomersService, LoyaltyCodeService],
 })
 export class CustomersModule {}

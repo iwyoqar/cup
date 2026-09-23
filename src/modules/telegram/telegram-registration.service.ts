@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CustomersRepository } from '../customers/customers.repository';
+import { CustomersService } from '../customers/customers.service';
 import { ReferralAttributionService } from '../referrals/referral-attribution.service';
 import { AttributionOutcome } from '../referrals/referral.types';
 import { TelegramAccountsRepository } from '../telegram-accounts/telegram-accounts.repository';
@@ -27,6 +28,7 @@ export class TelegramRegistrationService {
     private readonly telegramIdentityService: TelegramIdentityService,
     private readonly telegramAccountsRepository: TelegramAccountsRepository,
     private readonly customersRepository: CustomersRepository,
+    private readonly customersService: CustomersService,
     private readonly referralAttribution: ReferralAttributionService,
   ) {}
 
@@ -82,6 +84,10 @@ export class TelegramRegistrationService {
 
     const normalizedPhone = normalizeTelegramPhone(contact.phone_number);
     const customer = await this.customersRepository.updatePhone(account.customer.id, normalizedPhone);
+    // Phase 25: best-effort automatic Poster customer link (find-or-create by phone, never blocks or
+    // fails registration — see CustomersService.linkToPoster). Telegram module never calls Poster
+    // directly; this goes through CustomersService -> PosterClientsService -> PosterService.
+    await this.customersService.linkToPoster(customer);
     // Phase 14: registration is complete — a pending referral moves ATTRIBUTED -> REGISTERED (conditional update; a no-op for everyone else, never throws).
     await this.referralAttribution.markRegistered(customer.id);
     return { ok: true, customer };

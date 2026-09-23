@@ -11,6 +11,14 @@ export const envSchema = z.object({
   POSTER_API_BASE_URL: z.string().url(),
   POSTER_API_TOKEN: z.string().min(1, 'POSTER_API_TOKEN is required'),
   POSTER_DEFAULT_SPOT_ID: z.coerce.number().int().positive().default(1),
+  // Phase 25 — the Poster customer GROUP new CUP-created clients are assigned to. clients.createClient
+  // requires client_groups_id_client in practice (verified live 2026-09-23: rejected with "The field
+  // «Customer group» must be completed" when omitted), even though Poster's own docs table doesn't mark
+  // it required. No default: this is account-specific (there is no universally-correct group id, and a
+  // fresh account can have zero groups), so guessing would either fail loudly or silently misfile every
+  // new customer. Missing => automatic Poster client CREATION is skipped (existing candidates can still
+  // be found and linked; see PosterClientsService.findOrCreateByPhone).
+  POSTER_DEFAULT_CLIENT_GROUP_ID: z.coerce.number().int().positive().optional(),
 
   ORDER_STATUS_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(30000),
   CATALOG_SYNC_INTERVAL_MS: z.coerce.number().int().positive().default(300000),
