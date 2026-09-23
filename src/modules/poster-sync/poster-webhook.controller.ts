@@ -9,12 +9,14 @@ export class PosterWebhookController {
   constructor(private readonly webhook: PosterWebhookService) {}
 
   // Poster's dashboard "Check" button GETs this exact URL before accepting it as a webhook target — it only ever
-  // verifies reachability, never delivers a real event this way (real events always arrive as POST). The body
-  // deliberately matches the ONE documented acknowledgement shape ({"status":"accept"} — en/web/webhooks.md) rather
-  // than an invented value: the Check may validate the body, not just the HTTP status.
+  // verifies reachability, never delivers a real event this way (real events always arrive as POST).
+  // EXPERIMENTAL (2026-09-23): {"status":"accept"} — the one documented acknowledgement shape (en/web/webhooks.md)
+  // — did NOT make Poster's dashboard Check pass, despite the GET itself verified fast/correct (200, clean TLS
+  // chain). Trying {"status":"200"} as an undocumented probe at the operator's explicit request; revert to
+  // "accept" (or drop this route entirely) if this doesn't help either — it has no documentation support.
   @Get('poster')
   check() {
-    return { status: 'accept' };
+    return { status: '200' };
   }
 
   @Post('poster')
