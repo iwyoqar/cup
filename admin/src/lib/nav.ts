@@ -19,6 +19,7 @@ export type AdminPage =
   | 'analytics'
   | 'growth'
   | 'branch-intelligence'
+  | 'finance'
   | 'branch-config'
   | 'system-health'
   | 'errors'
@@ -87,6 +88,11 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'growth', label: 'Growth Intelligence', icon: 'growth', description: 'Lifecycle, RFM and opportunities across all customers.' },
       { id: 'branch-intelligence', label: 'Branch Intelligence', icon: 'branch', description: 'Branch-by-branch performance, mix and customer behaviour.' },
     ],
+  },
+  {
+    id: 'finance',
+    label: 'Finance',
+    items: [{ id: 'finance', label: 'Finance', icon: 'finance', description: 'Revenue, COGS, expenses, loans, taxes, investment and payback — the full financial picture.' }],
   },
   {
     id: 'system',

@@ -104,6 +104,9 @@ model Branch {
   carts                      Cart[]
   staffMembers               StaffMember[]
   posterImportedTransactions PosterImportedTransaction[]
+  expenses                   Expense[]
+  investments                Investment[]
+  cashAdjustments            CashAdjustment[]
 
   @@map("branches")
 }
@@ -187,6 +190,13 @@ model Product {
   priceMinor          Int
   isActive            Boolean                         @default(true)
   syncedAt            DateTime                        @default(now())
+  // Finance-1 — COGS, read live from Poster's own recipe data (menu.getProduct's `ingredients`/`cost`, only present
+  // for a product Poster itself has a "Dish" recipe for — see cogs-sync.service.ts). NEVER a CUP-invented recipe.
+  // hasRecipe=false means Poster has no recipe for this product yet; the finance dashboard must show "Data
+  // incomplete" for it, never fabricate a cost. theoreticalCostMinor is null until a sync with hasRecipe=true runs.
+  hasRecipe           Boolean                         @default(false)
+  theoreticalCostMinor Int?
+  costSyncedAt        DateTime?
   orderItems          OrderItem[]
   cartItems           CartItem[]
   // Phase 7: a FREE_PRODUCT promotion references a Product by id — no `onDelete` override
@@ -1180,4 +1190,140 @@ model PosterWebhookEvent {
   @@index([object, objectId])
   @@index([receivedAt])
   @@map("poster_webhook_events")
+}
+
+// =====================================================================================================================
+// FINANCE — full accounting: Revenue (reuses AnalyticsRepository's canonical, already-deduped CUP+POS source, not
+// modelled again here) minus COGS (read live from Poster's own recipe data via Product.theoreticalCostMinor, see
+// below — CUP never invents a recipe) equals Gross Profit; minus Expense rows equals Operating Profit; minus TaxRule /
+// Loan-interest / other financial costs equals Net Profit. Investment + CashAdjustment feed Cash Flow / Payback,
+// which are computed views, never stored. Every mutation here is audited via StaffScanEvent (actorType 'ADMIN',
+// customerId/branchId null when the record itself is not customer/branch-scoped) — no new audit table.
+// =====================================================================================================================
+
+model ExpenseCategory {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expenses  Expense[]
+
+  @@map("expense_categories")
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  categoryId  String
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  description String
+  amountMinor Int
+  date        DateTime
+  branchId    String?
+  branch      Branch?         @relation(fields: [branchId], references: [id])
+  // Phase Finance-1: a recurring expense is a real row for its OWN date/amount (the P&L/Cash Flow ledger never
+  // sums a "definition" — only real dated rows), PLUS a hint the scheduler (finance-recurring-expense.job.ts) reads
+  // to create the NEXT month's row a few days before the period rolls over, copying category/branch/description/
+  // amount. It never overwrites or deletes a past row, and never creates a second row for a period that already
+  // has one (idempotent by (categoryId, description, recurrenceInterval, that period) — see the job's own comment).
+  isRecurring         Boolean  @default(false)
+  recurrenceInterval  String? // ExpenseRecurrenceInterval | null — see src/common/enums/finance.ts
+  paymentStatus       String   @default("PAID") // ExpensePaymentStatus
+  notes               String?
+  createdBy           String? // Admin id
+  createdAt           DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([date])
+  @@index([categoryId, date])
+  @@index([branchId, date])
+  @@map("expenses")
+}
+
+model Loan {
+  id                  String        @id @default(cuid())
+  lender               String
+  principalMinor       Int
+  annualInterestRatePct Float // e.g. 18 means 18% per year
+  termMonths            Int
+  startDate             DateTime
+  status                String        @default("ACTIVE") // LoanStatus
+  notes                 String?
+  createdBy             String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  payments              LoanPayment[]
+
+  @@map("loans")
+}
+
+// One row per real payment actually made. principalMinor is a cash-flow item (reduces the outstanding balance,
+// never expensed); interestMinor is the P&L expense (see finance-pnl.service.ts) — the spec's own explicit
+// instruction not to subtract a whole loan payment as one operating expense.
+model LoanPayment {
+  id             String   @id @default(cuid())
+  loanId         String
+  loan           Loan     @relation(fields: [loanId], references: [id])
+  date           DateTime
+  principalMinor Int
+  interestMinor  Int
+  notes          String?
+  createdBy      String?
+  createdAt      DateTime @default(now())
+
+  @@index([loanId, date])
+  @@map("loan_payments")
+}
+
+model TaxRule {
+  id              String    @id @default(cuid())
+  name            String
+  ratePct         Float // e.g. 4 means 4%
+  calculationBase String // TaxCalculationBase — see src/common/enums/finance.ts
+  isActive        Boolean   @default(true)
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  notes           String?
+  createdBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isActive, effectiveFrom])
+  @@map("tax_rules")
+}
+
+model Investment {
+  id            String   @id @default(cuid())
+  category      String
+  description   String
+  amountMinor   Int
+  date          DateTime
+  branchId      String?
+  branch        Branch?  @relation(fields: [branchId], references: [id])
+  paymentSource String?
+  notes         String?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([date])
+  @@map("investments")
+}
+
+// A manual correction to the Cash Flow view only — never touches Revenue/Expense/COGS/P&L. amountMinor is SIGNED:
+// positive = unexplained cash in, negative = unexplained cash out (e.g. an owner's own cash top-up, a till
+// shortage). Used sparingly; the Cash Flow view's own components should cover almost everything without it.
+model CashAdjustment {
+  id          String   @id @default(cuid())
+  date        DateTime
+  amountMinor Int
+  reason      String
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+  @@map("cash_adjustments")
 }

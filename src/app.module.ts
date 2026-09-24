@@ -9,6 +9,7 @@ import { AutomationsModule } from './modules/automations/automations.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { GrowthIntelligenceModule } from './modules/growth-intelligence/growth-intelligence.module';
 import { BranchIntelligenceModule } from './modules/branch-intelligence/branch-intelligence.module';
+import { FinanceModule } from './modules/finance/finance.module';
 import { AdminCustomersModule } from './modules/admin-customers/admin-customers.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BranchModule } from './modules/branches/branch.module';
@@ -62,6 +63,7 @@ import { TelegramModule } from './modules/telegram/telegram.module';
     ReferralsModule,
     GrowthIntelligenceModule,
     BranchIntelligenceModule,
+    FinanceModule,
   ],
 })
 export class AppModule {}

@@ -16,6 +16,7 @@ import { AutomationsPage } from './pages/AutomationsPage';
 import { ReferralsPage } from './pages/ReferralsPage';
 import { GrowthPage } from './pages/GrowthPage';
 import { BranchIntelligencePage } from './pages/BranchIntelligencePage';
+import { FinancePage } from './pages/FinancePage';
 import { BranchConfigPage } from './pages/BranchConfigPage';
 import { StaffPage } from './pages/StaffPage';
 import { PosterImportPage } from './pages/PosterImportPage';
@@ -97,6 +98,7 @@ export function App() {
       {page === 'staff' && <StaffPage />}
       {page === 'growth' && <GrowthPage />}
       {page === 'branch-intelligence' && <BranchIntelligencePage />}
+      {page === 'finance' && <FinancePage />}
       {page === 'branch-config' && <BranchConfigPage />}
       {page === 'system-health' && <SystemHealthPage />}
       {page === 'errors' && <ErrorsPage onNavigate={setPage} />}

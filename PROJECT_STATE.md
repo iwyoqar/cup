@@ -1,6 +1,32 @@
 # CUP Coffee — Project State
 
-Last updated: 2026-09-24 (real POS purchases no longer wait 10 minutes to appear in reward progress; "5+1"-style rewards now count qualifying visits, not summed item quantity — owner decisions).
+Last updated: 2026-09-24 (Finance & Accounting Dashboard — full P&L/Cash Flow/Loans/Taxes/Investment/Payback, code-complete, not deployed).
+
+## Finance & Accounting Dashboard (2026-09-24, code-complete, not deployed)
+
+Full new `Admin → Finance` section: Revenue - COGS = Gross Profit; - Operating Expenses = Operating Profit; - Taxes - Interest - Other Financial Costs = Net Profit; plus Cash Flow, Loans, configurable Taxes, Investments, and Payback/ROI. New backend module `src/modules/finance/`, 8 new Prisma models (`ExpenseCategory`, `Expense`, `Loan`, `LoanPayment`, `TaxRule`, `Investment`, `CashAdjustment`, plus `Product.hasRecipe/theoreticalCostMinor/costSyncedAt`), new Admin UI `admin/src/pages/FinancePage.tsx` (Overview/P&L/Cash Flow/Expenses/Loans/Taxes/Investment & Payback tabs).
+
+**Phase 1 audit finding (corrected a wrong premise in the request):** the codebase had ZERO finance/expense/loan/tax/inventory/payroll/purchasing models or data before this — the only reusable piece was `AnalyticsRepository`'s already-deduped CUP+POS revenue source, reused verbatim (never re-derived).
+
+**COGS — the interesting discovery:** Poster POS has a real recipe/ingredient-cost system (`menu.getProduct`'s `ingredients`/`cost`, `storage.getStorageLeftovers`), verified live against the real account. But the REAL, currently-selling menu (all ~29 products) has NO recipe configured in Poster at all — a live test-recipe the owner added while investigating this (`product_id 61`, "Cappuccino 250 ml", English name, separate from the real "Капучино 250 мл" id 37) proved the mechanism works (18g coffee + 200ml milk + 1 cup = 8 570 so'm cost) but is not connected to any real sale. `FinanceCogsSyncService` reads this live per product every 30 min (`FINANCE_COGS_SYNC_INTERVAL_MS`) and caches `Product.theoreticalCostMinor` — a product with no Poster recipe stays `hasRecipe: false` forever, never estimated; the Overview/P&L UI shows an explicit "COGS data incomplete" banner naming exactly which products and quantities are excluded. COGS becomes accurate automatically, product by product, as the owner configures real recipes in Poster's own "Dishes" UI — no CUP-side data entry needed.
+
+**"5+1"-reward-style counting reused for nothing else:** deliberately kept COGS/Expense semantics independent of the reward-visit-counting change earlier today — no interaction between the two.
+
+**Two spec items explicitly NOT tracked, by design, per the spec's own "show Data incomplete, never fabricate" instruction (Phase 1's audit found no underlying data for either):**
+- Inventory *purchases* (cash spent restocking) — only theoretical COGS of goods *sold* exists (an accrual figure). No purchasing/supplier module exists or was built; Cash Flow's own view says so explicitly rather than substituting COGS for it.
+- Payroll as a dedicated per-employee system — folded into the "Salaries" default Expense category instead of a new model (`StaffMember` has no compensation field and none was added, per "do not create duplicate/unnecessary models").
+
+**Reused, not rebuilt:** `AnalyticsRepository` (revenue, per-product quantity/revenue, branch/period filtering), `AdminAuthGuard`/`CurrentAdmin`, `StaffScanEvent` (audit trail for every finance mutation, no new audit table), `Branch`, the project's whole-UZS-integer money convention, the `CatalogSyncJob`/scheduled-interval-from-config pattern (mirrored for `FinanceCogsSyncJob` and `FinanceRecurringExpenseJob`).
+
+**Loans:** principal repayment (cash-flow item) and interest (P&L expense) are always recorded as two separate fields on one `LoanPayment` row — never one blended "loan payment expense", per the spec's explicit instruction. Standard fixed-rate amortization for the estimated monthly payment; the real ledger only ever sums actually-recorded `LoanPayment` rows.
+
+**Taxes:** fully configurable (name, rate, base = Revenue/Gross Profit/Operating Profit, effective date range) — no hardcoded Uzbek tax rate or rule; explicitly presented as a calculation engine, not verified legal tax advice.
+
+**Payback/ROI:** never fabricates an estimate — explicit `NO_INVESTMENT_RECORDED` / `INSUFFICIENT_HISTORY` / `NEGATIVE_CASH_FLOW` states when a reliable projection isn't possible, matching the spec's own instruction.
+
+**Verified (2026-09-24):** `npx tsc --noEmit` and `npm run build` clean on both backend and `admin/`. Full manual walkthrough in a real browser against local `dev.db` — created a real expense, loan (250M so'm/18%/60mo, matching the spec's own worked example) with a payment recorded, a 4%-of-revenue tax rule, and an 80M so'm investment; confirmed Overview, P&L, Cash Flow, and Payback all reflect them correctly and consistently with each other. `POST /admin/finance/cogs-sync` verified live against the real Poster account (29 products scanned, all correctly reported as having no recipe yet).
+
+**Not yet deployed** — needs a Postgres migration on Render (`prisma/postgres/migrations/0003_finance_accounting_v1/`, already hand-authored and mirrors the two applied SQLite migrations) plus the usual `npm run render:build`/deploy. Not yet built: a printable/exportable monthly report matching the spec's literal ASCII layout (the P&L tab shows the same numbers interactively, with drill-down, instead), and per-branch Payback (Payback is currently whole-business only, since Investment can be branch-tagged but the owner's initial big-ticket items — espresso machine, renovation — are typically not meaningfully split per branch).
 
 ## Fix — real POS purchases no longer wait 10 minutes to appear in reward progress (2026-09-24, code-complete)
 

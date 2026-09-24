@@ -25,6 +25,13 @@ const PATHS = {
     </>
   ),
   segments: <path d="M4 5h16l-6 7.5V19l-4-2v-4.5z" />,
+  finance: (
+    <>
+      <rect x="3.5" y="6.5" width="17" height="12" rx="1.8" />
+      <path d="M3.5 10h17" />
+      <circle cx="16.5" cy="14.2" r="1.6" />
+    </>
+  ),
   loyalty: <path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z" />,
   rewards: (
     <>

@@ -22,6 +22,13 @@ export const envSchema = z.object({
 
   ORDER_STATUS_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(30000),
   CATALOG_SYNC_INTERVAL_MS: z.coerce.number().int().positive().default(300000),
+  // Finance-1 — COGS recipe sync (menu.getProduct per active product, no bulk form). Deliberately much
+  // less frequent than catalog sync: a recipe/ingredient price changes rarely, and this costs one Poster
+  // call per active product per tick (~30 today) rather than the catalog sync's two calls total.
+  FINANCE_COGS_SYNC_INTERVAL_MS: z.coerce.number().int().min(300000).default(1800000),
+  // Finance-1 — recurring-expense auto-generation tick. Daily is plenty: the job only needs to act within
+  // LEAD_DAYS (3) of a due date (finance-recurring-expense.service.ts).
+  FINANCE_RECURRING_EXPENSE_INTERVAL_MS: z.coerce.number().int().min(3600000).default(86400000),
 
   // See docs/PHASE-0-PLAN.md and the Phase 0 code review: an IdempotencyKey left "in_progress"
   // longer than this (e.g. a crash between reserving the key and recording Poster's outcome)

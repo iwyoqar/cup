@@ -14,6 +14,7 @@ import {
   PosterIncomingOrder,
   PosterIncomingOrderLinkInfo,
   PosterProduct,
+  PosterProductDetail,
   PosterSpot,
   PosterTransaction,
 } from './poster.types';
@@ -54,6 +55,14 @@ export class PosterService {
 
   async getProducts(): Promise<PosterProduct[]> {
     return this.get<PosterProduct[]>('menu.getProducts');
+  }
+
+  // Finance-1 — the ONE call that can reveal a product's recipe (see poster.types.ts's
+  // PosterProductDetail comment). Poster returns a bare `false` for a product with no recipe/tech
+  // card configured (VERIFIED live, 2026-09-24) — not an error, so it is returned as-is, never
+  // thrown. Read-only; never called per-request, only from the finance COGS sync job.
+  async getProductDetail(productId: string): Promise<PosterProductDetail | false> {
+    return this.get<PosterProductDetail | false>('menu.getProduct', { product_id: productId });
   }
 
   // Phase 11 — READ-ONLY. Poster requires the phone in international format ("+998..."). The caller

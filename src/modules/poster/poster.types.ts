@@ -53,6 +53,31 @@ export interface PosterProduct {
   price: Record<string, string>;
 }
 
+// Finance-1 — VERIFIED live (2026-09-24) against menu.getProduct?product_id=X (docs:
+// en/web/menu/getProduct.md) for a real "Dish" (type "2") the owner had just configured a recipe
+// for: `ingredients` carries one line per component, `structure_selfprice` is that component's
+// cost contribution in Poster wire units (kopeck/tiyin, same /100 rule as poster-money.ts). A
+// product with NO recipe configured in Poster (the vast majority in this account today) is type
+// "3" and either has no `ingredients` array at all or an empty one — never fabricated here.
+export interface PosterProductRecipeLine {
+  ingredient_id: string;
+  ingredient_name: string;
+  structure_unit: string; // g | ml | kg | l | p — display-only, CUP never converts units itself
+  structure_brutto: number | string;
+  structure_selfprice: string; // this component's cost, Poster wire units
+}
+
+// menu.getProduct's response — a strict superset of PosterProduct's fields for the one product
+// requested, plus `cost` (Poster's own pre-summed total, verified to equal the sum of
+// ingredients[].structure_selfprice) and `ingredients` when the product is a configured Dish.
+export interface PosterProductDetail {
+  product_id: string;
+  product_name: string;
+  type: string; // documented: "2" = dish (has a recipe), others do not
+  cost?: string; // Poster wire units — total theoretical cost, present only for a configured Dish
+  ingredients?: PosterProductRecipeLine[];
+}
+
 // CONFIRMED against official docs (github.com/joinposter/docs,
 // ru/web/incomingOrders/createIncomingOrder.md), 2026-09-17 — not yet re-verified against a
 // successful live response (the one live attempt so far was rejected for missing `phone`).

@@ -1,5 +1,11 @@
 # Changelog
 
+## Finance & Accounting Dashboard (2026-09-24)
+
+New `Admin → Finance` section: full P&L waterfall (Revenue → COGS → Gross Profit → Operating Expenses → Operating Profit → Taxes/Interest/Other Financial Costs → Net Profit), Cash Flow, configurable Expense categories, Loans (principal vs. interest kept separate), configurable Tax rules, Investments, and Payback/ROI. 8 new Prisma models. Revenue reuses `AnalyticsRepository` verbatim (no double-counting). COGS is read live from Poster's own recipe/"Dish" data per product (`menu.getProduct`, synced every 30 min) — verified live against the real account; the real menu has no recipes configured yet, so COGS/Gross Profit show an explicit "Data incomplete" banner naming the affected products rather than guessing. Inventory-purchase cash tracking and a dedicated payroll system were found to have no underlying data anywhere (Phase 1 audit) and are explicitly left as known gaps rather than fabricated — payroll folds into a "Salaries" expense category instead.
+
+`npx tsc --noEmit` / `npm run build` clean on both backend and `admin/`. Manually verified end-to-end in a real browser: created a real loan, tax rule, expense and investment and confirmed Overview/P&L/Cash Flow/Payback are all mutually consistent. Not yet deployed — Postgres migration is hand-authored and ready (`prisma/postgres/migrations/0003_finance_accounting_v1/`).
+
 ## Fix — real POS purchases no longer wait 10 minutes to appear in reward progress (2026-09-24)
 
 Root cause: `POSTER_IMPORT_SETTLE_SECONDS` (10 min) was applied to EVERY closed receipt uniformly, but it only ever protected against one specific race — a CUP Mini App checkout receipt being imported as a bare POS sale before Poster reports its `incoming_order.transaction_id` link back (see `TOO_RECENT`'s own original comment: "a settling delay... it only gives Poster time to report the receipt link of a CUP-created order first"). A receipt rung up directly at the register was never at risk of that race, yet waited the same 10 minutes for no reason.

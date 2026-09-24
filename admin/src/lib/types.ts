@@ -646,3 +646,147 @@ export interface AnalyticsOverview {
   };
   topProducts: { name: string; quantity: number; revenue: number }[];
 }
+
+// Finance-1 — GET /admin/finance/*. Every number is computed by the backend (whole UZS minor units); the UI only
+// formats. Revenue reuses Analytics' own already-deduped CUP+POS source; COGS is read live from Poster's own
+// recipe data (never invented) and is explicitly flagged incomplete rather than guessed.
+export type FinancePeriodKey = 'today' | 'yesterday' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'custom';
+
+export interface FinanceExpenseLine {
+  categoryId: string;
+  categoryName: string;
+  amountMinor: number;
+}
+
+export interface FinanceTaxLine {
+  ruleId: string;
+  name: string;
+  ratePct: number;
+  calculationBase: string;
+  baseAmountMinor: number;
+  amountMinor: number;
+}
+
+export interface FinancePnlOverview {
+  period: { key: FinancePeriodKey; startDate: string; endDate: string };
+  branch: { id: string; name: string } | null;
+  filters: { branches: { id: string; name: string }[] };
+  revenue: number;
+  cogs: { amountMinor: number; complete: boolean; missingRecipeProducts: { name: string; quantity: number }[] };
+  grossProfit: number;
+  grossMarginPct: number | null;
+  operatingExpenses: { total: number; byCategory: FinanceExpenseLine[] };
+  operatingProfit: number;
+  operatingMarginPct: number | null;
+  taxes: { total: number; lines: FinanceTaxLine[] };
+  interest: number;
+  otherFinancialCosts: { total: number; byCategory: FinanceExpenseLine[] };
+  netProfit: number;
+  netMarginPct: number | null;
+  topGrossProfitProducts: { name: string; quantity: number; revenueMinor: number; costMinor: number; grossProfitMinor: number }[];
+}
+
+export interface FinanceCashFlowOverview {
+  period: { key: FinancePeriodKey; startDate: string; endDate: string };
+  branch: { id: string; name: string } | null;
+  openingBalance: number;
+  cashIn: { revenue: number; manualAdjustments: number; total: number };
+  cashOut: {
+    operatingExpensesPaid: number;
+    financialExpensesPaid: number;
+    loanPrincipal: number;
+    loanInterest: number;
+    investments: number;
+    manualAdjustments: number;
+    total: number;
+  };
+  netCashFlow: number;
+  closingBalance: number;
+  limitations: string[];
+}
+
+export interface FinanceExpenseCategory {
+  id: string;
+  name: string;
+  type: 'OPERATING' | 'FINANCIAL';
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface FinanceExpense {
+  id: string;
+  categoryId: string;
+  category: FinanceExpenseCategory;
+  description: string;
+  amountMinor: number;
+  date: string;
+  branchId: string | null;
+  branch: { id: string; name: string } | null;
+  isRecurring: boolean;
+  recurrenceInterval: string | null;
+  paymentStatus: 'PAID' | 'UNPAID';
+  notes: string | null;
+}
+
+export interface FinanceExpensesPage {
+  rows: FinanceExpense[];
+  nextCursor: string | null;
+}
+
+export interface FinanceLoan {
+  id: string;
+  lender: string;
+  principalMinor: number;
+  annualInterestRatePct: number;
+  termMonths: number;
+  startDate: string;
+  status: 'ACTIVE' | 'PAID_OFF' | 'DEFAULTED';
+  notes: string | null;
+  estimatedMonthlyPaymentMinor: number;
+  outstandingPrincipalMinor: number;
+  totalPrincipalPaidMinor: number;
+  totalInterestPaidMinor: number;
+  paymentsMade: number;
+  nextEstimatedPaymentDate: string | null;
+}
+
+export interface FinanceTaxRule {
+  id: string;
+  name: string;
+  ratePct: number;
+  calculationBase: 'REVENUE' | 'GROSS_PROFIT' | 'OPERATING_PROFIT';
+  isActive: boolean;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  notes: string | null;
+}
+
+export interface FinanceInvestment {
+  id: string;
+  category: string;
+  description: string;
+  amountMinor: number;
+  date: string;
+  branchId: string | null;
+  branch: { id: string; name: string } | null;
+  paymentSource: string | null;
+  notes: string | null;
+}
+
+export interface FinancePayback {
+  totalInvestmentMinor: number;
+  cumulativeCashFlowMinor: number;
+  remainingInvestmentMinor: number;
+  paybackProgressPct: number | null;
+  estimatedPaybackMonths: number | null;
+  estimatedPaybackDate: string | null;
+  status: 'NO_INVESTMENT_RECORDED' | 'INSUFFICIENT_HISTORY' | 'NEGATIVE_CASH_FLOW' | 'OK';
+  note: string;
+}
+
+export interface FinanceRoi {
+  period: { key: FinancePeriodKey; startDate: string; endDate: string };
+  netProfitMinor: number;
+  totalInvestmentMinor: number;
+  roiPct: number | null;
+}
