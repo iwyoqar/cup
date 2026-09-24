@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import { ReportsOverview, ReportsLocationsOverview, AnalyticsPeriodKey } from './types';
+import { ReportsOverview, ReportsLocationsOverview, ReportsPaymentsOverview, AnalyticsPeriodKey } from './types';
 
 export interface ReportsFilters {
   period: AnalyticsPeriodKey;
@@ -28,4 +28,8 @@ export function fetchReportsSales(filters: ReportsFilters): Promise<ReportsOverv
 
 export function fetchReportsLocations(filters: ReportsFilters): Promise<ReportsLocationsOverview> {
   return apiRequest<ReportsLocationsOverview>(`/admin/reports/locations?${buildParams(filters).toString()}`);
+}
+
+export function fetchReportsPayments(filters: ReportsFilters): Promise<ReportsPaymentsOverview> {
+  return apiRequest<ReportsPaymentsOverview>(`/admin/reports/payments?${buildParams(filters).toString()}`);
 }

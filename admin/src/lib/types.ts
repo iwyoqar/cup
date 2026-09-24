@@ -763,6 +763,32 @@ export interface ReportsLocationsOverview {
   notes: string[];
 }
 
+// Reports Phase B2 — GET /admin/reports/payments. Payment methods come from Poster (dash.getPaymentsReport),
+// normalized by the backend; nothing Poster-specific reaches the UI. When `available` is false the money fields are
+// null — never render them as zero. cupRevenueMinor is CUP's canonical revenue for the same range, shown for
+// comparison only; it is never added to or netted against the Poster payment figures.
+export interface ReportsPaymentRow {
+  paymentId: string;
+  name: string;
+  amountMinor: number;
+  sharePercent: number;
+}
+
+export interface ReportsPaymentsOverview {
+  period: { key: AnalyticsPeriodKey; startDate: string; endDate: string; timezoneOffsetMinutes: number };
+  branch: { id: string; name: string } | null;
+  filters: { branches: { id: string; name: string }[] };
+  branchFilterSupported: boolean;
+  source: 'POSTER';
+  available: boolean;
+  unavailableReason: 'poster_unavailable' | 'malformed_response' | null;
+  totalPaymentsMinor: number | null;
+  methodsTotalMinor: number | null;
+  payments: ReportsPaymentRow[];
+  cupRevenueMinor: number;
+  warnings: string[];
+}
+
 // Finance-1 — GET /admin/finance/*. Every number is computed by the backend (whole UZS minor units); the UI only
 // formats. Revenue reuses Analytics' own already-deduped CUP+POS source; COGS is read live from Poster's own
 // recipe data (never invented) and is explicitly flagged incomplete rather than guessed.

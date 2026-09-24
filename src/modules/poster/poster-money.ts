@@ -65,3 +65,27 @@ export function cupUzsToPosterPrice(uzs: number): number {
   }
   return uzs * POSTER_PRICE_UNITS_PER_CUP_UZS;
 }
+
+// Reports Phase B2 — Poster REPORT aggregates (dash.getPaymentsReport) -> CUP whole UZS. Same documented kopeck
+// wire unit as above, but an aggregate is a sum Poster computed itself and is not guaranteed to be a whole number
+// of so'm, so it is rounded (half away from zero, in integer arithmetic) instead of rejected. Returns null for
+// anything that is not an integer amount, so the caller can refuse a malformed report rather than show a guess.
+// NOT for dash.getSpotsSales — see poster.types.ts's PosterSpotsSales comment for why that endpoint is not /100.
+export function posterReportAmountToCupUzs(raw: unknown): number | null {
+  const units = posterReportRawUnits(raw);
+  if (units === null) return null;
+  const sign = units < 0 ? -1 : 1;
+  const abs = Math.abs(units);
+  const whole = Math.floor(abs / POSTER_PRICE_UNITS_PER_CUP_UZS);
+  const rest = abs - whole * POSTER_PRICE_UNITS_PER_CUP_UZS;
+  return sign * (rest * 2 >= POSTER_PRICE_UNITS_PER_CUP_UZS ? whole + 1 : whole);
+}
+
+// The raw integer Poster sent (number or numeric string), or null if it is not an integer. Used for exact
+// comparisons on Poster's own scale before any rounding happens.
+export function posterReportRawUnits(raw: unknown): number | null {
+  if (typeof raw === 'string' && raw.trim() === '') return null;
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) ? n : null;
+}

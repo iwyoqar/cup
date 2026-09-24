@@ -227,6 +227,27 @@ export interface PosterSpotsSales {
   middle_invoice: number;
 }
 
+// Reports Phase B2 — dash.getPaymentsReport (official docs: en/web/dash/getPaymentsReport.md). Documented GET params:
+// date_from / date_to (Ymd, inclusive — NOTE the snake_case, unlike dash.getSpotsSales's dateFrom/dateTo) and an
+// optional spot_id. Documented response: { days: [...], total: {...} } where every `payed_*_sum` is "in kopecks"
+// (days carry numeric STRINGS, total carries NUMBERS in the docs' own example); `days` switches to monthly buckets
+// for ranges over 65 days, so CUP reads `total` only. `payed_sum_sum` is Poster's own all-methods total. The docs
+// list payed_cash_sum, payed_card_sum, payed_third_party_sum (total only), payed_cert_in_sum, payed_cert_out_sum,
+// payed_bonus_sum and payed_incust_sum; any further `payed_*_sum` key the real account returns is kept, never
+// dropped or renamed. NOT verified live yet (no Poster credentials in the environment this was written in) —
+// PosterReportsService validates every field at runtime instead of trusting this shape.
+export type PosterPaymentsReportAmount = number | string;
+
+export interface PosterPaymentsReportTotal {
+  payed_sum_sum?: PosterPaymentsReportAmount;
+  [key: string]: PosterPaymentsReportAmount | undefined;
+}
+
+export interface PosterPaymentsReportRaw {
+  days?: ({ date?: string } & Record<string, PosterPaymentsReportAmount | undefined>)[];
+  total?: PosterPaymentsReportTotal;
+}
+
 // Phase 25 — clients.createClient. CONFIRMED against official docs (github.com/joinposter/docs,
 // en/web/clients/createClient.md) AND against a real live create on the development account
 // (2026-09-23, disposable test phone +998900000001 -> client_id 3): response is a bare number

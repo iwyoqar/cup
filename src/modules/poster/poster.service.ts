@@ -16,6 +16,7 @@ import {
   PosterProduct,
   PosterProductDetail,
   PosterSpot,
+  PosterPaymentsReportRaw,
   PosterSpotsSales,
   PosterTransaction,
 } from './poster.types';
@@ -147,6 +148,14 @@ export class PosterService {
   // fake a breakdown. See poster.types.ts for why `revenue` here is NOT divided by 100 like elsewhere in this module.
   async getSpotsSales(dateFrom: string, dateTo: string, spotId?: string): Promise<PosterSpotsSales> {
     return this.get<PosterSpotsSales>('dash.getSpotsSales', { dateFrom, dateTo, ...(spotId ? { spot_id: spotId } : {}) });
+  }
+
+  // Reports Phase B2 — READ-ONLY dash.getPaymentsReport (payment-method totals). Documented params are snake_case
+  // date_from/date_to (Ymd, inclusive) plus optional spot_id; omitted, Poster covers every location. Returned as
+  // `unknown` on purpose: the shape is validated field by field in PosterReportsService, never trusted here. One call
+  // per report request — never once per payment method or per branch.
+  async getPaymentsReport(dateFrom: string, dateTo: string, spotId?: string): Promise<unknown> {
+    return this.get<unknown>('dash.getPaymentsReport', { date_from: dateFrom, date_to: dateTo, ...(spotId ? { spot_id: spotId } : {}) });
   }
 
   async createOrder(input: CreatePosterOrderInput): Promise<PosterCreateOrderOutcome> {

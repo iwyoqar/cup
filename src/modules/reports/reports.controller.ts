@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AdminAuthGuard } from '../admin-auth/admin-auth.guard';
 import { parseBusinessDate } from '../analytics/analytics-period';
 import { ReportsLocationsService } from './reports-locations.service';
+import { ReportsPaymentsService } from './reports-payments.service';
 import { ReportsService } from './reports.service';
 
 // Same query convention as /admin/analytics/overview (Part 3 of the Phase A spec): `period` (today | yesterday |
@@ -24,6 +25,7 @@ export class ReportsController {
   constructor(
     private readonly reportsService: ReportsService,
     private readonly reportsLocationsService: ReportsLocationsService,
+    private readonly reportsPaymentsService: ReportsPaymentsService,
   ) {}
 
   @Get('overview')
@@ -45,5 +47,13 @@ export class ReportsController {
     const parsed = overviewQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException('Invalid reports query.');
     return this.reportsLocationsService.getLocations(parsed.data);
+  }
+
+  // Reports Phase B2 — payment-method breakdown read from Poster (observational; never part of any revenue figure).
+  @Get('payments')
+  payments(@Query() query: unknown) {
+    const parsed = overviewQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException('Invalid reports query.');
+    return this.reportsPaymentsService.getPayments(parsed.data);
   }
 }
