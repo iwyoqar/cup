@@ -1,5 +1,9 @@
 # Changelog
 
+## Fix — Step 2.1: Poster scan window now uses UTC+5 business-local day boundaries (2026-09-24)
+
+`resolveWindow()` (the only thing `analyze()` calls) treated a `since`/`until` date string as a raw UTC calendar day instead of the UTC+5 business-local day Finance/Analytics already use — a single-day scan (`today`/`yesterday`) could misattribute a receipt near midnight local time, causing a real 375,000 so'm daily reconciliation mismatch found during Step 2's production verification. Now reuses `rangeFor`/`addDays`/`businessDateOf`/`parseBusinessDate` from `analytics-period.ts` (no second date-range implementation); the Poster-side fetch window is widened a day each side (matching `poster-reconcile.service.ts`'s own established pattern) and the result is filtered to the exact business-local window by `date_close` before classification. Verified against real production Poster data: the 7 affected receipts now correctly resolve as "today". No schema change, no revenue/attribution rule changes. `tsc --noEmit` / `npm run build` clean.
+
 ## Finance V2 Step 2 — Revenue Reconciliation (2026-09-24)
 
 New `Admin → Finance → Reconciliation` tab + `GET /admin/finance/reconciliation`: a read-only verification layer around the existing canonical revenue (`AnalyticsRepository.cupTotals`/`posTotals`, unchanged) that reuses `PosterTransactionImportService.analyze()` (the same live-Poster read-only scan the import preview already uses). Shows Poster gross qualifying sales split into CUP-originated vs independent POS (already-recognized vs pending, by reason), customer/branch attribution (unattributed is never excluded revenue), excluded transactions by reason, and a RECONCILED/MISMATCH/INCOMPLETE status from cross-checking the live scan's own "already imported" total against the canonical stored revenue for the same window.

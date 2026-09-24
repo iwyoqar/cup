@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '../../common/config/config.service';
+import { addDays, businessDateOf, parseBusinessDate, rangeFor } from '../analytics/analytics-period';
 import { PosterService } from '../poster/poster.service';
 import { PosterTransaction } from '../poster/poster.types';
 import { ImportedTransactionData, PosterImportRepository } from './poster-import.repository';
@@ -247,12 +248,18 @@ export class PosterTransactionImportService {
 
   // The read-only classification. NEVER writes anything (not even the CUP-link cache — those are returned and saved by run() only after the gates).
   async analyze(request: { since?: string; until?: string; limit?: number; write?: boolean }): Promise<Analysis> {
-    const window = resolveWindow(request.since, request.until);
+    const window = resolveWindow(request.since, request.until, this.config.env.BUSINESS_TIMEZONE_OFFSET_MINUTES);
     const limit = clampLimit(request.limit);
 
-    // 1. Poster read (one request for the whole bounded window), oldest first, then capped.
+    // 1. Poster read (dateFrom/dateTo already widened by a day each side — see resolveWindow's own comment), then
+    // filtered to the EXACT business-local window by the receipt's own close time — never trusting Poster's own
+    // date-string filter to have used the same day boundary this business does.
     const fetched = await this.poster.getClosedTransactions(window.dateFrom, window.dateTo);
-    const ordered = [...fetched].sort((a, b) => Number(a.transaction_id) - Number(b.transaction_id));
+    const inWindow = fetched.filter((t) => {
+      const closeMs = Number(t.date_close);
+      return Number.isFinite(closeMs) && closeMs >= window.from && closeMs < window.to;
+    });
+    const ordered = [...inWindow].sort((a, b) => Number(a.transaction_id) - Number(b.transaction_id));
     const batch = ordered.slice(0, limit);
 
     const summary = this.newSummary({ since: window.since, until: window.until }, limit, ordered.length > limit, batch.length, !!request.write);
@@ -518,31 +525,35 @@ function hasApplicationId(raw: PosterTransaction): boolean {
 
 // --- bounded input handling -----------------------------------------------------------------------------------
 
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
-
-export function resolveWindow(since?: string, until?: string): { since: string; until: string; dateFrom: string; dateTo: string } {
-  const today = new Date();
-  const untilDate = until ? parseDate(until) : new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-  const sinceDate = since ? parseDate(since) : new Date(untilDate.getTime() - 24 * 3600 * 1000);
-  if (sinceDate.getTime() > untilDate.getTime()) throw new BadRequestException('since must not be after until.');
-  const days = Math.round((untilDate.getTime() - sinceDate.getTime()) / (24 * 3600 * 1000)) + 1;
-  if (days > MAX_WINDOW_DAYS) throw new BadRequestException(`The window may span at most ${MAX_WINDOW_DAYS} days.`);
-  return { since: isoDate(sinceDate), until: isoDate(untilDate), dateFrom: ymd(sinceDate), dateTo: ymd(untilDate) };
-}
-
-function parseDate(value: string): Date {
-  if (!DATE_ONLY.test(value)) throw new BadRequestException('Dates must be YYYY-MM-DD.');
-  const date = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(date.getTime()) || isoDate(date) !== value) throw new BadRequestException('Invalid date.');
-  return date;
-}
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function ymd(date: Date): string {
-  return isoDate(date).replace(/-/g, '');
+// Step 2.1 (2026-09-24) — a `since`/`until` date string now means a BUSINESS-LOCAL calendar day (the same UTC+5
+// convention resolveFinanceRange/analytics-period.ts already established for Finance), not a raw UTC day. Verified
+// live in production: 7 receipts at 20:47-21:04 UTC (01:47-02:04 local) were previously attributed to the wrong
+// UTC calendar date by a plain single-day scan, producing a real 375,000 so'm daily reconciliation mismatch that a
+// multi-day window never showed (the boundary receipt landed inside it either way). Reuses rangeFor/addDays/
+// businessDateOf from analytics-period.ts directly — no second date-range implementation.
+//
+// Poster's own account-timezone interpretation of a plain date string is unverified (and, per
+// poster-reconcile.service.ts's own DATE_MARGIN comment, known to differ from this business's UTC+5 offset) — so
+// dateFrom/dateTo (sent to Poster's own date-filtered API) are widened by a day on each side, exactly like
+// poster-reconcile.service.ts already does for the same reason. This only ever WIDENS what Poster returns, never
+// what gets counted: `from`/`to` are the exact business-local instants the fetched batch is filtered against
+// immediately after (see analyze()), so a receipt just outside the requested window is still correctly excluded.
+export function resolveWindow(since: string | undefined, until: string | undefined, offsetMinutes: number): { since: string; until: string; dateFrom: string; dateTo: string; from: number; to: number } {
+  const today = businessDateOf(new Date(), offsetMinutes);
+  const untilDate = until ?? today;
+  const sinceDate = since ?? addDays(untilDate, -1);
+  if (!parseBusinessDate(sinceDate) || !parseBusinessDate(untilDate)) throw new BadRequestException('Dates must be YYYY-MM-DD.');
+  if (sinceDate > untilDate) throw new BadRequestException('since must not be after until.');
+  const range = rangeFor(sinceDate, untilDate, offsetMinutes);
+  if (range.days > MAX_WINDOW_DAYS) throw new BadRequestException(`The window may span at most ${MAX_WINDOW_DAYS} days.`);
+  return {
+    since: sinceDate,
+    until: untilDate,
+    dateFrom: addDays(sinceDate, -1).replace(/-/g, ''),
+    dateTo: addDays(untilDate, 1).replace(/-/g, ''),
+    from: range.from.getTime(),
+    to: range.to.getTime(),
+  };
 }
 
 function clampLimit(limit?: number): number {

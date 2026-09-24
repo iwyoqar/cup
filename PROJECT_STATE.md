@@ -1,6 +1,14 @@
 # CUP Coffee — Project State
 
-Last updated: 2026-09-24 (Finance V2 Step 2 — Revenue Reconciliation, code-complete, not yet deployed; caught a real historical money-scale artifact in LOCAL dev.db only — production confirmed clean).
+Last updated: 2026-09-24 (Step 2.1 — fixed a real UTC+5 day-boundary bug in Poster's read-only scan window, found by Reconciliation's own production verification).
+
+## Fix — Step 2.1: Poster scan window now uses business-local (UTC+5) day boundaries (2026-09-24)
+
+Found by Reconciliation's own read-only production verification (Step 2): a single-day `analyze()` scan (`today`/`yesterday`) used `resolveWindow()`, which treated a date string as a raw UTC calendar day — not the UTC+5 business-local day `resolveFinanceRange()`/Analytics already use. 7 real production receipts at 20:47–21:04 UTC (01:47–02:04 local) were attributed to the wrong UTC-side calendar date, producing a real 375,000 so'm daily reconciliation mismatch (invisible in multi-day windows, since the boundary receipt landed inside either way).
+
+**Fix, one file, one caller (`resolveWindow()`'s only call site is `analyze()`):** `resolveWindow()` now reuses `rangeFor`/`addDays`/`businessDateOf`/`parseBusinessDate` from `analytics-period.ts` directly (no second date-range implementation) to resolve the exact UTC+5 business-local instant range. The Poster-side `dateFrom`/`dateTo` are widened by a day each side (mirroring `poster-reconcile.service.ts`'s own established `DATE_MARGIN` pattern, since Poster's own account-timezone interpretation of a date string is unverified/likely different) — `analyze()` then filters the fetched batch to the *exact* business-local window by each receipt's own `date_close` before classification, so the widened Poster read never widens what actually gets counted. Revenue formulas, CUP/POS attribution rules, and import eligibility are all unchanged.
+
+**Verified against real production Poster data:** the 7 boundary receipts are all present in the widened Poster read (dateFrom=20260923/dateTo=20260925) and now correctly resolve as "today" (not "yesterday") under the fixed window math — the mismatch is arithmetically eliminated (the window now equals what `posTotals()` already used). `npx tsc --noEmit` / `npm run build` clean. No schema change.
 
 ## Finance V2 Step 2 — Revenue Reconciliation (2026-09-24, code-complete, not deployed)
 
