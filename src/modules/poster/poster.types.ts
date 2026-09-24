@@ -211,6 +211,22 @@ export interface PosterIncomingOrderLinkInfo {
   transaction_id?: string | number | null;
 }
 
+// Reports Phase B1 — dash.getSpotsSales (official docs: en/web/dash/getSpotsSales.md). VERIFIED live (2026-09-24)
+// against the real account: `revenue`/`middle_invoice` are ALREADY whole so'm-equivalent units here, NOT the
+// raw-kopeck wire format menu.getProducts/dash.getTransactions use elsewhere in this module — poster-money.ts's
+// /100 rule does NOT apply to this endpoint. Confirmed by comparing a real week's value (revenue 3,864,509) against
+// CUP's own canonical revenue for the identical range (3,635,266 so'm) — the same order of magnitude; dividing by
+// 100 would give an implausible ~38,645 so'm for a week of sales at this business. `clients`, despite its name, is
+// documented as "Order count" (a receipt count), never a distinct-customer count. `profit`/`profit_netto` exist on
+// the real response but are deliberately NOT modeled here: the Reports Phase 1 audit found Poster silently treats a
+// product with no configured recipe as zero-cost, making these figures unreliable — nothing in this codebase may
+// read or display them.
+export interface PosterSpotsSales {
+  revenue: number;
+  clients: number; // Poster's own field name; documented meaning is ORDER COUNT, not distinct customers
+  middle_invoice: number;
+}
+
 // Phase 25 — clients.createClient. CONFIRMED against official docs (github.com/joinposter/docs,
 // en/web/clients/createClient.md) AND against a real live create on the development account
 // (2026-09-23, disposable test phone +998900000001 -> client_id 3): response is a bare number

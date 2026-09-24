@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import { RewardProgram, RewardProgramListPage, RewardRedemptionsPage } from './types';
+import { AnalyticsPeriodKey, RewardProgram, RewardProgramListPage, RewardRedemptionsPage, RewardReport } from './types';
 
 export interface RewardProgramInput {
   name: string;
@@ -45,4 +45,19 @@ export function deactivateRewardProgram(id: string): Promise<RewardProgram> {
 export function fetchRewardRedemptions(id: string, cursor?: string): Promise<RewardRedemptionsPage> {
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
   return apiRequest<RewardRedemptionsPage>(`/admin/reward-programs/${id}/redemptions${query}`);
+}
+
+export interface RewardReportFilters {
+  period: AnalyticsPeriodKey;
+  startDate?: string;
+  endDate?: string;
+}
+
+export function fetchRewardReport(filters: RewardReportFilters): Promise<RewardReport> {
+  const params = new URLSearchParams({ period: filters.period });
+  if (filters.period === 'custom') {
+    if (filters.startDate) params.set('startDate', filters.startDate);
+    if (filters.endDate) params.set('endDate', filters.endDate);
+  }
+  return apiRequest<RewardReport>(`/admin/reward-programs/reports/5-plus-1?${params.toString()}`);
 }

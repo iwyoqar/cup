@@ -98,6 +98,31 @@ export class RewardProgressRepository {
     return result;
   }
 
+  // 5+1 Admin Report — every customer who has EVER made a qualifying purchase in this category, CUP or imported
+  // POS, all-time (no date bound — matches the reward engine's own always-cumulative progress math, never a new
+  // period-scoped qualification rule). Two `distinct` queries, never a loop; used only to build the bounded
+  // "which customers participate" universe the report's summary/available-reward figures are computed over.
+  // customerId: { not: null } on the POS side excludes anonymous imported receipts (owner decision, 2026-09-24) —
+  // an anonymous purchase has no customer to ever "participate" as.
+  async distinctQualifyingCustomerIds(categoryId: string): Promise<string[]> {
+    const [cupOrders, posTransactions] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { status: { in: [...CUSTOMER_METRICS_ORDER_STATUSES] }, items: { some: { isRewardItem: false, product: { categoryId } } } },
+        select: { customerId: true },
+        distinct: ['customerId'],
+      }),
+      this.prisma.posterImportedTransaction.findMany({
+        where: { status: IMPORTED_POS_STATUS, paidMinor: { gt: 0 }, customerId: { not: null }, items: { some: { quantity: { gt: 0 }, posterPayedSumMinor: { gt: 0 }, product: { categoryId } } } },
+        select: { customerId: true },
+        distinct: ['customerId'],
+      }),
+    ]);
+    const ids = new Set<string>();
+    for (const o of cupOrders) ids.add(o.customerId);
+    for (const t of posTransactions) if (t.customerId) ids.add(t.customerId);
+    return [...ids];
+  }
+
   // A qualifying order/transaction is one that has AT LEAST ONE qualifying line — filtered with the
   // exact same predicates sumCupQuantity/sumImportedPosQuantity use per-line, just counting the
   // parent row once (via `some`) instead of summing every matching line's quantity.

@@ -9,6 +9,7 @@ import { AdminPage, NAV_GROUPS } from './nav';
 const PATH_TO_PAGE = new Map<string, AdminPage>(NAV_GROUPS.flatMap((g) => g.items.map((i) => [i.path, i.id] as const)));
 
 export function pageForPath(pathname: string): AdminPage {
+  if (pathname === '/admin/reports') return 'reports-overview'; // parent route redirect (Part 10 of the Reports Phase A spec)
   return PATH_TO_PAGE.get(pathname) ?? 'dashboard';
 }
 

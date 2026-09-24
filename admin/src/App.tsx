@@ -6,11 +6,15 @@ import { AdminProfile } from './lib/types';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { ReportsOverviewPage } from './pages/ReportsOverviewPage';
+import { ReportsSalesPage } from './pages/ReportsSalesPage';
+import { ReportsLocationsPage } from './pages/ReportsLocationsPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { SegmentsPage } from './pages/SegmentsPage';
 import { CampaignsPage } from './pages/CampaignsPage';
 import { PromotionsPage } from './pages/PromotionsPage';
 import { RewardProgramsPage } from './pages/RewardProgramsPage';
+import { FivePlusOneReportPage } from './pages/FivePlusOneReportPage';
 import { LoyaltyPage } from './pages/LoyaltyPage';
 import { AutomationsPage } from './pages/AutomationsPage';
 import { ReferralsPage } from './pages/ReferralsPage';
@@ -92,10 +96,14 @@ export function App() {
       {page === 'dashboard' && <DashboardPage admin={admin} onNavigate={navigate} />}
       {page === 'sales' && <AnalyticsPage view="sales" />}
       {page === 'analytics' && <AnalyticsPage view="analytics" />}
+      {page === 'reports-overview' && <ReportsOverviewPage />}
+      {page === 'reports-sales' && <ReportsSalesPage />}
+      {page === 'reports-locations' && <ReportsLocationsPage />}
       {page === 'customers' && <CustomersPage />}
       {page === 'segments' && <SegmentsPage />}
       {page === 'loyalty' && <LoyaltyPage />}
       {page === 'rewards' && <RewardProgramsPage />}
+      {page === 'rewards-5plus1' && <FivePlusOneReportPage />}
       {page === 'promotions' && <PromotionsPage />}
       {page === 'referrals' && <ReferralsPage />}
       {page === 'campaigns' && <CampaignsPage />}

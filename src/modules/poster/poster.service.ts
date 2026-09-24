@@ -16,6 +16,7 @@ import {
   PosterProduct,
   PosterProductDetail,
   PosterSpot,
+  PosterSpotsSales,
   PosterTransaction,
 } from './poster.types';
 
@@ -138,6 +139,14 @@ export class PosterService {
 
   async getSpots(): Promise<PosterSpot[]> {
     return this.get<PosterSpot[]>('access.getSpots');
+  }
+
+  // Reports Phase B1 — READ-ONLY dash.getSpotsSales (location sales report), dateFrom/dateTo in Poster's documented
+  // Ymd format. `spotId` scopes to one Poster location; omitted, Poster aggregates ALL locations into one combined
+  // total (there is no per-location breakdown in a single call) — callers must never call this once per branch to
+  // fake a breakdown. See poster.types.ts for why `revenue` here is NOT divided by 100 like elsewhere in this module.
+  async getSpotsSales(dateFrom: string, dateTo: string, spotId?: string): Promise<PosterSpotsSales> {
+    return this.get<PosterSpotsSales>('dash.getSpotsSales', { dateFrom, dateTo, ...(spotId ? { spot_id: spotId } : {}) });
   }
 
   async createOrder(input: CreatePosterOrderInput): Promise<PosterCreateOrderOutcome> {

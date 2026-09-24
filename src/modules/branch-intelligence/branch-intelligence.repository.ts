@@ -7,6 +7,28 @@ import { dayBucketFromEpochMsSql, epochMsCastSql, epochMsParam } from '../../com
 const ORDER_STATUSES = [...CUSTOMER_METRICS_ORDER_STATUSES];
 const num = (v: bigint | number | string | null | undefined): number => (v === null || v === undefined ? 0 : Number(v));
 
+// A branch whose only activity in the period is anonymous POS purchases has no row from branchRowsIdentified() at
+// all (nothing there to join against) — this is its starting point before anonymous revenue/orders are merged in.
+const EMPTY_BRANCH_ROW = (branchId: string): BranchRow => ({
+  branchId,
+  customers: 0,
+  orders: 0,
+  revenue: 0,
+  cupOrders: 0,
+  cupRevenue: 0,
+  posOrders: 0,
+  posRevenue: 0,
+  cupCustomers: 0,
+  posCustomers: 0,
+  newCustomers: 0,
+  customers2Plus: 0,
+  customers3Plus: 0,
+  repeatPurchases: 0,
+  alsoOtherBranches: 0,
+  latestHere: 0,
+  arrivedFromOther: 0,
+});
+
 export interface RangeMs {
   from: number; // inclusive epoch ms
   to: number; // exclusive epoch ms
@@ -76,7 +98,29 @@ export class BranchIntelligenceRepository {
   }
 
   // Per-branch period metrics in one pass: purchases at MAPPED branches inside the period, grouped per (branch, customer) and then per branch.
+  //
+  // Bug found during Reports Phase B1 (2026-09-24): the raw query below INNER JOINs per-purchase rows against `nb`/`lp` ON customerId, so an anonymous
+  // POS purchase (customerId NULL, introduced by Phase 19) is silently dropped from EVERY figure here, including revenue/orders — not just the
+  // customer-behavior figures where dropping it would actually be correct (a purchase with no customer cannot have cross-branch customer behavior).
+  // `totals()` below has no such join and correctly includes anonymous revenue, so branch revenue could undercount the all-branches total by exactly
+  // the anonymous amount, with no "unmapped" figure to explain the gap (these rows DO have a branchId). Fixed by keeping the query's identified-customer
+  // behavior exactly as before (nb/lp/rn/prevB are genuinely undefined for a purchase with no customer — the INNER JOIN there is correct) and merging
+  // anonymous purchases back in afterwards as pure revenue/orders, via posAnonymousByBranch() below, which never touches a customer-level figure.
   async branchRows(r: RangeMs): Promise<BranchRow[]> {
+    const [rows, anonymous] = await Promise.all([this.branchRowsIdentified(r), this.posAnonymousByBranch(r)]);
+    const byId = new Map(rows.map((row) => [row.branchId, row]));
+    for (const a of anonymous) {
+      const row = byId.get(a.branchId) ?? EMPTY_BRANCH_ROW(a.branchId);
+      row.orders += a.orders;
+      row.revenue += a.revenue;
+      row.posOrders += a.orders;
+      row.posRevenue += a.revenue;
+      byId.set(a.branchId, row);
+    }
+    return [...byId.values()];
+  }
+
+  private async branchRowsIdentified(r: RangeMs): Promise<BranchRow[]> {
     const rows = await this.prisma.$queryRaw<Record<string, bigint | number | string | null>[]>(Prisma.sql`
       WITH p AS (${PURCHASES}), s AS (${SEQUENCED}),
       per AS (SELECT * FROM s WHERE t >= ${r.from} AND t < ${r.to} AND b IS NOT NULL),
@@ -145,6 +189,18 @@ export class BranchIntelligenceRepository {
     };
   }
 
+  // Reports Phase B1 — the customer-less subset of each branch's POS revenue (posRevenue in branchRows() above), grouped by branch. Never a second POS
+  // revenue calculation: callers derive "identified POS" per branch by subtracting this from branchRows()'s own posRevenue/posOrders for that branch.
+  async posAnonymousByBranch(r: RangeMs): Promise<{ branchId: string; orders: number; revenue: number }[]> {
+    const rows = await this.prisma.$queryRaw<{ b: string; orders: bigint | number; revenue: bigint | number | null }[]>(Prisma.sql`
+      SELECT "branchId" AS b, COUNT(*) AS orders, SUM("totalMinor") AS revenue
+        FROM "poster_imported_transactions"
+       WHERE "status" = 'IMPORTED' AND "customerId" IS NULL AND "branchId" IS NOT NULL
+         AND "occurredAt" >= ${epochMsParam(r.from)} AND "occurredAt" < ${epochMsParam(r.to)}
+       GROUP BY "branchId"`);
+    return rows.map((x) => ({ branchId: x.b, orders: num(x.orders), revenue: num(x.revenue) }));
+  }
+
   // Per branch: the latest qualifying purchase EVER (not limited to the period) and how many calendar days of the period had at least one purchase.
   async activity(r: RangeMs, offsetMinutes: number): Promise<{ branchId: string; lastAt: number; activeDays: number }[]> {
     const rows = await this.prisma.$queryRaw<{ b: string; lastAt: bigint | number; activeDays: bigint | number }[]>(Prisma.sql`
@@ -196,8 +252,11 @@ export class BranchIntelligenceRepository {
   }
 
   // The customers who purchased at the branch in the period (used only for the customer-level reward availability figure).
+  // c IS NOT NULL: an anonymous POS purchase (Phase 19) has no customer to check reward availability for — without
+  // this filter, a NULL slipped into the caller's customerId list and crashed a downstream Prisma `in` query (found
+  // during Reports Phase B1, 2026-09-24). Consistent with the same exclusion AnalyticsRepository.posCustomerIds() already applies.
   async customerIdsAtBranch(r: RangeMs, branchId: string): Promise<string[]> {
-    const rows = await this.prisma.$queryRaw<{ c: string }[]>(Prisma.sql`WITH p AS (${PURCHASES}) SELECT DISTINCT c FROM p WHERE b = ${branchId} AND t >= ${r.from} AND t < ${r.to}`);
+    const rows = await this.prisma.$queryRaw<{ c: string }[]>(Prisma.sql`WITH p AS (${PURCHASES}) SELECT DISTINCT c FROM p WHERE b = ${branchId} AND t >= ${r.from} AND t < ${r.to} AND c IS NOT NULL`);
     return rows.map((x) => x.c);
   }
 

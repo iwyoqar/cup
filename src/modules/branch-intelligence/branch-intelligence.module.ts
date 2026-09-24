@@ -14,5 +14,7 @@ import { BranchIntelligenceService } from './branch-intelligence.service';
   imports: [AdminAuthModule, AnalyticsModule, GrowthIntelligenceModule, RewardsModule],
   controllers: [BranchIntelligenceController],
   providers: [BranchIntelligenceRepository, BranchIntelligenceService],
+  // Reports Phase B1: Locations reuses this service's canonical branch attribution instead of re-deriving it.
+  exports: [BranchIntelligenceRepository, BranchIntelligenceService],
 })
 export class BranchIntelligenceModule {}

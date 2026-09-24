@@ -9,6 +9,7 @@ import { RewardProgressRepository } from './reward-progress.repository';
 import { RewardProgressService } from './reward-progress.service';
 import { RewardRedemptionsRepository } from './reward-redemptions.repository';
 import { RewardRedemptionService } from './reward-redemption.service';
+import { RewardReportService } from './reward-report.service';
 
 // CatalogModule is reused for qualifying-category/reward-product validation — never a second
 // product/category lookup (same pattern PromotionsModule already established for FREE_PRODUCT).
@@ -36,6 +37,7 @@ import { RewardRedemptionService } from './reward-redemption.service';
     RewardEligibilityService,
     RewardRedemptionsRepository,
     RewardRedemptionService,
+    RewardReportService,
   ],
   exports: [RewardProgramsService, RewardRedemptionService, RewardProgressRepository, RewardProgramsRepository, RewardEligibilityService],
 })

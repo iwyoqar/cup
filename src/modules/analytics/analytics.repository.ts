@@ -106,23 +106,23 @@ export class AnalyticsRepository {
   async cupDailyRevenue(range: QueryRange, offsetMinutes: number): Promise<DailyRow[]> {
     const branch = range.branchId ? Prisma.sql`AND "branchId" = ${range.branchId}` : Prisma.empty;
     const day = dayBucketSql('"createdAt"', offsetMinutes);
-    const rows = await this.prisma.$queryRaw<{ day: string; revenue: bigint | number | null }[]>(Prisma.sql`
-      SELECT ${day} AS day, SUM("totalMinor") AS revenue
+    const rows = await this.prisma.$queryRaw<{ day: string; revenue: bigint | number | null; orders: bigint | number }[]>(Prisma.sql`
+      SELECT ${day} AS day, SUM("totalMinor") AS revenue, COUNT(*) AS orders
       FROM "orders"
       WHERE "status" IN (${Prisma.join(CUP_STATUSES)}) AND "createdAt" >= ${dateTimeParam(range.from)} AND "createdAt" < ${dateTimeParam(range.to)} ${branch}
       GROUP BY day`);
-    return rows.map((r) => ({ day: r.day, revenue: Number(r.revenue ?? 0) }));
+    return rows.map((r) => ({ day: r.day, revenue: Number(r.revenue ?? 0), orders: Number(r.orders ?? 0) }));
   }
 
   async posDailyRevenue(range: QueryRange, offsetMinutes: number): Promise<DailyRow[]> {
     const branch = range.branchId ? Prisma.sql`AND "branchId" = ${range.branchId}` : Prisma.empty;
     const day = dayBucketSql('"occurredAt"', offsetMinutes);
-    const rows = await this.prisma.$queryRaw<{ day: string; revenue: bigint | number | null }[]>(Prisma.sql`
-      SELECT ${day} AS day, SUM("totalMinor") AS revenue
+    const rows = await this.prisma.$queryRaw<{ day: string; revenue: bigint | number | null; orders: bigint | number }[]>(Prisma.sql`
+      SELECT ${day} AS day, SUM("totalMinor") AS revenue, COUNT(*) AS orders
       FROM "poster_imported_transactions"
       WHERE "status" = 'IMPORTED' AND "occurredAt" >= ${dateTimeParam(range.from)} AND "occurredAt" < ${dateTimeParam(range.to)} ${branch}
       GROUP BY day`);
-    return rows.map((r) => ({ day: r.day, revenue: Number(r.revenue ?? 0) }));
+    return rows.map((r) => ({ day: r.day, revenue: Number(r.revenue ?? 0), orders: Number(r.orders ?? 0) }));
   }
 
   // --- products -------------------------------------------------------------------------------------------------

@@ -49,7 +49,7 @@ export class GrowthIntelligenceRepository {
           FROM "orders" WHERE "status" IN (${Prisma.join(ORDER_STATUSES)}) ${branch('"branchId"')} ${idFilter('"customerId"')}
         UNION ALL
         SELECT "customerId", ${epochMsCastSql('"occurredAt"')}, "totalMinor"
-          FROM "poster_imported_transactions" WHERE "status" = 'IMPORTED' ${branch('"branchId"')} ${idFilter('"customerId"')}
+          FROM "poster_imported_transactions" WHERE "status" = 'IMPORTED' AND "customerId" IS NOT NULL ${branch('"branchId"')} ${idFilter('"customerId"')}
       ), r AS (
         SELECT c, t, a,
                ROW_NUMBER() OVER (PARTITION BY c ORDER BY t) AS rn,

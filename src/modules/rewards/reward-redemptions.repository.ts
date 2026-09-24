@@ -65,6 +65,45 @@ export class RewardRedemptionsRepository {
     return this.prisma.rewardRedemption.count({ where: { rewardProgramId } });
   }
 
+  // 5+1 Admin Report — every customer who has EVER redeemed this program, all-time (participatingCustomers union).
+  async distinctCustomerIdsForProgram(rewardProgramId: string): Promise<string[]> {
+    const rows = await this.prisma.rewardRedemption.findMany({ where: { rewardProgramId }, select: { customerId: true }, distinct: ['customerId'] });
+    return rows.map((r) => r.customerId);
+  }
+
+  // Successful redemptions within a business-day range — the ONE "Free Coffees Redeemed" figure (never
+  // RewardRedemptionAttempt, which has no bearing on this count — see that model's own comment).
+  countForProgramInRange(rewardProgramId: string, from: Date, to: Date): Promise<number> {
+    return this.prisma.rewardRedemption.count({ where: { rewardProgramId, redeemedAt: { gte: from, lt: to } } });
+  }
+
+  // Top-N customers by successful redemption count within an optional period, tie-broken by most recent redemption
+  // then customer id (deterministic, never arbitrary — Part 7 of the 5+1 report spec). ONE grouped query, never one
+  // query per customer, whatever the number of customers.
+  async topCustomersForProgram(rewardProgramId: string, range: { from: Date; to: Date } | null, limit: number): Promise<{ customerId: string; count: number; lastRedemptionAt: Date }[]> {
+    const rows = await this.prisma.rewardRedemption.groupBy({
+      by: ['customerId'],
+      where: { rewardProgramId, ...(range ? { redeemedAt: { gte: range.from, lt: range.to } } : {}) },
+      _count: { _all: true },
+      _max: { redeemedAt: true },
+      orderBy: [{ _count: { customerId: 'desc' } }, { _max: { redeemedAt: 'desc' } }, { customerId: 'asc' }],
+      take: limit,
+    });
+    return rows.map((r) => ({ customerId: r.customerId, count: r._count._all, lastRedemptionAt: r._max.redeemedAt as Date }));
+  }
+
+  // Recent successful redemptions within an optional period, with only the DIRECT relations the schema actually
+  // has: customer (name/phone) and, when the redemption has a linked CUP order, that order's branch. A POS-path
+  // redemption (orderId null — the majority in practice) simply has no branch here, never inferred.
+  recentForProgram(rewardProgramId: string, range: { from: Date; to: Date } | null, limit: number) {
+    return this.prisma.rewardRedemption.findMany({
+      where: { rewardProgramId, ...(range ? { redeemedAt: { gte: range.from, lt: range.to } } : {}) },
+      orderBy: [{ redeemedAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+      include: { customer: { select: { displayName: true, phone: true } }, order: { select: { id: true, branch: { select: { name: true } } } } },
+    });
+  }
+
   list(rewardProgramId: string, options: { cursor?: string; take: number }) {
     return this.prisma.rewardRedemption.findMany({
       where: { rewardProgramId },

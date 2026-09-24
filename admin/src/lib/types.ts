@@ -625,6 +625,46 @@ export interface RewardRedemptionsPage {
   nextCursor: string | null;
 }
 
+// 5+1 Admin Report — GET /admin/reward-programs/reports/5-plus-1. Every number is computed by the backend from the
+// EXISTING reward engine; the UI only formats. Two time scopes: PERIOD (freeCoffeesRedeemed, topCustomers ranking,
+// recentRedemptions) vs CURRENT STATUS (everything else in summary, and topCustomers' own qualifyingCoffees/
+// currentProgress) — never conflate them when displaying.
+export interface RewardReportTopCustomer {
+  rank: number;
+  customerId: string;
+  customerName: string;
+  phone: string | null;
+  freeCoffeesRedeemed: number;
+  qualifyingCoffees: number;
+  currentProgress: { qualifyingCount: number; buyQuantity: number; availableRewards: number };
+  lastRedemptionAt: string;
+}
+
+export interface RewardReportRedemption {
+  redeemedAt: string;
+  customerId: string;
+  customerName: string;
+  rewardProductName: string;
+  branchName: string | null;
+  orderId: string | null;
+}
+
+export interface RewardReport {
+  program: { id: string; name: string; buyQuantity: number; rewardQuantity: number; qualifyingCategoryName: string; isActive: boolean } | null;
+  period: { key: AnalyticsPeriodKey; startDate: string; endDate: string; timezoneOffsetMinutes: number };
+  summary: {
+    participatingCustomers: number;
+    qualifyingCoffees: number;
+    freeCoffeesRedeemed: number;
+    rewardsAvailable: number;
+    customersWithAvailableReward: number;
+  };
+  topCustomers: RewardReportTopCustomer[];
+  recentRedemptions: RewardReportRedemption[];
+  branchAttributionAvailable: boolean;
+  notes: string[];
+}
+
 // Phase 17 — GET /admin/analytics/overview. Every number is computed by the backend (whole UZS); the UI only formats.
 export type AnalyticsPeriodKey = 'today' | 'yesterday' | 'last7' | 'last30' | 'custom';
 
@@ -644,6 +684,83 @@ export interface AnalyticsOverview {
     pos: { purchases: number; revenue: number; importedDataExists: boolean };
   };
   topProducts: { name: string; quantity: number; revenue: number }[];
+}
+
+// Reports Phase A — GET /admin/reports/overview and /admin/reports/sales. Both routes return this same shape (one
+// backend computation, reused by two pages — see src/modules/reports/reports.service.ts); every number is computed
+// by the backend, the UI only formats. Never re-derive revenue from these numbers client-side.
+export interface ReportsOverview {
+  period: { key: AnalyticsPeriodKey; startDate: string; endDate: string; timezoneOffsetMinutes: number };
+  branch: { id: string; name: string } | null;
+  filters: { branches: { id: string; name: string }[] };
+  revenue: number;
+  orders: number;
+  customers: number;
+  newCustomers: number;
+  returningCustomers: number;
+  averageOrder: number;
+  revenueByDay: { date: string; revenue: number }[];
+  ordersByDay: { date: string; orders: number }[];
+  sourceBreakdown: {
+    cupOriginated: { orders: number; revenue: number };
+    independentPos: { purchases: number; revenue: number };
+    anonymousPos: { purchases: number; revenue: number };
+    importedDataExists: boolean;
+  };
+  topProducts: { name: string; quantity: number; revenue: number }[];
+  notes: string[];
+}
+
+// Reports Phase B1 — GET /admin/reports/locations. posRevenue is identified + anonymous POS COMBINED;
+// anonymousPosRevenue is a subset breakout of it, never additive on top. posterReference is Poster's OWN report,
+// kept separate for comparison only — never merged into the CUP figures above it.
+export interface ReportsLocationsSummary {
+  revenue: number;
+  orders: number;
+  customers: number;
+  newCustomers: number;
+  returningCustomers: number;
+  averageReceipt: number;
+  cupRevenue: number;
+  posRevenue: number;
+  anonymousPosRevenue: number;
+  unattributedRevenue: number;
+  unattributedOrders: number;
+}
+
+export interface ReportsLocationsBranchRow {
+  branchId: string;
+  branchName: string;
+  revenue: number;
+  orders: number;
+  customers: number;
+  newCustomers: number;
+  returningCustomers: number;
+  averageReceipt: number;
+  cupRevenue: number;
+  posRevenue: number;
+  anonymousPosRevenue: number;
+}
+
+export interface PosterLocationReference {
+  available: boolean;
+  scope: 'all_locations_combined' | 'branch';
+  revenueMinor: number;
+  orders: number;
+  averageReceiptMinor: number;
+  note: string;
+}
+
+export interface ReportsLocationsOverview {
+  period: { key: AnalyticsPeriodKey; startDate: string; endDate: string; timezoneOffsetMinutes: number };
+  branch: { id: string; name: string } | null;
+  filters: { branches: { id: string; name: string }[] };
+  summary: ReportsLocationsSummary;
+  branches: ReportsLocationsBranchRow[];
+  trend: { date: string; revenue: number; orders: number }[];
+  detail: { customers: { new: number; returning: number } } | null;
+  posterReference: PosterLocationReference;
+  notes: string[];
 }
 
 // Finance-1 — GET /admin/finance/*. Every number is computed by the backend (whole UZS minor units); the UI only

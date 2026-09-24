@@ -11,6 +11,7 @@ export type AdminPage =
   | 'segments'
   | 'loyalty'
   | 'rewards'
+  | 'rewards-5plus1'
   | 'promotions'
   | 'referrals'
   | 'campaigns'
@@ -19,6 +20,9 @@ export type AdminPage =
   | 'continuous-sync'
   | 'staff'
   | 'analytics'
+  | 'reports-overview'
+  | 'reports-sales'
+  | 'reports-locations'
   | 'growth'
   | 'branch-intelligence'
   | 'finance'
@@ -69,6 +73,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'loyalty', label: 'Loyalty', icon: 'loyalty', description: 'Points, levels, XP, cashback, streaks and achievements.', path: '/admin/loyalty' },
       { id: 'rewards', label: 'Rewards', icon: 'rewards', description: 'Buy-X-get-Y reward programs, their progress and redemptions.', path: '/admin/rewards' },
+      { id: 'rewards-5plus1', label: '5+1 Coffee', icon: 'rewards', description: 'Participation, free coffees redeemed, top customers and redemption history.', path: '/admin/rewards/5-plus-1' },
       { id: 'promotions', label: 'Promotions', icon: 'promotions', description: 'Discounts and benefits: who is eligible and how they are used.', path: '/admin/promotions' },
       { id: 'referrals', label: 'Referrals', icon: 'referrals', description: 'Referral program rules, attribution and rewards.', path: '/admin/referrals' },
     ],
@@ -97,6 +102,15 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'analytics', label: 'Analytics', icon: 'analytics', description: 'Customers, sources and product performance over any period.', path: '/admin/analytics' },
       { id: 'growth', label: 'Growth Intelligence', icon: 'growth', description: 'Lifecycle, RFM and opportunities across all customers.', path: '/admin/growth' },
       { id: 'branch-intelligence', label: 'Branch Intelligence', icon: 'branch', description: 'Branch-by-branch performance, mix and customer behaviour.', path: '/admin/branch-intelligence' },
+    ],
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    items: [
+      { id: 'reports-overview', label: 'Overview', icon: 'analytics', description: 'Operational dashboard: revenue, orders, customers and trends.', path: '/admin/reports/overview' },
+      { id: 'reports-sales', label: 'Sales', icon: 'sales', description: 'Sales report: summary, trends, source split and top products.', path: '/admin/reports/sales' },
+      { id: 'reports-locations', label: 'Locations', icon: 'branch', description: 'Branch performance for the selected period.', path: '/admin/reports/locations' },
     ],
   },
   {
