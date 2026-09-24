@@ -224,7 +224,7 @@ function PnlTab({ ready, ...filters }: TabProps) {
       </SectionCard>
       {!data.cogs.complete && (
         <SectionCard description="Sold in this period, no Poster recipe configured yet — excluded from COGS above." title="Products with unknown cost">
-          <KeyValue rows={data.cogs.missingRecipeProducts.map((p) => ({ key: p.name, label: p.name, value: `×${number(p.quantity)}` }))} />
+          <KeyValue rows={data.cogs.missingRecipeProducts.map((p, i) => ({ key: `${p.name}-${i}`, label: p.name, value: `×${number(p.quantity)}` }))} />
         </SectionCard>
       )}
     </div>
