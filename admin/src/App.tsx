@@ -12,6 +12,14 @@ import { ReportsLocationsPage } from './pages/ReportsLocationsPage';
 import { ReportsPaymentsPage } from './pages/ReportsPaymentsPage';
 import { ReportsProductsPage } from './pages/ReportsProductsPage';
 import { ReportsCategoriesPage } from './pages/ReportsCategoriesPage';
+import { ReportsCustomersPage } from './pages/ReportsCustomersPage';
+import { ReportsEmployeesPage } from './pages/ReportsEmployeesPage';
+import { ReportsTaxesPage } from './pages/ReportsTaxesPage';
+import { ReportsLoyaltyPage } from './pages/ReportsLoyaltyPage';
+import { ReportsPromotionsPage } from './pages/ReportsPromotionsPage';
+import { ReportsCampaignsPage } from './pages/ReportsCampaignsPage';
+import { ReportsReferralsPage } from './pages/ReportsReferralsPage';
+import { ReportsAbcAnalysisPage } from './pages/ReportsAbcAnalysisPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { SegmentsPage } from './pages/SegmentsPage';
 import { CampaignsPage } from './pages/CampaignsPage';
@@ -105,6 +113,14 @@ export function App() {
       {page === 'reports-payments' && <ReportsPaymentsPage />}
       {page === 'reports-products' && <ReportsProductsPage />}
       {page === 'reports-categories' && <ReportsCategoriesPage />}
+      {page === 'reports-customers' && <ReportsCustomersPage />}
+      {page === 'reports-employees' && <ReportsEmployeesPage />}
+      {page === 'reports-taxes' && <ReportsTaxesPage />}
+      {page === 'reports-loyalty' && <ReportsLoyaltyPage onNavigate={navigate} />}
+      {page === 'reports-promotions' && <ReportsPromotionsPage />}
+      {page === 'reports-campaigns' && <ReportsCampaignsPage />}
+      {page === 'reports-referrals' && <ReportsReferralsPage />}
+      {page === 'reports-abc' && <ReportsAbcAnalysisPage />}
       {page === 'customers' && <CustomersPage />}
       {page === 'segments' && <SegmentsPage />}
       {page === 'loyalty' && <LoyaltyPage />}

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { posterAnalyticsRevenueToCupUzs, posterReportAmountToCupUzs, posterReportRawUnits } from '../poster/poster-money';
 import { PosterService } from '../poster/poster.service';
-import { PosterCategoriesSalesRow, PosterPaymentsReportRaw, PosterProductsSalesRow } from '../poster/poster.types';
+import { PosterCategoriesSalesRow, PosterEmployee, PosterPaymentsReportRaw, PosterProductsSalesRow, PosterTaxRow, PosterWaiterSalesRow } from '../poster/poster.types';
 
 // Reports Phase B1 — Poster's OWN sales report, exposed as a SEPARATE "reference" figure for comparison only. Never
 // the canonical CUP revenue source (that stays AnalyticsRepository/BranchIntelligenceRepository), and never merged
@@ -60,6 +60,38 @@ export interface PosterSalesReferenceRow {
 }
 
 export type PosterSalesReference = { available: true; rows: PosterSalesReferenceRow[] } | { available: false; reason: 'poster_unavailable' | 'malformed_response' };
+
+// Reports Phase D2 — Poster employee (waiter) sales, normalized. Revenue scale follows dash.getSpotsSales's verified
+// whole-so'm behaviour (see posterAnalyticsRevenueToCupUzs). `receipts` is Poster's `clients`, documented as closed
+// orders count. Poster profit / service-time fields are never read.
+export interface PosterWaiterSales {
+  employeeId: string;
+  name: string;
+  revenueMinor: number;
+  receipts: number | null; // null if Poster omitted / sent a non-integer count — never guessed
+}
+export type PosterWaitersReference = { available: true; rows: PosterWaiterSales[] } | { available: false; reason: 'poster_unavailable' | 'malformed_response' };
+
+export interface PosterEmployeeMeta {
+  employeeId: string;
+  name: string;
+  roleName: string | null;
+}
+
+// Reports Phase E — Poster's configured taxes, normalized. No amounts: finance.getTaxes does not report any.
+export interface PosterTaxConfig {
+  taxId: string;
+  name: string;
+  ratePercent: number | null;
+  typeLabel: string | null; // Poster's documented type code -> label; unknown codes stay null (never guessed)
+  fiscal: boolean | null;
+  rawDeleteFlag: string | null;
+}
+export type PosterTaxesReference = { available: true; taxes: PosterTaxConfig[] } | { available: false; reason: 'poster_unavailable' | 'malformed_response' };
+
+const POSTER_TAX_TYPES: Record<string, string> = { '1': 'Sales tax', '2': 'Turnover tax', '3': 'VAT', '4': 'No tax' };
+
+const idOf = (v: unknown): string => (typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '');
 
 function parseQuantity(raw: unknown): number | null {
   if (typeof raw !== 'string' && typeof raw !== 'number') return null;
@@ -192,7 +224,73 @@ export class PosterReportsService {
     return { available: true, rows };
   }
 
-  private malformedReference(detail: string): PosterSalesReference {
+  // One dash.getWaitersSales call (all branches — Poster documents no spot filter).
+  async getWaitersSales(dateFromYmd: string, dateToYmd: string): Promise<PosterWaitersReference> {
+    let raw: unknown;
+    try {
+      raw = await this.poster.getWaitersSales(dateFromYmd, dateToYmd);
+    } catch (err) {
+      this.logger.warn(`Poster waiters sales unavailable: ${err instanceof Error ? err.message : String(err)}`);
+      return { available: false, reason: 'poster_unavailable' };
+    }
+    if (!Array.isArray(raw)) return this.malformedReference('dash.getWaitersSales response is not an array');
+    const rows: PosterWaiterSales[] = [];
+    for (const row of raw as PosterWaiterSalesRow[]) {
+      const employeeId = idOf(row?.user_id);
+      const revenueMinor = posterAnalyticsRevenueToCupUzs(row?.revenue);
+      if (!employeeId || revenueMinor === null) return this.malformedReference('dash.getWaitersSales row missing user_id/revenue');
+      const receiptsRaw = row.clients === undefined ? null : Number(row.clients);
+      rows.push({ employeeId, name: typeof row.name === 'string' && row.name.trim() ? row.name : employeeId, revenueMinor, receipts: receiptsRaw !== null && Number.isInteger(receiptsRaw) && receiptsRaw >= 0 ? receiptsRaw : null });
+    }
+    return { available: true, rows };
+  }
+
+  // One access.getEmployees call. Metadata is optional: any failure returns null and the report still works.
+  async getEmployees(): Promise<Map<string, PosterEmployeeMeta> | null> {
+    try {
+      const raw = await this.poster.getEmployees();
+      if (!Array.isArray(raw)) return null;
+      const out = new Map<string, PosterEmployeeMeta>();
+      for (const e of raw as PosterEmployee[]) {
+        const employeeId = idOf(e?.user_id);
+        if (employeeId) out.set(employeeId, { employeeId, name: typeof e.name === 'string' ? e.name : employeeId, roleName: typeof e.role_name === 'string' && e.role_name ? e.role_name : null });
+      }
+      return out;
+    } catch (err) {
+      this.logger.warn(`Poster employees list unavailable: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  }
+
+  // One finance.getTaxes call.
+  async getTaxes(): Promise<PosterTaxesReference> {
+    let raw: unknown;
+    try {
+      raw = await this.poster.getTaxes();
+    } catch (err) {
+      this.logger.warn(`Poster taxes unavailable: ${err instanceof Error ? err.message : String(err)}`);
+      return { available: false, reason: 'poster_unavailable' };
+    }
+    if (!Array.isArray(raw)) return this.malformedReference('finance.getTaxes response is not an array');
+    const taxes: PosterTaxConfig[] = [];
+    for (const t of raw as PosterTaxRow[]) {
+      const taxId = idOf(t?.tax_id);
+      if (!taxId) return this.malformedReference('finance.getTaxes row missing tax_id');
+      const rate = t.tax_value === undefined || t.tax_value === '' ? null : Number(t.tax_value);
+      const fiscal = idOf(t.fiscal);
+      taxes.push({
+        taxId,
+        name: typeof t.tax_name === 'string' && t.tax_name ? t.tax_name : taxId,
+        ratePercent: rate !== null && Number.isFinite(rate) ? rate : null,
+        typeLabel: POSTER_TAX_TYPES[idOf(t.type)] ?? null,
+        fiscal: fiscal === '1' ? true : fiscal === '0' ? false : null,
+        rawDeleteFlag: idOf(t.delete) || null,
+      });
+    }
+    return { available: true, taxes };
+  }
+
+  private malformedReference(detail: string): { available: false; reason: 'malformed_response' } {
     this.logger.warn(`Poster sales reference malformed: ${detail}`);
     return { available: false, reason: 'malformed_response' };
   }

@@ -26,6 +26,14 @@ export type AdminPage =
   | 'reports-payments'
   | 'reports-products'
   | 'reports-categories'
+  | 'reports-customers'
+  | 'reports-employees'
+  | 'reports-taxes'
+  | 'reports-loyalty'
+  | 'reports-promotions'
+  | 'reports-campaigns'
+  | 'reports-referrals'
+  | 'reports-abc'
   | 'growth'
   | 'branch-intelligence'
   | 'finance'
@@ -117,6 +125,14 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'reports-payments', label: 'Payments', icon: 'finance', description: 'How sales were paid — payment methods as reported by Poster POS.', path: '/admin/reports/payments' },
       { id: 'reports-products', label: 'Products', icon: 'sales', description: 'Which products sell, the revenue they bring and their theoretical cost.', path: '/admin/reports/products' },
       { id: 'reports-categories', label: 'Categories', icon: 'segments', description: 'How sales are distributed across product categories.', path: '/admin/reports/categories' },
+      { id: 'reports-customers', label: 'Customers', icon: 'customers', description: 'Who buys, how much and how often — identified customers, with anonymous POS shown separately.', path: '/admin/reports/customers' },
+      { id: 'reports-employees', label: 'Employees', icon: 'staff', description: 'Sales Poster attributes to each Poster employee — descriptive, not a performance score.', path: '/admin/reports/employees' },
+      { id: 'reports-taxes', label: 'Taxes', icon: 'finance', description: "Poster's configured taxes next to CUP Finance's calculated tax liability — two separate sources.", path: '/admin/reports/taxes' },
+      { id: 'reports-loyalty', label: 'Loyalty', icon: 'loyalty', description: 'How the loyalty program is used: points, levels, rewards, cashback, achievements, birthdays.', path: '/admin/reports/loyalty' },
+      { id: 'reports-promotions', label: 'Promotions', icon: 'promotions', description: 'Which promotions are redeemed, how often and by how many customers.', path: '/admin/reports/promotions' },
+      { id: 'reports-campaigns', label: 'Campaigns', icon: 'campaigns', description: 'Telegram campaign send activity: recipients, successful and failed sends.', path: '/admin/reports/campaigns' },
+      { id: 'reports-referrals', label: 'Referrals', icon: 'referrals', description: 'Referral funnel, qualification, rewards and referrer activity.', path: '/admin/reports/referrals' },
+      { id: 'reports-abc', label: 'ABC Analysis', icon: 'analytics', description: 'Revenue-based A/B/C classification of the products sold in the period.', path: '/admin/reports/abc-analysis' },
     ],
   },
   {

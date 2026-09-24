@@ -64,9 +64,10 @@ export class AdminCustomersRepository {
   }
 }
 
+// Exported (Reports Phase D1) so the Customers report searches by exactly the same rule; logic unchanged.
 // Search is server-side only (spec Part 10) — no arbitrary query capability is ever exposed
 // to the Admin frontend, just a plain-text term matched against displayName/phone/username.
-function buildSearchWhere(search: string | undefined): Prisma.CustomerWhereInput {
+export function buildSearchWhere(search: string | undefined): Prisma.CustomerWhereInput {
   const trimmed = search?.trim();
   if (!trimmed) {
     return {};

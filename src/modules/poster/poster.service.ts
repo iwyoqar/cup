@@ -171,6 +171,22 @@ export class PosterService {
     return this.get<unknown>('dash.getCategoriesSales', { dateFrom, dateTo, ...(spotId ? { spot_id: spotId } : {}) });
   }
 
+  // Reports Phase D2 — READ-ONLY dash.getWaitersSales. Documented params are dateFrom/dateTo (Ymd) only — there is no
+  // spot filter. One call per report request. Validated by the caller (PosterReportsService).
+  async getWaitersSales(dateFrom: string, dateTo: string): Promise<unknown> {
+    return this.get<unknown>('dash.getWaitersSales', { dateFrom, dateTo });
+  }
+
+  // Reports Phase D2 — READ-ONLY access.getEmployees (employee metadata). One call per report request, never per employee.
+  async getEmployees(): Promise<unknown> {
+    return this.get<unknown>('access.getEmployees');
+  }
+
+  // Reports Phase E — READ-ONLY finance.getTaxes (Poster's configured tax list; no period, no amounts).
+  async getTaxes(): Promise<unknown> {
+    return this.get<unknown>('finance.getTaxes');
+  }
+
   async createOrder(input: CreatePosterOrderInput): Promise<PosterCreateOrderOutcome> {
     try {
       const raw = await this.post<CreatePosterOrderRawResponse>('incomingOrders.createIncomingOrder', input);

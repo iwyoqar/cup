@@ -40,5 +40,7 @@ import { FinanceRepository } from './finance.repository';
     FinanceRecurringExpenseService,
     FinanceRecurringExpenseJob,
   ],
+  // Reports Phase E reads the SAME tax liability (FinancePnlService) and rule list (FinanceTaxService) — wiring only.
+  exports: [FinancePnlService, FinanceTaxService],
 })
 export class FinanceModule {}

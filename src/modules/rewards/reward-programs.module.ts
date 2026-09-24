@@ -39,6 +39,7 @@ import { RewardReportService } from './reward-report.service';
     RewardRedemptionService,
     RewardReportService,
   ],
-  exports: [RewardProgramsService, RewardRedemptionService, RewardProgressRepository, RewardProgramsRepository, RewardEligibilityService],
+  // Reports Phase F1 also reuses RewardProgressService (current available rewards) — wiring only, no logic change.
+  exports: [RewardProgramsService, RewardRedemptionService, RewardProgressRepository, RewardProgressService, RewardProgramsRepository, RewardEligibilityService],
 })
 export class RewardsModule {}

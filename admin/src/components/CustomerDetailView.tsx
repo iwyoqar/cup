@@ -13,6 +13,10 @@ interface CustomerDetailViewProps {
   onBack: () => void;
   /** Phase 26: called after a successful deactivation, so the caller can navigate away and refresh its own list. */
   onDeactivated?: () => void;
+  /** Reports (Phase D1) open Customer 360 for viewing only: hides the two write actions below. Default false keeps the Customers page unchanged. */
+  readOnly?: boolean;
+  /** Label of the back button; defaults to the Customers page wording. */
+  backLabel?: string;
 }
 
 const NO_BRANCH = 'Filial aniqlanmagan';
@@ -26,7 +30,7 @@ function friendlyError(err: unknown): string {
 
 // Phase 11.4 — unified Customer 360. Every figure (totals, breakdown, favorite branch, reward progress, segments,
 // promotions, activity order) is calculated by the server; this page only formats and lays out what it receives.
-export function CustomerDetailView({ customerId, onBack, onDeactivated }: CustomerDetailViewProps) {
+export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly = false, backLabel }: CustomerDetailViewProps) {
   const [data, setData] = useState<AdminCustomer360 | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -90,7 +94,7 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated }: Custom
   return (
     <div className="c360">
       <button className="button-secondary" onClick={onBack} type="button" style={{ marginBottom: 16 }}>
-        ← Back to customers
+        ← {backLabel ?? 'Back to customers'}
       </button>
 
       {error && (
@@ -343,6 +347,7 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated }: Custom
               <span>CUP code</span>
               <span className="c360__code">{data.identity.loyaltyCode ?? '—'}</span>
             </div>
+            {!readOnly && (
             <div className="row" style={{ gap: 8 }}>
               <button className="button-secondary" disabled={regenerating} onClick={handleRegenerate} type="button">
                 {regenerating ? 'Regenerating...' : 'Regenerate code'}
@@ -351,6 +356,7 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated }: Custom
                 Deactivate customer
               </button>
             </div>
+            )}
             {actionError && <p className="error-text">{actionError}</p>}
           </section>
         </>

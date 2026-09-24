@@ -278,6 +278,45 @@ export interface PosterCategoriesSalesRow {
   revenue?: string | number;
 }
 
+// Reports Phase D2 — dash.getWaitersSales (official docs: en/web/dash/getWaitersSales.md). Documented GET params:
+// dateFrom/dateTo (Ymd, inclusive) ONLY — no spot_id, and no branch/spot field in the response, so employee sales
+// cannot be split by branch. Response: an ARRAY of { user_id, name, revenue, clients, middle_invoice, profit,
+// profit_netto, middle_time, worked_time }. `clients` is documented as "Closed orders count" (a receipt count, not
+// customers — the same field dash.getSpotsSales documents as "Order count"). `revenue` is documented in kopecks, but
+// dash.getSpotsSales's identically-documented `revenue` was VERIFIED live to be whole so'm (see poster-money.ts's
+// posterAnalyticsRevenueToCupUzs). profit / profit_netto / middle_time / worked_time are deliberately NOT modeled.
+// NOT verified live yet.
+export interface PosterWaiterSalesRow {
+  user_id?: string | number;
+  name?: string;
+  revenue?: string | number;
+  clients?: string | number;
+}
+
+// Reports Phase D2 — access.getEmployees (official docs: en/web/access/getEmployees.md). Metadata only: user_id,
+// name, role_name, user_type. Poster documents NO active/inactive flag for employees. NOT verified live yet.
+export interface PosterEmployee {
+  user_id?: string | number;
+  name?: string;
+  role_name?: string;
+  user_type?: string | number;
+}
+
+// Reports Phase E — finance.getTaxes (official docs: en/web/finance/getTaxes.md). This is Poster's tax CONFIGURATION
+// list — { tax_id, tax_name, tax_value (percent), type (1 sales tax, 2 turnover tax, 3 VAT, 4 no tax), fiscal, fixed,
+// delete } — with NO date parameters and NO amounts. It therefore cannot answer "how much tax in this period"; CUP
+// shows it as Poster's configured taxes only. The docs describe `delete` inconsistently ("0—removed, 1—not removed"),
+// so CUP passes the raw flag through without interpreting it. NOT verified live yet.
+export interface PosterTaxRow {
+  tax_id?: string | number;
+  tax_name?: string;
+  tax_value?: string | number;
+  type?: string | number;
+  fiscal?: string | number;
+  fixed?: string | number;
+  delete?: string | number;
+}
+
 // Phase 25 — clients.createClient. CONFIRMED against official docs (github.com/joinposter/docs,
 // en/web/clients/createClient.md) AND against a real live create on the development account
 // (2026-09-23, disposable test phone +998900000001 -> client_id 3): response is a bare number
