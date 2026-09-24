@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { posterReportAmountToCupUzs, posterReportRawUnits } from '../poster/poster-money';
+import { posterAnalyticsRevenueToCupUzs, posterReportAmountToCupUzs, posterReportRawUnits } from '../poster/poster-money';
 import { PosterService } from '../poster/poster.service';
-import { PosterPaymentsReportRaw } from '../poster/poster.types';
+import { PosterCategoriesSalesRow, PosterPaymentsReportRaw, PosterProductsSalesRow } from '../poster/poster.types';
 
 // Reports Phase B1 — Poster's OWN sales report, exposed as a SEPARATE "reference" figure for comparison only. Never
 // the canonical CUP revenue source (that stays AnalyticsRepository/BranchIntelligenceRepository), and never merged
@@ -48,6 +48,25 @@ const PAYMENT_METHOD_NAMES: Record<string, string> = {
 };
 const PAYMENT_FIELD = /^payed_([a-z0-9_]+)_sum$/;
 const TOTAL_FIELD = 'payed_sum_sum';
+
+// Reports Phase C1/C2 — Poster's own per-product / per-category sales, normalized. REFERENCE ONLY: Poster's figures
+// cover every sale Poster saw (CUP-originated incoming orders included), so they are compared with CUP's canonical
+// figures, never added to them. Poster profit fields are never read.
+export interface PosterSalesReferenceRow {
+  posterId: string; // Poster product_id / category_id, as a string
+  name: string;
+  quantity: number; // Poster's `count` — may be fractional for weight-sold products; rounded to 3 decimals
+  revenueMinor: number; // whole UZS
+}
+
+export type PosterSalesReference = { available: true; rows: PosterSalesReferenceRow[] } | { available: false; reason: 'poster_unavailable' | 'malformed_response' };
+
+function parseQuantity(raw: unknown): number | null {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+  if (typeof raw === 'string' && raw.trim() === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.round(n * 1000) / 1000 : null;
+}
 
 const UNAVAILABLE_NOTE = 'Poster reference could not be read for this period.';
 
@@ -122,6 +141,60 @@ export class PosterReportsService {
     }
 
     return { available: true, methods, totalMinor, rawTotal, rawMethodsSum };
+  }
+
+  // One dash.getProductsSales call. Rows for the same product_id (one per modification) are summed into one product.
+  // Revenue = Poster's payed_sum (paid, after discount — the same meaning CUP's POS import stores per line), kopecks.
+  async getProductsSalesReference(dateFromYmd: string, dateToYmd: string, spotId?: string): Promise<PosterSalesReference> {
+    let raw: unknown;
+    try {
+      raw = await this.poster.getProductsSales(dateFromYmd, dateToYmd, spotId);
+    } catch (err) {
+      this.logger.warn(`Poster products sales unavailable: ${err instanceof Error ? err.message : String(err)}`);
+      return { available: false, reason: 'poster_unavailable' };
+    }
+    if (!Array.isArray(raw)) return this.malformedReference('dash.getProductsSales response is not an array');
+    const byId = new Map<string, PosterSalesReferenceRow>();
+    for (const row of raw as PosterProductsSalesRow[]) {
+      const posterId = row && (typeof row.product_id === 'string' || typeof row.product_id === 'number') ? String(row.product_id).trim() : '';
+      const quantity = parseQuantity(row?.count);
+      const revenueMinor = posterReportAmountToCupUzs(row?.payed_sum);
+      if (!posterId || quantity === null || revenueMinor === null) return this.malformedReference('dash.getProductsSales row missing product_id/count/payed_sum');
+      const existing = byId.get(posterId);
+      if (existing) {
+        existing.quantity = Math.round((existing.quantity + quantity) * 1000) / 1000;
+        existing.revenueMinor += revenueMinor;
+      } else {
+        byId.set(posterId, { posterId, name: typeof row.product_name === 'string' ? row.product_name : posterId, quantity, revenueMinor });
+      }
+    }
+    return { available: true, rows: [...byId.values()] };
+  }
+
+  // One dash.getCategoriesSales call. `revenue` scale: see posterAnalyticsRevenueToCupUzs (poster-money.ts).
+  async getCategoriesSalesReference(dateFromYmd: string, dateToYmd: string, spotId?: string): Promise<PosterSalesReference> {
+    let raw: unknown;
+    try {
+      raw = await this.poster.getCategoriesSales(dateFromYmd, dateToYmd, spotId);
+    } catch (err) {
+      this.logger.warn(`Poster categories sales unavailable: ${err instanceof Error ? err.message : String(err)}`);
+      return { available: false, reason: 'poster_unavailable' };
+    }
+    if (!Array.isArray(raw)) return this.malformedReference('dash.getCategoriesSales response is not an array');
+    const rows: PosterSalesReferenceRow[] = [];
+    for (const row of raw as PosterCategoriesSalesRow[]) {
+      const posterId = row && (typeof row.category_id === 'string' || typeof row.category_id === 'number') ? String(row.category_id).trim() : '';
+      const quantity = parseQuantity(row?.count);
+      const revenueMinor = posterAnalyticsRevenueToCupUzs(row?.revenue);
+      if (!posterId || quantity === null || revenueMinor === null) return this.malformedReference('dash.getCategoriesSales row missing category_id/count/revenue');
+      rows.push({ posterId, name: typeof row.category_name === 'string' ? row.category_name : posterId, quantity, revenueMinor });
+    }
+    return { available: true, rows };
+  }
+
+  private malformedReference(detail: string): PosterSalesReference {
+    this.logger.warn(`Poster sales reference malformed: ${detail}`);
+    return { available: false, reason: 'malformed_response' };
   }
 
   private malformed(detail: string): PosterPaymentsBreakdown {

@@ -10,6 +10,8 @@ import { ReportsOverviewPage } from './pages/ReportsOverviewPage';
 import { ReportsSalesPage } from './pages/ReportsSalesPage';
 import { ReportsLocationsPage } from './pages/ReportsLocationsPage';
 import { ReportsPaymentsPage } from './pages/ReportsPaymentsPage';
+import { ReportsProductsPage } from './pages/ReportsProductsPage';
+import { ReportsCategoriesPage } from './pages/ReportsCategoriesPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { SegmentsPage } from './pages/SegmentsPage';
 import { CampaignsPage } from './pages/CampaignsPage';
@@ -101,6 +103,8 @@ export function App() {
       {page === 'reports-sales' && <ReportsSalesPage />}
       {page === 'reports-locations' && <ReportsLocationsPage />}
       {page === 'reports-payments' && <ReportsPaymentsPage />}
+      {page === 'reports-products' && <ReportsProductsPage />}
+      {page === 'reports-categories' && <ReportsCategoriesPage />}
       {page === 'customers' && <CustomersPage />}
       {page === 'segments' && <SegmentsPage />}
       {page === 'loyalty' && <LoyaltyPage />}

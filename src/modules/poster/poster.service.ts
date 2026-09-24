@@ -158,6 +158,19 @@ export class PosterService {
     return this.get<unknown>('dash.getPaymentsReport', { date_from: dateFrom, date_to: dateTo, ...(spotId ? { spot_id: spotId } : {}) });
   }
 
+  // Reports Phase C1 — READ-ONLY dash.getProductsSales (per-product sales). snake_case date_from/date_to (Ymd,
+  // inclusive), optional spot_id. Returned as `unknown`: validated row by row in PosterReportsService. One call per
+  // report request — never once per product.
+  async getProductsSales(dateFrom: string, dateTo: string, spotId?: string): Promise<unknown> {
+    return this.get<unknown>('dash.getProductsSales', { date_from: dateFrom, date_to: dateTo, ...(spotId ? { spot_id: spotId } : {}) });
+  }
+
+  // Reports Phase C2 — READ-ONLY dash.getCategoriesSales (per-category sales). camelCase dateFrom/dateTo (Ymd), as
+  // documented and as dash.getSpotsSales uses, optional spot_id. Returned as `unknown`, validated by the caller.
+  async getCategoriesSales(dateFrom: string, dateTo: string, spotId?: string): Promise<unknown> {
+    return this.get<unknown>('dash.getCategoriesSales', { dateFrom, dateTo, ...(spotId ? { spot_id: spotId } : {}) });
+  }
+
   async createOrder(input: CreatePosterOrderInput): Promise<PosterCreateOrderOutcome> {
     try {
       const raw = await this.post<CreatePosterOrderRawResponse>('incomingOrders.createIncomingOrder', input);

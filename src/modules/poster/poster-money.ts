@@ -89,3 +89,15 @@ export function posterReportRawUnits(raw: unknown): number | null {
   const n = Number(raw);
   return Number.isSafeInteger(n) ? n : null;
 }
+
+// Reports Phase C2 — Poster "analytics revenue" aggregates (dash.getCategoriesSales `revenue`) -> CUP whole UZS. Poster
+// DOCUMENTS these in kopecks, but the identically-documented dash.getSpotsSales `revenue` was VERIFIED live (Reports
+// Phase B1, 2026-09-24) to already be whole so'm on the CUP account, so this sibling field follows the verified
+// behaviour (factor 1), not the doc. Rounded (not rejected) if Poster sends a fraction. null for non-numeric input.
+// Until a live read confirms it, every caller shows the figure as an unverified reference with a magnitude check.
+export function posterAnalyticsRevenueToCupUzs(raw: unknown): number | null {
+  if (typeof raw === 'string' && raw.trim() === '') return null;
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && Math.abs(n) <= Number.MAX_SAFE_INTEGER ? Math.round(n) : null;
+}

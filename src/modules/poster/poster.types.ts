@@ -248,6 +248,36 @@ export interface PosterPaymentsReportRaw {
   total?: PosterPaymentsReportTotal;
 }
 
+// Reports Phase C1 — dash.getProductsSales (official docs: en/web/dash/getProductsSales.md). Documented GET params:
+// snake_case date_from/date_to (Ymd, inclusive) + optional spot_id. Response: an ARRAY, one row per product AND
+// modification (the same product_id can appear several times). `count` is a decimal string ("171.0000") because
+// weight-sold products exist; `payed_sum` is documented "paid ... including discount" in kopecks — the same field name
+// and scale as dash.getTransactions's payed_sum, which IS verified live as kopecks (poster-money.ts). The
+// product_profit / product_profit_netto fields exist but are deliberately NOT modeled: the Reports audit found Poster
+// silently treats a product without a recipe as zero-cost, so nothing in CUP may read them. NOT verified live yet.
+export interface PosterProductsSalesRow {
+  product_id?: string | number;
+  product_name?: string;
+  modification_id?: string | number;
+  category_id?: string | number;
+  count?: string | number;
+  payed_sum?: string | number;
+  weight_flag?: string | number;
+}
+
+// Reports Phase C2 — dash.getCategoriesSales (official docs: en/web/dash/getCategoriesSales.md). Documented GET
+// params: camelCase dateFrom/dateTo (Ymd) + optional spot_id — the same convention as dash.getSpotsSales. Response:
+// an ARRAY of { category_id, category_name, count, revenue, profit, profit_netto }; category_id 0 is Poster's
+// "Главный экран"/top-screen pseudo-category. `revenue` is documented in kopecks, but so is dash.getSpotsSales's
+// `revenue`, which was VERIFIED live (Phase B1) to be whole so'm — see PosterReportsService for which scale is used.
+// profit / profit_netto are deliberately NOT modeled (same reason as above). NOT verified live yet.
+export interface PosterCategoriesSalesRow {
+  category_id?: string | number;
+  category_name?: string;
+  count?: string | number;
+  revenue?: string | number;
+}
+
 // Phase 25 — clients.createClient. CONFIRMED against official docs (github.com/joinposter/docs,
 // en/web/clients/createClient.md) AND against a real live create on the development account
 // (2026-09-23, disposable test phone +998900000001 -> client_id 3): response is a bare number

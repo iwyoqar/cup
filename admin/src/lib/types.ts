@@ -789,6 +789,115 @@ export interface ReportsPaymentsOverview {
   warnings: string[];
 }
 
+// Reports Phase C1/C2 — GET /admin/reports/products and /admin/reports/categories. Both are views over ONE backend
+// product-sales aggregate (Analytics' own per-product CUP + imported-POS figures), so category totals always equal
+// product totals for the same filters. Costing is THEORETICAL (Product.theoreticalCostMinor from Poster recipes):
+// null means "no recipe", never zero cost — render it as "—". Poster reference figures are comparison only.
+export type ReportsSource = 'all' | 'cup' | 'pos';
+
+export interface ReportsSourceSplit {
+  cupQuantity: number;
+  cupRevenueMinor: number;
+  posQuantity: number;
+  posRevenueMinor: number;
+}
+
+export interface ReportsReconciliation {
+  canonicalRevenueMinor: number;
+  productRevenueMinor: number;
+  unmappedPosRevenueMinor: number;
+  cupOrderLevelDifferenceMinor: number;
+  posReceiptLevelDifferenceMinor: number;
+}
+
+export interface ReportsProductRow {
+  productId: string;
+  posterProductId: string;
+  productName: string;
+  categoryId: string;
+  categoryName: string;
+  posterCategoryId: string;
+  categoryActive: boolean;
+  quantity: number;
+  revenueMinor: number;
+  averagePriceMinor: number | null;
+  source: ReportsSourceSplit;
+  costing: { hasRecipe: boolean; theoreticalCostMinor: number | null; theoreticalCOGSMinor: number | null; theoreticalGrossProfitMinor: number | null };
+  posterReference: { quantity: number; revenueMinor: number } | null;
+}
+
+export interface ReportsProductsOverview {
+  period: { key: AnalyticsPeriodKey; startDate: string; endDate: string; timezoneOffsetMinutes: number };
+  branch: { id: string; name: string } | null;
+  category: { id: string; name: string } | null;
+  source: ReportsSource;
+  filters: { branches: { id: string; name: string }[]; categories: { id: string; name: string; isActive: boolean }[] };
+  summary: {
+    productsSold: number;
+    unitsSold: number;
+    revenueMinor: number;
+    productsWithRecipe: number;
+    costedRevenueMinor: number;
+    theoreticalCOGSMinor: number | null;
+    theoreticalGrossProfitMinor: number | null;
+  };
+  products: ReportsProductRow[];
+  unmappedPos: { posterProductId: string; name: string | null; quantity: number; revenueMinor: number }[];
+  posterReference: {
+    available: boolean;
+    unavailableReason: 'poster_unavailable' | 'malformed_response' | null;
+    totalQuantity: number | null;
+    totalRevenueMinor: number | null;
+    unmapped: { posterProductId: string; name: string; quantity: number; revenueMinor: number }[];
+  };
+  reconciliation: ReportsReconciliation;
+  warnings: string[];
+}
+
+export interface ReportsCategoryRow {
+  categoryId: string;
+  categoryName: string;
+  posterCategoryId: string;
+  categoryActive: boolean;
+  isPosterTopScreen: boolean;
+  productCount: number;
+  unitsSold: number;
+  revenueMinor: number;
+  averageUnitPriceMinor: number | null;
+  source: ReportsSourceSplit;
+  costing: { productsWithRecipe: number; recipeCoveragePercent: number; costedRevenueMinor: number; theoreticalCOGSMinor: number | null; theoreticalGrossProfitMinor: number | null };
+  posterReference: { quantity: number; revenueMinor: number } | null;
+}
+
+export interface ReportsCategoriesOverview {
+  period: { key: AnalyticsPeriodKey; startDate: string; endDate: string; timezoneOffsetMinutes: number };
+  branch: { id: string; name: string } | null;
+  source: ReportsSource;
+  filters: { branches: { id: string; name: string }[] };
+  summary: {
+    categoriesWithSales: number;
+    productsSold: number;
+    unitsSold: number;
+    revenueMinor: number;
+    productsWithRecipe: number;
+    recipeCoveragePercent: number | null;
+    costedRevenueMinor: number;
+    theoreticalCOGSMinor: number | null;
+    theoreticalGrossProfitMinor: number | null;
+  };
+  categories: ReportsCategoryRow[];
+  uncategorized: { productCount: number; unitsSold: number; revenueMinor: number; products: { posterProductId: string; quantity: number; revenueMinor: number }[] } | null;
+  posterReference: {
+    available: boolean;
+    unavailableReason: 'poster_unavailable' | 'malformed_response' | null;
+    totalQuantity: number | null;
+    totalRevenueMinor: number | null;
+    unmapped: { posterCategoryId: string; name: string; quantity: number; revenueMinor: number }[];
+  };
+  reconciliation: ReportsReconciliation;
+  warnings: string[];
+}
+
 // Finance-1 — GET /admin/finance/*. Every number is computed by the backend (whole UZS minor units); the UI only
 // formats. Revenue reuses Analytics' own already-deduped CUP+POS source; COGS is read live from Poster's own
 // recipe data (never invented) and is explicitly flagged incomplete rather than guessed.

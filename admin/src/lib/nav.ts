@@ -24,6 +24,8 @@ export type AdminPage =
   | 'reports-sales'
   | 'reports-locations'
   | 'reports-payments'
+  | 'reports-products'
+  | 'reports-categories'
   | 'growth'
   | 'branch-intelligence'
   | 'finance'
@@ -113,6 +115,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'reports-sales', label: 'Sales', icon: 'sales', description: 'Sales report: summary, trends, source split and top products.', path: '/admin/reports/sales' },
       { id: 'reports-locations', label: 'Locations', icon: 'branch', description: 'Branch performance for the selected period.', path: '/admin/reports/locations' },
       { id: 'reports-payments', label: 'Payments', icon: 'finance', description: 'How sales were paid — payment methods as reported by Poster POS.', path: '/admin/reports/payments' },
+      { id: 'reports-products', label: 'Products', icon: 'sales', description: 'Which products sell, the revenue they bring and their theoretical cost.', path: '/admin/reports/products' },
+      { id: 'reports-categories', label: 'Categories', icon: 'segments', description: 'How sales are distributed across product categories.', path: '/admin/reports/categories' },
     ],
   },
   {
