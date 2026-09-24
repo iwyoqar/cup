@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { AdminAuthGuard } from '../admin-auth/admin-auth.guard';
 import { parseBusinessDate } from '../analytics/analytics-period';
@@ -14,6 +14,7 @@ import { ReportsLoyaltyService } from './reports-loyalty.service';
 import { ReportsPromotionsService } from './reports-promotions.service';
 import { ReportsReferralsService } from './reports-referrals.service';
 import { ReportsTaxesService } from './reports-taxes.service';
+import { ReportsReceiptsService } from './reports-receipts.service';
 import { ReportsService } from './reports.service';
 
 // Same query convention as /admin/analytics/overview (Part 3 of the Phase A spec): `period` (today | yesterday |
@@ -69,6 +70,16 @@ const referralsQuerySchema = periodOnlySchema.extend({
 });
 const abcQuerySchema = overviewQuerySchema.extend({ source: z.enum(['all', 'cup', 'pos']).default('all'), categoryId: idField.optional() });
 
+// Reports Phase H — Receipts. Keyset cursor pagination, 1..100 rows per request (default 50): never an unbounded history.
+const receiptsQuerySchema = overviewQuerySchema.extend({
+  source: z.enum(['all', 'cup', 'pos']).default('all'),
+  status: z.enum(['all', 'paid', 'unpaid']).default('all'),
+  search: z.string().max(100).optional(),
+  customerId: idField.optional(),
+  cursor: z.string().max(512).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
 function parseQuery<T extends z.ZodTypeAny>(schema: T, query: unknown, branchSupported = true): z.infer<T> {
   if (!branchSupported && query && typeof query === 'object' && 'branchId' in query) throw new BadRequestException('Branch filter is not supported for this report.');
   const parsed = schema.safeParse(query);
@@ -94,6 +105,7 @@ export class ReportsController {
     private readonly reportsCampaignsService: ReportsCampaignsService,
     private readonly reportsReferralsService: ReportsReferralsService,
     private readonly reportsAbcService: ReportsAbcService,
+    private readonly reportsReceiptsService: ReportsReceiptsService,
   ) {}
 
   @Get('overview')
@@ -177,5 +189,17 @@ export class ReportsController {
   @Get('abc-analysis')
   abcAnalysis(@Query() query: unknown) {
     return this.reportsAbcService.getAbc(parseQuery(abcQuerySchema, query));
+  }
+
+  @Get('receipts')
+  receipts(@Query() query: unknown) {
+    return this.reportsReceiptsService.getReceipts(parseQuery(receiptsQuerySchema, query));
+  }
+
+  // Read-only receipt detail with its line items. source = CUP (Order id) | POS (Poster transaction id).
+  @Get('receipts/:source/:id')
+  receipt(@Param('source') source: string, @Param('id') id: string) {
+    if ((source !== 'CUP' && source !== 'POS') || !/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new BadRequestException('Invalid receipt reference.');
+    return this.reportsReceiptsService.getReceipt(source, id);
   }
 }

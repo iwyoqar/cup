@@ -49,7 +49,7 @@ async function bootstrap(): Promise<void> {
   // Authorization/JWT/initData a request might carry.
   const requestLogger = new Logger('HTTP');
   app.getHttpAdapter().getInstance().addHook('onResponse', (request, reply, done) => {
-    requestLogger.log(`${request.method} ${request.url.split('?')[0]} -> ${reply.statusCode}`);
+    requestLogger.log(`${request.method} ${request.url.split('?')[0]} -> ${reply.statusCode} ${Math.round(reply.elapsedTime)}ms`);
     done();
   });
   await app.listen(config.env.PORT, '0.0.0.0');

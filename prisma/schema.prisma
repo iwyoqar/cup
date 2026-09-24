@@ -223,6 +223,8 @@ model Order {
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
 
+  // Reports Phase H: every Analytics/Finance/Reports query range-filters qualifying orders by createdAt (and Receipts pages by it).
+  @@index([createdAt])
   @@map("orders")
 }
 
@@ -829,6 +831,8 @@ model PosterImportedTransaction {
   items               PosterImportedTransactionItem[]
 
   @@index([customerId, status])
+  // Reports Phase H: every Analytics/Finance/Reports query range-filters imported POS receipts by occurredAt.
+  @@index([occurredAt])
   @@map("poster_imported_transactions")
 }
 

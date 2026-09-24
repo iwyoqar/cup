@@ -34,6 +34,7 @@ export type AdminPage =
   | 'reports-campaigns'
   | 'reports-referrals'
   | 'reports-abc'
+  | 'reports-receipts'
   | 'growth'
   | 'branch-intelligence'
   | 'finance'
@@ -133,6 +134,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'reports-campaigns', label: 'Campaigns', icon: 'campaigns', description: 'Telegram campaign send activity: recipients, successful and failed sends.', path: '/admin/reports/campaigns' },
       { id: 'reports-referrals', label: 'Referrals', icon: 'referrals', description: 'Referral funnel, qualification, rewards and referrer activity.', path: '/admin/reports/referrals' },
       { id: 'reports-abc', label: 'ABC Analysis', icon: 'analytics', description: 'Revenue-based A/B/C classification of the products sold in the period.', path: '/admin/reports/abc-analysis' },
+      { id: 'reports-receipts', label: 'Receipts', icon: 'audit', description: 'Individual receipts in the period — CUP orders and imported POS receipts, read-only.', path: '/admin/reports/receipts' },
     ],
   },
   {

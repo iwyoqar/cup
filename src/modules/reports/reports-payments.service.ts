@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '../../common/config/config.service';
-import { AnalyticsService, OverviewQuery } from '../analytics/analytics.service';
+import { AnalyticsRepository } from '../analytics/analytics.repository';
+import { OverviewQuery } from '../analytics/analytics.service';
 import { resolveAnalyticsRange } from '../analytics/analytics-period';
 import { BranchIntelligenceRepository } from '../branch-intelligence/branch-intelligence.repository';
 import { PosterReportsService } from './poster-reports.service';
@@ -36,7 +37,7 @@ export interface ReportsPaymentsOverview {
 @Injectable()
 export class ReportsPaymentsService {
   constructor(
-    private readonly analyticsService: AnalyticsService,
+    private readonly analyticsRepository: AnalyticsRepository,
     private readonly branchIntelligenceRepository: BranchIntelligenceRepository,
     private readonly posterReports: PosterReportsService,
     private readonly config: ConfigService,
@@ -50,19 +51,21 @@ export class ReportsPaymentsService {
     const dateToYmd = range.endDate.replace(/-/g, '');
 
     // Branch → Poster spot via the existing Branch.posterSpotId mapping only (dash.getPaymentsReport documents spot_id).
-    let spotId: string | undefined;
-    if (query.branchId) {
-      const branch = (await this.branchIntelligenceRepository.listBranches()).find((b) => b.id === query.branchId);
-      if (!branch) throw new BadRequestException('Unknown branch.');
-      spotId = String(branch.posterSpotId);
-    }
+    const allBranches = await this.branchIntelligenceRepository.listBranches();
+    const branch = query.branchId ? allBranches.find((b) => b.id === query.branchId) : undefined;
+    if (query.branchId && !branch) throw new BadRequestException('Unknown branch.');
+    const spotId = branch ? String(branch.posterSpotId) : undefined;
 
-    const [overview, poster] = await Promise.all([this.analyticsService.getOverview(query, now), this.posterReports.getPaymentsBreakdown(dateFromYmd, dateToYmd, spotId)]);
+    // Phase H: CUP revenue = AnalyticsRepository.cupTotals + posTotals — exactly the two figures AnalyticsService.getOverview
+    // adds for its `revenue` — instead of running the whole Analytics overview (customers, products, daily series) for one number.
+    const q = { from: range.from, to: range.to, branchId: branch ? branch.id : null };
+    const [cup, pos, poster] = await Promise.all([this.analyticsRepository.cupTotals(q), this.analyticsRepository.posTotals(q), this.posterReports.getPaymentsBreakdown(dateFromYmd, dateToYmd, spotId)]);
+    const overview = { revenue: cup.revenue + pos.revenue };
 
     const base = {
       period: { key: query.period, startDate: range.startDate, endDate: range.endDate, timezoneOffsetMinutes: offset },
-      branch: overview.branch,
-      filters: overview.filters,
+      branch: branch ? { id: branch.id, name: branch.name } : null,
+      filters: { branches: allBranches.filter((b) => b.isActive).map((b) => ({ id: b.id, name: b.name })) },
       branchFilterSupported: true,
       source: 'POSTER' as const,
       cupRevenueMinor: overview.revenue,

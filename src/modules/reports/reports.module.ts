@@ -25,6 +25,7 @@ import { ReportsLoyaltyService } from './reports-loyalty.service';
 import { ReportsPromotionsService } from './reports-promotions.service';
 import { ReportsReferralsService } from './reports-referrals.service';
 import { ReportsTaxesService } from './reports-taxes.service';
+import { ReportsReceiptsService } from './reports-receipts.service';
 import { ReportsService } from './reports.service';
 
 // Reports Phase A/B1 — composes AnalyticsModule's exported AnalyticsService/AnalyticsRepository (the canonical
@@ -54,6 +55,7 @@ import { ReportsService } from './reports.service';
     ReportsCampaignsService,
     ReportsReferralsService,
     ReportsAbcService,
+    ReportsReceiptsService,
     PosterReportsService,
   ],
 })

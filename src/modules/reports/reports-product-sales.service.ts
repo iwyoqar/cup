@@ -59,6 +59,13 @@ export interface ProductSalesAggregate {
   reconciliation: ProductSalesReconciliation;
 }
 
+export interface PreparedProductSales {
+  offset: number;
+  range: ResolvedRange;
+  allBranches: { id: string; name: string; isActive: boolean; posterSpotId: number }[];
+  branchRow: { id: string; name: string; isActive: boolean; posterSpotId: number } | undefined;
+}
+
 // Reports Phase C1/C2 — the ONE product-sales aggregation both the Products and Categories reports are built on (the
 // Categories report groups these rows; it never re-queries sales). Every sales figure is read from AnalyticsRepository's
 // existing, unmodified per-product aggregates:
@@ -77,13 +84,19 @@ export class ReportsProductSalesService {
     private readonly config: ConfigService,
   ) {}
 
-  async aggregate(query: ProductSalesQuery, now: Date = new Date()): Promise<ProductSalesAggregate> {
+  // Phase H: range + branch resolution split out so callers can start their Poster reference read in parallel with
+  // aggregate() (the Poster call needs only the dates and the branch's spot id).
+  async prepare(query: ProductSalesQuery, now: Date = new Date()): Promise<PreparedProductSales> {
     const offset = this.config.env.BUSINESS_TIMEZONE_OFFSET_MINUTES;
     const range = resolveAnalyticsRange(query, now, offset); // canonical resolver; throws 400 on an invalid custom range
-
     const allBranches = await this.branchIntelligenceRepository.listBranches();
     const branchRow = query.branchId ? allBranches.find((b) => b.id === query.branchId) : undefined;
     if (query.branchId && !branchRow) throw new BadRequestException('Unknown branch.');
+    return { offset, range, allBranches, branchRow };
+  }
+
+  async aggregate(query: ProductSalesQuery, now: Date = new Date(), prepared?: PreparedProductSales): Promise<ProductSalesAggregate> {
+    const { offset, range, allBranches, branchRow } = prepared ?? (await this.prepare(query, now));
     const q: QueryRange = { from: range.from, to: range.to, branchId: branchRow ? branchRow.id : null };
 
     const wantCup = query.source !== 'pos';

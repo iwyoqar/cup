@@ -86,10 +86,12 @@ export class ReportsCategoriesService {
   ) {}
 
   async getCategories(query: CategoriesReportQuery, now: Date = new Date()): Promise<ReportsCategoriesOverview> {
-    const agg = await this.productSales.aggregate(query, now);
+    // Phase H: the Poster reference read runs in parallel with the DB aggregate.
+    const prepared = await this.productSales.prepare(query, now);
     const ymd = (d: string) => d.replace(/-/g, '');
-    const [poster, allCategories] = await Promise.all([
-      this.posterReports.getCategoriesSalesReference(ymd(agg.range.startDate), ymd(agg.range.endDate), agg.branch ? String(agg.branch.posterSpotId) : undefined),
+    const [agg, poster, allCategories] = await Promise.all([
+      this.productSales.aggregate(query, now, prepared),
+      this.posterReports.getCategoriesSalesReference(ymd(prepared.range.startDate), ymd(prepared.range.endDate), prepared.branchRow ? String(prepared.branchRow.posterSpotId) : undefined),
       this.repository.listCategories(),
     ]);
     const posterById = poster.available ? new Map(poster.rows.map((r) => [r.posterId, r])) : null;

@@ -66,9 +66,13 @@ export class ReportsProductsService {
     const category = query.categoryId ? categories.find((c) => c.id === query.categoryId) : undefined;
     if (query.categoryId && !category) throw new BadRequestException('Unknown category.');
 
-    const agg = await this.productSales.aggregate(query, now);
+    // Phase H: the Poster reference read runs in parallel with the DB aggregate (it only needs the dates and the spot id).
+    const prepared = await this.productSales.prepare(query, now);
     const ymd = (d: string) => d.replace(/-/g, '');
-    const poster = await this.posterReports.getProductsSalesReference(ymd(agg.range.startDate), ymd(agg.range.endDate), agg.branch ? String(agg.branch.posterSpotId) : undefined);
+    const [agg, poster] = await Promise.all([
+      this.productSales.aggregate(query, now, prepared),
+      this.posterReports.getProductsSalesReference(ymd(prepared.range.startDate), ymd(prepared.range.endDate), prepared.branchRow ? String(prepared.branchRow.posterSpotId) : undefined),
+    ]);
     const posterById = poster.available ? new Map(poster.rows.map((r) => [r.posterId, r])) : null;
 
     const inCategory = category ? agg.products.filter((p) => p.categoryId === category.id) : agg.products;

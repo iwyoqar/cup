@@ -204,3 +204,33 @@ export interface ReportsAbcOverview {
   reconciliation: { productReportRevenueMinor: number; abcRevenueMinor: number; excludedNonPositiveMinor: number; unmappedPosRevenueMinor: number };
   notes: string[];
 }
+
+export interface ReportsReceiptRow {
+  source: 'CUP' | 'POS';
+  receiptId: string;
+  cupOrderId: string | null;
+  posterTransactionId: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  branchId: string | null;
+  branchName: string | null;
+  occurredAt: string;
+  items: number;
+  totalMinor: number;
+  paidMinor: number | null;
+  status: string;
+  paymentMethod: string | null;
+}
+export interface ReportsReceiptsOverview {
+  period: ReportPeriod;
+  branch: IdName | null;
+  filters: { branches: IdName[] };
+  summary: { receipts: number; revenueMinor: number; paidMinor: number; unpaidReceipts: number; identifiedCustomers: number; anonymousPosReceipts: number; cupReceipts: number; posReceipts: number };
+  reconciliation: { analyticsRevenueMinor: number; receiptsRevenueMinor: number; comparable: boolean };
+  rows: ReportsReceiptRow[];
+  page: { limit: number; nextCursor: string | null; total: number };
+  notes: string[];
+}
+export interface ReportsReceiptDetail extends ReportsReceiptRow {
+  lines: { product: string; posterProductId: string; mapped: boolean; quantity: number; unitPriceMinor: number; totalMinor: number; isRewardItem: boolean }[];
+}

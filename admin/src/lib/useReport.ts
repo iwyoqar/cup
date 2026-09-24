@@ -14,9 +14,11 @@ export function useReport<T>(name: string, params: Record<string, string | numbe
   const load = useCallback(() => {
     if (!ready) return undefined;
     let cancelled = false;
+    // Phase H: a newer filter change aborts the in-flight request (the `cancelled` flag still guards against a late response).
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
-    apiRequest<T>(`/admin/reports/${name}?${qs}`)
+    apiRequest<T>(`/admin/reports/${name}?${qs}`, { signal: controller.signal })
       .then((result) => {
         if (!cancelled) setData(result);
       })
@@ -28,6 +30,7 @@ export function useReport<T>(name: string, params: Record<string, string | numbe
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [name, qs, ready]);
 

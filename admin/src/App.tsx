@@ -20,6 +20,7 @@ import { ReportsPromotionsPage } from './pages/ReportsPromotionsPage';
 import { ReportsCampaignsPage } from './pages/ReportsCampaignsPage';
 import { ReportsReferralsPage } from './pages/ReportsReferralsPage';
 import { ReportsAbcAnalysisPage } from './pages/ReportsAbcAnalysisPage';
+import { ReportsReceiptsPage } from './pages/ReportsReceiptsPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { SegmentsPage } from './pages/SegmentsPage';
 import { CampaignsPage } from './pages/CampaignsPage';
@@ -121,6 +122,7 @@ export function App() {
       {page === 'reports-campaigns' && <ReportsCampaignsPage />}
       {page === 'reports-referrals' && <ReportsReferralsPage />}
       {page === 'reports-abc' && <ReportsAbcAnalysisPage />}
+      {page === 'reports-receipts' && <ReportsReceiptsPage />}
       {page === 'customers' && <CustomersPage />}
       {page === 'segments' && <SegmentsPage />}
       {page === 'loyalty' && <LoyaltyPage />}

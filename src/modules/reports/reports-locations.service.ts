@@ -1,11 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '../../common/config/config.service';
 import { AnalyticsRepository } from '../analytics/analytics.repository';
-import { resolveAnalyticsRange } from '../analytics/analytics-period';
+import { enumerateDates, resolveAnalyticsRange } from '../analytics/analytics-period';
 import { BranchIntelligenceQuery, BranchIntelligenceService } from '../branch-intelligence/branch-intelligence.service';
 import { BranchIntelligenceRepository, RangeMs } from '../branch-intelligence/branch-intelligence.repository';
 import { PosterLocationReference, PosterReportsService } from './poster-reports.service';
-import { ReportsService } from './reports.service';
 
 export interface ReportsLocationsSummary {
   revenue: number;
@@ -61,7 +60,6 @@ export class ReportsLocationsService {
     private readonly branchIntelligence: BranchIntelligenceService,
     private readonly branchIntelligenceRepository: BranchIntelligenceRepository,
     private readonly analyticsRepository: AnalyticsRepository,
-    private readonly reportsService: ReportsService,
     private readonly posterReports: PosterReportsService,
     private readonly config: ConfigService,
   ) {}
@@ -74,8 +72,21 @@ export class ReportsLocationsService {
     const dateToYmd = range.endDate.replace(/-/g, '');
 
     // BranchIntelligenceService itself throws BadRequestException for an unknown branchId — reused, not re-checked.
-    const [overview, trendData] = await Promise.all([this.branchIntelligence.getOverview(query, now), this.reportsService.getOverview(query, now)]);
-    const trend = trendData.revenueByDay.map((r, i) => ({ date: r.date, revenue: r.revenue, orders: trendData.ordersByDay[i]?.orders ?? 0 }));
+    // Phase H: the trend is read straight from the two daily aggregates Reports Overview's revenueByDay/ordersByDay are
+    // built from (AnalyticsRepository.cupDailyRevenue + posDailyRevenue, zero-filled over the same business days), instead
+    // of running the whole Overview (and the full Analytics overview inside it) just for this series. Same numbers.
+    const trendRange = { from: range.from, to: range.to, branchId: query.branchId ?? null };
+    const [overview, cupDaily, posDaily] = await Promise.all([
+      this.branchIntelligence.getOverview(query, now),
+      this.analyticsRepository.cupDailyRevenue(trendRange, offset),
+      this.analyticsRepository.posDailyRevenue(trendRange, offset),
+    ]);
+    const byDay = new Map<string, { revenue: number; orders: number }>();
+    for (const r of [...cupDaily, ...posDaily]) {
+      const d = byDay.get(r.day) ?? { revenue: 0, orders: 0 };
+      byDay.set(r.day, { revenue: d.revenue + r.revenue, orders: d.orders + r.orders });
+    }
+    const trend = enumerateDates(range.startDate, range.endDate).map((date) => ({ date, revenue: byDay.get(date)?.revenue ?? 0, orders: byDay.get(date)?.orders ?? 0 }));
 
     if (query.branchId) {
       const branches = await this.branchIntelligenceRepository.listBranches();

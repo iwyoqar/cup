@@ -48,6 +48,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, '');
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
+  /** Optional AbortSignal (Reports Phase H): lets a superseded filter request be cancelled in the browser. */
+  signal?: AbortSignal;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -66,6 +68,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       method: options.method ?? 'GET',
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: options.signal,
     });
   } catch {
     throw new ApiError(0, 'network_error');

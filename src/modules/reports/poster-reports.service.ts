@@ -115,12 +115,21 @@ export class PosterReportsService {
     const scope: PosterLocationReference['scope'] = spotId ? 'branch' : 'all_locations_combined';
     try {
       const raw = await this.poster.getSpotsSales(dateFromYmd, dateToYmd, spotId);
+      // Phase H hardening: an unexpected shape (e.g. an empty array, a missing field) used to become NaN -> JSON null with
+      // available: true, which crashed the Locations page. Anything not numeric is now "unavailable", never a fake figure.
+      const revenue = posterAnalyticsRevenueToCupUzs((raw as unknown as Record<string, unknown> | null)?.revenue);
+      const orders = posterAnalyticsRevenueToCupUzs((raw as unknown as Record<string, unknown> | null)?.clients);
+      const middle = posterAnalyticsRevenueToCupUzs((raw as unknown as Record<string, unknown> | null)?.middle_invoice);
+      if (raw === null || typeof raw !== 'object' || Array.isArray(raw) || revenue === null || orders === null || middle === null) {
+        this.logger.warn('Poster location reference malformed: dash.getSpotsSales returned no numeric revenue/clients/middle_invoice');
+        return { available: false, scope, revenueMinor: 0, orders: 0, averageReceiptMinor: 0, note: UNAVAILABLE_NOTE };
+      }
       return {
         available: true,
         scope,
-        revenueMinor: Math.round(raw.revenue),
-        orders: Math.round(raw.clients), // Poster's field name is misleading — documented meaning is order/receipt count
-        averageReceiptMinor: Math.round(raw.middle_invoice),
+        revenueMinor: revenue, // same Math.round as before (posterAnalyticsRevenueToCupUzs rounds a whole-so'm value)
+        orders, // Poster's field name is misleading — documented meaning is order/receipt count
+        averageReceiptMinor: middle,
         note:
           scope === 'branch'
             ? "Poster's own report for this location. Poster's day boundaries are not verified against CUP's UTC+5 business day — treat as a reference, not an exact match."
