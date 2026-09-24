@@ -789,3 +789,50 @@ export interface FinanceRoi {
   totalInvestmentMinor: number;
   roiPct: number | null;
 }
+
+// Finance-2 — GET /admin/finance/reconciliation. A verification/explanation layer around the SAME canonical
+// revenue (cupTotals/posTotals) Overview/P&L already use — never a second revenue calculation.
+export interface FinanceCategoryAmount {
+  category: string;
+  count: number;
+  amountMinor: number;
+}
+
+export interface FinanceReconciliationTransaction {
+  posterTransactionId: string;
+  occurredAt: string | null;
+  totalMinor: number;
+  paidMinor: number;
+  branchName: string | null;
+  customerName: string | null;
+  hasPosterClient: boolean;
+  category: string;
+  outcome: string;
+  reason?: string;
+}
+
+export interface FinanceReconciliation {
+  period: { key: FinancePeriodKey; startDate: string; endDate: string };
+  branch: { id: string; name: string } | null;
+  status: 'RECONCILED' | 'MISMATCH' | 'INCOMPLETE';
+  incompleteReason: string | null;
+  posterGrossQualifyingSales: { count: number; amountMinor: number };
+  cupOriginatedSales: { count: number; amountMinor: number };
+  independentPosSales: {
+    total: { count: number; amountMinor: number };
+    alreadyRecognized: { count: number; amountMinor: number };
+    pending: { count: number; amountMinor: number; byReason: FinanceCategoryAmount[] };
+  };
+  customerAttribution: {
+    knownCustomer: { count: number; amountMinor: number };
+    unknownCustomer: { count: number; amountMinor: number };
+    unknownBreakdown: { noPosterClient: { count: number; amountMinor: number }; unlinkedPosterClient: { count: number; amountMinor: number } };
+  };
+  branchAttribution: { attributed: { count: number; amountMinor: number }; unattributed: { count: number; amountMinor: number } };
+  excluded: FinanceCategoryAmount[];
+  recognizedRevenue: { cupRevenueMinor: number; posRevenueMinor: number; totalMinor: number };
+  crossCheck: { liveScanAlreadyImportedMinor: number; canonicalPosRevenueMinor: number; differenceMinor: number };
+  scanned: number;
+  truncated: boolean;
+  transactions: FinanceReconciliationTransaction[];
+}

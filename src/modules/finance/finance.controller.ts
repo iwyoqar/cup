@@ -10,6 +10,7 @@ import { FinanceInvestmentService } from './finance-investment.service';
 import { FinanceLoanService } from './finance-loan.service';
 import { FinancePeriodQuery } from './finance-period';
 import { FinancePnlService } from './finance-pnl.service';
+import { FinanceReconciliationService } from './finance-reconciliation.service';
 import { FinanceTaxService } from './finance-tax.service';
 import {
   createCashAdjustmentSchema,
@@ -50,6 +51,7 @@ export class FinanceController {
     private readonly cashAdjustments: FinanceCashAdjustmentService,
     private readonly cogsRepository: FinanceCogsRepository,
     private readonly cogsSync: FinanceCogsSyncService,
+    private readonly reconciliation: FinanceReconciliationService,
   ) {}
 
   private periodQuery(query: Record<string, string | undefined>): FinancePeriodQuery & { branchId?: string } {
@@ -71,6 +73,14 @@ export class FinanceController {
   @Get('cash-flow')
   cashFlowView(@Query() query: Record<string, string | undefined>) {
     return this.cashFlow.getOverview(this.periodQuery(query));
+  }
+
+  // Finance-2 — a read-only verification/explanation layer around the canonical revenue source (cupTotals/
+  // posTotals, unchanged). Reuses the SAME live Poster scan (analyze()) the admin import preview already uses;
+  // never writes, never performs a real import.
+  @Get('reconciliation')
+  reconciliationView(@Query() query: Record<string, string | undefined>) {
+    return this.reconciliation.getReconciliation(this.periodQuery(query));
   }
 
   @Get('roi')

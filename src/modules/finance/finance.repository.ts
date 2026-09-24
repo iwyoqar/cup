@@ -288,4 +288,11 @@ export class FinanceRepository {
   findBranch(id: string) {
     return this.prisma.branch.findUnique({ where: { id }, select: { id: true, name: true } });
   }
+
+  // Finance-2 (Reconciliation) — the live Poster scan (poster-transaction-import.service.ts's analyze()) reports each
+  // receipt's Poster posterSpotId, not a CUP branchId; this is how a branch filter on the reconciliation view is
+  // applied to that scan's in-memory details, without re-scanning per branch.
+  findBranchWithSpotId(id: string) {
+    return this.prisma.branch.findUnique({ where: { id }, select: { id: true, name: true, posterSpotId: true } });
+  }
 }

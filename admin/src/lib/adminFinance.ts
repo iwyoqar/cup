@@ -9,6 +9,7 @@ import {
   FinancePayback,
   FinancePeriodKey,
   FinancePnlOverview,
+  FinanceReconciliation,
   FinanceRoi,
   FinanceTaxRule,
 } from './types';
@@ -44,6 +45,10 @@ export function fetchFinanceRoi(filters: FinanceFilters): Promise<FinanceRoi> {
 
 export function fetchFinancePayback(): Promise<FinancePayback> {
   return apiRequest<FinancePayback>('/admin/finance/payback');
+}
+
+export function fetchFinanceReconciliation(filters: FinanceFilters): Promise<FinanceReconciliation> {
+  return apiRequest<FinanceReconciliation>(`/admin/finance/reconciliation?${periodParams(filters).toString()}`);
 }
 
 export function fetchCogsStatus(): Promise<{ productsWithoutRecipe: number }> {

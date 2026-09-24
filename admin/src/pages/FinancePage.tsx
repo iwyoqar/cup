@@ -9,10 +9,11 @@ import { FinanceExpensesTab } from '../components/FinanceExpensesTab';
 import { FinanceLoansTab } from '../components/FinanceLoansTab';
 import { FinanceTaxesTab } from '../components/FinanceTaxesTab';
 import { FinanceInvestmentsTab } from '../components/FinanceInvestmentsTab';
+import { FinanceReconciliationTab } from '../components/FinanceReconciliationTab';
 import { ChartContainer, BarChart, EmptyState, ErrorState, FilterBar, FilterField, KeyValue, LoadingState, PageHeader, SectionCard, StatCard, StatGrid, StatusBadge, Tabs } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
-type Tab = 'overview' | 'pnl' | 'cashflow' | 'expenses' | 'loans' | 'taxes' | 'investments';
+type Tab = 'overview' | 'pnl' | 'cashflow' | 'reconciliation' | 'expenses' | 'loans' | 'taxes' | 'investments';
 
 export function FinancePage() {
   const [tab, setTab] = useState<Tab>('overview');
@@ -32,6 +33,7 @@ export function FinancePage() {
           { id: 'overview', label: 'Overview' },
           { id: 'pnl', label: 'P&L' },
           { id: 'cashflow', label: 'Cash Flow' },
+          { id: 'reconciliation', label: 'Reconciliation' },
           { id: 'expenses', label: 'Expenses' },
           { id: 'loans', label: 'Loans' },
           { id: 'taxes', label: 'Taxes' },
@@ -39,7 +41,7 @@ export function FinancePage() {
         ]}
       />
 
-      {(tab === 'overview' || tab === 'pnl' || tab === 'cashflow') && (
+      {(tab === 'overview' || tab === 'pnl' || tab === 'cashflow' || tab === 'reconciliation') && (
         <FilterBar>
           <FinancePeriodPicker onChange={setRange} value={range} />
           <FilterField label="Branch">
@@ -54,6 +56,7 @@ export function FinancePage() {
       {tab === 'overview' && <OverviewTab branchId={branchId || undefined} ready={ready} {...range} />}
       {tab === 'pnl' && <PnlTab branchId={branchId || undefined} ready={ready} {...range} />}
       {tab === 'cashflow' && <CashFlowTab branchId={branchId || undefined} ready={ready} {...range} />}
+      {tab === 'reconciliation' && <FinanceReconciliationTab branchId={branchId || undefined} ready={ready} {...range} />}
       {tab === 'expenses' && <FinanceExpensesTab />}
       {tab === 'loans' && <FinanceLoansTab />}
       {tab === 'taxes' && <FinanceTaxesTab />}

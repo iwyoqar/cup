@@ -1,5 +1,13 @@
 # Changelog
 
+## Finance V2 Step 2 — Revenue Reconciliation (2026-09-24)
+
+New `Admin → Finance → Reconciliation` tab + `GET /admin/finance/reconciliation`: a read-only verification layer around the existing canonical revenue (`AnalyticsRepository.cupTotals`/`posTotals`, unchanged) that reuses `PosterTransactionImportService.analyze()` (the same live-Poster read-only scan the import preview already uses). Shows Poster gross qualifying sales split into CUP-originated vs independent POS (already-recognized vs pending, by reason), customer/branch attribution (unattributed is never excluded revenue), excluded transactions by reason, and a RECONCILED/MISMATCH/INCOMPLETE status from cross-checking the live scan's own "already imported" total against the canonical stored revenue for the same window.
+
+Verification against real local data surfaced a genuine historical artifact: 8 old dev.db rows imported before the 2026-09-22 money-scale fix still carry values 100x too large (the fix was never applied retroactively, as documented). Checked production directly (read-only) and confirmed clean — 0 of 25 production rows predate the fix. Nothing was changed; per the task's own instruction, a real discrepancy is reported, not silently corrected.
+
+`npx tsc --noEmit` / `npm run build` clean on both backend and `admin/`. No schema change. Not yet deployed.
+
 ## POS import now counts customer-unlinked receipts (2026-09-24)
 
 `PosterImportedTransaction.customerId`/`posterClientId` are now nullable. A closed, paid receipt with no Poster client, or one whose client isn't linked to a CUP customer, is imported anonymously instead of being skipped — so Analytics/Finance revenue reflects real total sales, not just the subset attributable to a known customer. A receipt bearing Poster's `application_id` marker with no resolved customer link is still skipped (never guessed). Every per-customer consumer already filters by a specific customerId, so anonymous rows are automatically excluded from rewards/loyalty/CRM/Customer 360; `AnalyticsRepository.posCustomerIds` got an explicit non-null filter so they don't inflate the customer count.

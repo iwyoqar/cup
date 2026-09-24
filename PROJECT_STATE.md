@@ -1,6 +1,20 @@
 # CUP Coffee — Project State
 
-Last updated: 2026-09-24 (POS import now accepts customer-unlinked receipts, counted anonymously — owner decision, code-complete, not yet deployed).
+Last updated: 2026-09-24 (Finance V2 Step 2 — Revenue Reconciliation, code-complete, not yet deployed; caught a real historical money-scale artifact in LOCAL dev.db only — production confirmed clean).
+
+## Finance V2 Step 2 — Revenue Reconciliation (2026-09-24, code-complete, not deployed)
+
+New `Admin → Finance → Reconciliation` tab + `GET /admin/finance/reconciliation`. A READ-ONLY verification/explanation layer around the EXISTING canonical revenue source (`AnalyticsRepository.cupTotals`/`posTotals`, unchanged — Overview/P&L still use it directly, no second revenue engine). Reuses `PosterTransactionImportService.analyze()` verbatim (the SAME read-only live-Poster-scan the admin import preview and data-quality report already use, documented as never writing) — so reconciliation and the actual import can never disagree.
+
+**Model:** Poster Gross Qualifying Sales (every closed+paid receipt in the period) = CUP-Originated + Independent POS Sales. Independent POS splits into Already Recognized (`ALREADY_IMPORTED` — already in CUP's canonical revenue today) and Pending (`IMPORTABLE`/`UNRESOLVED`/`UNSUPPORTED_LINE`/`UNMAPPED_BRANCH`/`POSSIBLE_CUP_ORIGIN`/`TOO_RECENT` — real sales not yet reflected, each its own named, pre-existing reason, nothing invented). Customer- and branch-unattributed sales are explicitly shown as still-counted revenue, never excluded. Excluded transactions (`UNPAID`/`REFUND_UNVERIFIED`/`OTHER`) are broken out separately. Branch filtering matches live-scanned receipts by the branch's own `posterSpotId` (no re-scan per branch — one scan, filtered in memory).
+
+**Cross-check / status:** `RECONCILED` / `MISMATCH` / `INCOMPLETE`, driven by comparing the live scan's own `ALREADY_IMPORTED` total against the canonical stored `posTotals()` for the same window — these are tautologically the same rows and should always agree exactly; any difference is a genuine anomaly, not a normal "still importing" gap (that gap is the separate, expected Pending bucket). `INCOMPLETE` covers a truncated scan (>1000 receipts) or a failed live Poster read.
+
+**Real finding during verification (2026-09-24):** running this against local `dev.db` surfaced a genuine `MISMATCH` (−10,098 so'm) — 8 old `PosterImportedTransaction` rows (Poster ids 11/21/22/23/25/27/28/30) imported on 2026-09-21, BEFORE the Phase 10.1/22.1 money-scale fix (`POSTER_PRICE_UNITS_PER_CUP_UZS` 1→100, deployed 2026-09-22) — their stored `totalMinor` is exactly 100x what the now-fixed conversion computes from the same live Poster data. This is the well-known, already-documented residue: the 2026-09-22 fix was explicitly never applied retroactively to historical rows. **Checked production (read-only) and confirmed CLEAN: 0 of production's 25 `IMPORTED` rows were imported before 2026-09-22** — this artifact exists only in local dev.db from earlier testing, not in production. No historical data was touched, per the spec's explicit "stop and report, do not silently fix" instruction — decision on whether/how to correct old dev.db test rows (if ever needed) is left to the owner.
+
+**Verified live (2026-09-24) against local dev.db, all spec test cases:** CUP-originated counted exactly once (no double-count: posterGross = cupOriginated + independentTotal, confirmed to the so'm); independent POS with/without linked customer both correctly split (21 known / 46 unknown, further split by no-Poster-client vs unlinked-Poster-client); excluded (8 UNPAID) correctly separated; branch attribution mechanism verified in code (no unattributed-branch receipts existed in this test window to exercise it naturally).
+
+`npx tsc --noEmit` / `npm run build` clean on both backend and `admin/`. No schema change, no new migration needed (purely a new read path over existing tables). **Not yet deployed.**
 
 ## Behavior change — POS import no longer skips customer-unlinked receipts (2026-09-24, code-complete)
 
