@@ -800,15 +800,24 @@ model StaffScanEvent {
 // feeds loyalty or reward calculation yet (Phase 11.3). The Poster transaction id is the ONLY dedupe authority
 // (unique index); rows are never created from heuristics.
 //
-// status: IMPORTED = every line resolved; UNRESOLVED = attributable to a customer/branch but at least one line
-// could not be resolved (unmapped product, modifier, fractional quantity) — kept for audit, excluded from any
-// future qualification. No refund/void status exists because Poster's behaviour for those is not verified.
+// status: IMPORTED = every line resolved; UNRESOLVED = attributable to a branch (customer optional, see below)
+// but at least one line could not be resolved (unmapped product, modifier, fractional quantity) — kept for
+// audit, excluded from any future qualification. No refund/void status exists because Poster's behaviour for
+// those is not verified.
+//
+// Owner decision (2026-09-24): posterClientId/customerId are nullable — a receipt with no Poster client, or
+// one whose client is not linked to a CUP customer, is now imported ANONYMOUSLY (for accurate total revenue in
+// Analytics/Finance) instead of being skipped entirely. Every per-CUSTOMER consumer (rewards, loyalty2,
+// automations, Customer 360) already filters by a specific real customerId, so a null row simply never matches
+// and is automatically excluded from anything customer-scoped — see poster-transaction-import.service.ts's
+// classification loop for the one remaining case that still must be skipped (a probable CUP-originated receipt,
+// via application_id, is never imported anonymously — it wants the real link or nothing, never a guess).
 model PosterImportedTransaction {
   id                  String                          @id @default(cuid())
   posterTransactionId String                          @unique
-  posterClientId      String
-  customerId          String
-  customer            Customer                        @relation(fields: [customerId], references: [id])
+  posterClientId      String?
+  customerId          String?
+  customer            Customer?                       @relation(fields: [customerId], references: [id])
   branchId            String
   branch              Branch                          @relation(fields: [branchId], references: [id])
   posterSpotId        Int
@@ -1204,6 +1213,11 @@ model PosterWebhookEvent {
 model ExpenseCategory {
   id        String    @id @default(cuid())
   name      String    @unique
+  // OPERATING (rent, salaries, marketing, ...) reduces Operating Profit; FINANCIAL (bank/payment
+  // fees, penalties, ...) is kept out of Operating Expenses and only reduces Net Profit — the
+  // spec's own explicit "keep them separate from operating expenses" instruction. Reuses
+  // Expense/ExpenseCategory instead of a second parallel model for "other financial costs".
+  type      String    @default("OPERATING") // ExpenseCategoryType — see src/common/enums/finance.ts
   sortOrder Int       @default(0)
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())

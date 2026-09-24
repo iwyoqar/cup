@@ -1,6 +1,20 @@
 # CUP Coffee — Project State
 
-Last updated: 2026-09-24 (Finance & Accounting Dashboard — full P&L/Cash Flow/Loans/Taxes/Investment/Payback, code-complete, not deployed).
+Last updated: 2026-09-24 (POS import now accepts customer-unlinked receipts, counted anonymously — owner decision, code-complete, not yet deployed).
+
+## Behavior change — POS import no longer skips customer-unlinked receipts (2026-09-24, code-complete)
+
+Trigger: the owner deleted and rebuilt the entire real Poster menu mid-session (32→3 products; catalog sync correctly deactivated the old 29 and activated the new 3 — confirmed no staleness bug). While investigating, the owner asked to wipe CUP's entire production database and re-import from Poster fresh; this was **refused** (blocked by the environment's own safety classifier on a read-only prep step, and independently — a full wipe would destroy real customers, real reward redemptions, staff/admin accounts, with no verified backup, to fix a problem that didn't actually exist). The real underlying want, once clarified: import ALL real Poster sales into CUP, not just the subset already linked to a CUP customer.
+
+**Old behavior:** `poster-transaction-import.service.ts` skipped a receipt entirely (`NO_CLIENT` / `CLIENT_NOT_LINKED`, never written) if it had no Poster client, or its client wasn't linked to a CUP customer — meaning Analytics/Finance revenue only ever reflected the subset of real sales attributable to a known customer.
+
+**New behavior:** `PosterImportedTransaction.customerId`/`posterClientId` are now nullable. Such a receipt is imported anonymously (`customerId: null`) as long as it's still closed/paid and its branch is mapped — the ONE remaining case still skipped is a receipt bearing Poster's `application_id` marker (a probable CUP-order) with no resolved link: that always wants the real link or nothing, never a guess. Every per-customer consumer (rewards, Loyalty2, CRM automation triggers, Customer 360) already filters by a specific real `customerId`, so an anonymous row is automatically excluded from all of them without any change needed there; `AnalyticsRepository.posCustomerIds` got one explicit `customerId: { not: null }` filter so anonymous rows don't inflate the "distinct customers" count. Revenue (`posTotals`, and Finance's own P&L reuse of it) already summed with no customer filter, so it picks up anonymous sales automatically — **this is a real, upward revenue-figure change once deployed**, not cosmetic.
+
+**Verified live (2026-09-24) against local `dev.db` using the real production Poster account:** a real preview+import of 2026-09-01..24 found 81 receipts; 52 were importable (up from what would have been ~28 under the old rule — 29 `NO_CLIENT` + 24 `CLIENT_NOT_LINKED` no longer skipped, only 4 `APPLICATION_ID_UNLINKED` still held back). A real write imported all 52: 41 landed anonymous (`customerId: null`), 21 with a real customer. `GET /admin/analytics/overview` correctly summed all 62 IMPORTED receipts into revenue (3,611,366 so'm from POS) while `customers: 1` stayed correct (not inflated by the 41 anonymous rows).
+
+**Admin UI:** the now-dead `UNMAPPED_CUSTOMER` import category was removed from `PosterImportPage.tsx`'s labels/order; the data-quality report's `customers` block (`receiptsWithLinkedCustomer`/`receiptsWithoutPosterClient`/`receiptsWithUnlinkedPosterClient`) already existed and now carries the customer-linkage visibility that used to live in the attribution grouping.
+
+`npx tsc --noEmit` / `npm run build` clean on both backend and `admin/`. Postgres migration hand-authored (`prisma/postgres/migrations/0004_pos_import_allow_anonymous/`). **Not yet deployed.**
 
 ## Finance & Accounting Dashboard (2026-09-24, code-complete, not deployed)
 

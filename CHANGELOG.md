@@ -1,5 +1,11 @@
 # Changelog
 
+## POS import now counts customer-unlinked receipts (2026-09-24)
+
+`PosterImportedTransaction.customerId`/`posterClientId` are now nullable. A closed, paid receipt with no Poster client, or one whose client isn't linked to a CUP customer, is imported anonymously instead of being skipped — so Analytics/Finance revenue reflects real total sales, not just the subset attributable to a known customer. A receipt bearing Poster's `application_id` marker with no resolved customer link is still skipped (never guessed). Every per-customer consumer already filters by a specific customerId, so anonymous rows are automatically excluded from rewards/loyalty/CRM/Customer 360; `AnalyticsRepository.posCustomerIds` got an explicit non-null filter so they don't inflate the customer count.
+
+Verified live against the real Poster account: a real import of 2026-09-01..24 grew from ~28 to 52 importable receipts; 41 of the 52 landed anonymous, 21 with a real customer; Analytics revenue and customer counts both came out correct. `npx tsc --noEmit` / `npm run build` clean on both backend and `admin/`. Postgres migration ready (`0004_pos_import_allow_anonymous`). Not yet deployed.
+
 ## Finance & Accounting Dashboard (2026-09-24)
 
 New `Admin → Finance` section: full P&L waterfall (Revenue → COGS → Gross Profit → Operating Expenses → Operating Profit → Taxes/Interest/Other Financial Costs → Net Profit), Cash Flow, configurable Expense categories, Loans (principal vs. interest kept separate), configurable Tax rules, Investments, and Payback/ROI. 8 new Prisma models. Revenue reuses `AnalyticsRepository` verbatim (no double-counting). COGS is read live from Poster's own recipe/"Dish" data per product (`menu.getProduct`, synced every 30 min) — verified live against the real account; the real menu has no recipes configured yet, so COGS/Gross Profit show an explicit "Data incomplete" banner naming the affected products rather than guessing. Inventory-purchase cash tracking and a dedicated payroll system were found to have no underlying data anywhere (Phase 1 audit) and are explicitly left as known gaps rather than fabricated — payroll folds into a "Salaries" expense category instead.

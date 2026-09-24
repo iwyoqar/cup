@@ -30,17 +30,14 @@ const CATEGORY_LABELS: Record<PosterImportCategory, string> = {
   UNRESOLVED: 'Unresolved product',
   UNSUPPORTED_LINE: 'Unsupported line',
   UNMAPPED_BRANCH: 'Unmapped branch',
-  UNMAPPED_CUSTOMER: 'Unmapped customer',
   UNPAID: 'Unpaid',
   TOO_RECENT: 'Too recent',
   REFUND_UNVERIFIED: 'Refund-like (excluded)',
   OTHER: 'Other',
 };
-const CATEGORY_ORDER: PosterImportCategory[] = ['IMPORTABLE', 'ALREADY_IMPORTED', 'CUP_ORIGINATED', 'POSSIBLE_CUP_ORIGIN', 'UNRESOLVED', 'UNSUPPORTED_LINE', 'UNMAPPED_BRANCH', 'UNMAPPED_CUSTOMER', 'UNPAID', 'TOO_RECENT', 'REFUND_UNVERIFIED', 'OTHER'];
+const CATEGORY_ORDER: PosterImportCategory[] = ['IMPORTABLE', 'ALREADY_IMPORTED', 'CUP_ORIGINATED', 'POSSIBLE_CUP_ORIGIN', 'UNRESOLVED', 'UNSUPPORTED_LINE', 'UNMAPPED_BRANCH', 'UNPAID', 'TOO_RECENT', 'REFUND_UNVERIFIED', 'OTHER'];
 
 const REASON_LABELS: Record<string, string> = {
-  NO_CLIENT: 'Receipt has no Poster customer',
-  CLIENT_NOT_LINKED: 'Poster customer is not linked to a CUP customer',
   BRANCH_NOT_MAPPED: 'Poster spot has no CUP branch',
   BRANCH_INACTIVE: 'CUP branch is inactive',
   NOT_A_PAID_SALE: 'Not a paid sale (unpaid / zero total)',
@@ -311,8 +308,8 @@ function PreviewResult({ summary, stale }: { summary: PosterImportSummary; stale
       </div>
       <p className="analytics__note">
         Totals: importable {formatSom(summary.revenueByCategoryMinor.IMPORTABLE)}
-        {summary.partiallyPaid > 0 ? ` · ${summary.partiallyPaid} importable receipt${summary.partiallyPaid === 1 ? ' is' : 's are'} only partly paid (a free / discounted line)` : ''} · Unmapped-customer receipts{' '}
-        {formatSom(summary.revenueByCategoryMinor.UNMAPPED_CUSTOMER)} are not attributed to anyone. Poster reads: {summary.posterReads.transactions + summary.posterReads.deletedTransactions + summary.posterReads.incomingOrderLinks}.
+        {summary.partiallyPaid > 0 ? ` · ${summary.partiallyPaid} importable receipt${summary.partiallyPaid === 1 ? ' is' : 's are'} only partly paid (a free / discounted line)` : ''}. A receipt with no linked CUP customer is still
+        imported (anonymously) as long as its branch and products are mapped. Poster reads: {summary.posterReads.transactions + summary.posterReads.deletedTransactions + summary.posterReads.incomingOrderLinks}.
       </p>
       <div className="pi__refund">
         <strong>Refund policy: {r.status.replace('_', ' ')}.</strong> {r.excludedReceipts} receipt{r.excludedReceipts === 1 ? '' : 's'} excluded for a negative amount / quantity.{' '}

@@ -24,7 +24,7 @@ export class PosterImportHistoryService {
         importedAt: r.importedAt.toISOString(),
         branchName: r.branch.name,
         posterSpotId: r.posterSpotId,
-        customerName: r.customer.displayName,
+        customerName: r.customer?.displayName ?? null, // null = anonymous import (no Poster client, or one not linked to a CUP customer)
         totalMinor: r.totalMinor,
         paidMinor: r.paidMinor,
         status: r.status,

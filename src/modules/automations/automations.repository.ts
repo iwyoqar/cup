@@ -238,7 +238,8 @@ export class AutomationsRepository {
       this.prisma.posterImportedTransaction.groupBy({ by: ['customerId'], where: { customerId: { in: customerIds }, status: 'IMPORTED' }, _min: { importedAt: true } }),
     ]);
     for (const r of cup) if (r._min.createdAt) out.set(r.customerId, r._min.createdAt.getTime());
-    for (const r of pos) if (r._min.importedAt) out.set(r.customerId, Math.min(out.get(r.customerId) ?? Infinity, r._min.importedAt.getTime()));
+    // customerId: { in: customerIds } already excludes null at the DB level (a nullable column since 2026-09-24 for anonymous POS imports).
+    for (const r of pos) if (r._min.importedAt && r.customerId) out.set(r.customerId, Math.min(out.get(r.customerId) ?? Infinity, r._min.importedAt.getTime()));
     return out;
   }
 
@@ -251,7 +252,8 @@ export class AutomationsRepository {
       this.prisma.posterImportedTransaction.groupBy({ by: ['customerId'], where: { customerId: { in: customerIds }, status: 'IMPORTED', ...(upTo ? { importedAt: { lte: upTo } } : {}) }, _sum: { totalMinor: true } }),
     ]);
     for (const r of cup) out.set(r.customerId, (out.get(r.customerId) ?? 0) + (r._sum.totalMinor ?? 0));
-    for (const r of pos) out.set(r.customerId, (out.get(r.customerId) ?? 0) + (r._sum.totalMinor ?? 0));
+    // customerId: { in: customerIds } already excludes null at the DB level.
+    for (const r of pos) if (r.customerId) out.set(r.customerId, (out.get(r.customerId) ?? 0) + (r._sum.totalMinor ?? 0));
     return out;
   }
 

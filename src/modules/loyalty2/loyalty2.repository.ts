@@ -119,7 +119,8 @@ export class Loyalty2Repository {
       this.prisma.posterImportedTransaction.findMany({ where: { customerId: { in: customerIds }, status: 'IMPORTED' }, select: { id: true, customerId: true, occurredAt: true, totalMinor: true } }),
     ]);
     for (const o of orders) out.get(o.customerId)?.push({ sourceType: 'CUP_ORDER', sourceId: o.id, at: o.createdAt, amountMinor: o.totalMinor });
-    for (const t of pos) out.get(t.customerId)?.push({ sourceType: 'POS', sourceId: t.id, at: t.occurredAt, amountMinor: t.totalMinor });
+    // customerId: { in: customerIds } already excludes null at the DB level.
+    for (const t of pos) if (t.customerId) out.get(t.customerId)?.push({ sourceType: 'POS', sourceId: t.id, at: t.occurredAt, amountMinor: t.totalMinor });
     for (const list of out.values()) list.sort(comparePurchases);
     return out;
   }

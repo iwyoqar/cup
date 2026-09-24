@@ -3,8 +3,8 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 
 export interface ImportedTransactionData {
   posterTransactionId: string;
-  posterClientId: string;
-  customerId: string;
+  posterClientId: string | null;
+  customerId: string | null;
   branchId: string;
   posterSpotId: number;
   status: 'IMPORTED' | 'UNRESOLVED';

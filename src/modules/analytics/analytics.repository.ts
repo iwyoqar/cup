@@ -69,9 +69,11 @@ export class AnalyticsRepository {
     return rows.map((r) => r.customerId);
   }
 
+  // customerId: { not: null } excludes anonymous imported receipts (owner decision, 2026-09-24 — see the model's own
+  // schema comment) from the customer count; they still count fully toward revenue via posTotals above.
   async posCustomerIds(range: QueryRange): Promise<string[]> {
-    const rows = await this.prisma.posterImportedTransaction.groupBy({ by: ['customerId'], where: this.posWhere(range) });
-    return rows.map((r) => r.customerId);
+    const rows = await this.prisma.posterImportedTransaction.groupBy({ by: ['customerId'], where: { ...this.posWhere(range), customerId: { not: null } } });
+    return rows.map((r) => r.customerId as string);
   }
 
   // Which of `customerIds` had a qualifying sale STRICTLY BEFORE `before` (any branch — "returning" means returning to the business).
@@ -84,7 +86,7 @@ export class AnalyticsRepository {
   async posCustomersWithSaleBefore(customerIds: string[], before: Date): Promise<string[]> {
     if (customerIds.length === 0) return [];
     const rows = await this.prisma.posterImportedTransaction.groupBy({ by: ['customerId'], where: { status: 'IMPORTED', customerId: { in: customerIds }, occurredAt: { lt: before } } });
-    return rows.map((r) => r.customerId);
+    return rows.map((r) => r.customerId as string); // customerId: { in: customerIds } already excludes null at the DB level
   }
 
   // --- daily revenue --------------------------------------------------------------------------------------------

@@ -178,7 +178,6 @@ export type PosterImportCategory =
   | 'UNRESOLVED'
   | 'UNSUPPORTED_LINE'
   | 'UNMAPPED_BRANCH'
-  | 'UNMAPPED_CUSTOMER'
   | 'UNPAID'
   | 'TOO_RECENT'
   | 'REFUND_UNVERIFIED'

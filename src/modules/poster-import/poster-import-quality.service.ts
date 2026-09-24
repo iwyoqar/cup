@@ -5,8 +5,11 @@ import { PosterSpotMappingService } from './poster-spot-mapping.service';
 
 // Categories whose receipts CUP can attribute to a branch, a customer and products (they are, or would be, POS purchases).
 const ATTRIBUTED: ImportCategory[] = ['IMPORTABLE', 'ALREADY_IMPORTED'];
-// Real sales CUP is choosing not to (or cannot yet) attribute — their revenue is the "unattributed revenue" the report exposes.
-const UNATTRIBUTED: ImportCategory[] = ['UNMAPPED_BRANCH', 'UNMAPPED_CUSTOMER', 'UNRESOLVED', 'UNSUPPORTED_LINE', 'POSSIBLE_CUP_ORIGIN'];
+// Real sales CUP is choosing not to (or cannot yet) attribute to a branch/products — their revenue is the "unattributed
+// revenue" the report exposes. Customer linkage is NOT part of this grouping (owner decision, 2026-09-24): an
+// anonymous receipt (no Poster client, or an unlinked one) is now imported as IMPORTABLE/ALREADY_IMPORTED like any
+// other — see the separate `customers` block below for customer-linkage visibility specifically.
+const UNATTRIBUTED: ImportCategory[] = ['UNMAPPED_BRANCH', 'UNRESOLVED', 'UNSUPPORTED_LINE', 'POSSIBLE_CUP_ORIGIN'];
 
 // Phase 19 — the attribution data-quality report. Three read-only parts: (1) the spot -> branch mapping, (2) what is already stored in
 // poster_imported_transactions, (3) an optional LIVE scan of one bounded Poster window using the very same classification the import uses (so the report
@@ -40,7 +43,7 @@ export class PosterImportQualityService {
             unattributedTransactions: sum(UNATTRIBUTED, summary.categories),
             attributedRevenueMinor: sum(ATTRIBUTED, summary.revenueByCategoryMinor),
             unattributedRevenueMinor: sum(UNATTRIBUTED, summary.revenueByCategoryMinor),
-            note: 'Attributed = a paid receipt with a linked CUP customer, a mapped active branch and mapped products (importable or already imported). Unattributed = a real receipt CUP cannot yet attribute. Unpaid, too-recent, CUP-originated and refund-excluded receipts are in neither group.',
+            note: 'Attributed = a paid receipt with a mapped active branch and mapped products (importable or already imported) — a CUP customer link is no longer required (see customers below). Unattributed = a real receipt CUP cannot yet attribute to a branch/products. Unpaid, too-recent, CUP-originated and refund-excluded receipts are in neither group.',
           },
           customers: { receiptsWithLinkedCustomer: summary.details.filter((d) => d.customerName !== null && d.customerName !== undefined).length, receiptsWithoutPosterClient: summary.details.filter((d) => d.hasPosterClient === false).length, receiptsWithUnlinkedPosterClient: summary.details.filter((d) => d.hasPosterClient === true && (d.customerName === null || d.customerName === undefined)).length },
           products: { unresolvedReceipts: summary.categories.UNRESOLVED, unsupportedLineReceipts: summary.categories.UNSUPPORTED_LINE },

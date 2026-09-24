@@ -35,7 +35,9 @@ export class RewardProgressRepository {
       }),
     ]);
     for (const i of cup) result.set(i.order.customerId, (result.get(i.order.customerId) ?? 0) + i.quantity);
-    for (const i of pos) result.set(i.transaction.customerId, (result.get(i.transaction.customerId) ?? 0) + i.quantity);
+    // The where clause already constrains customerId to `in: customerIds` (never null at the DB level — SQL IN never
+    // matches NULL); this guard is pure type-narrowing for the now-nullable column, not a real runtime possibility.
+    for (const i of pos) if (i.transaction.customerId) result.set(i.transaction.customerId, (result.get(i.transaction.customerId) ?? 0) + i.quantity);
     return result;
   }
 
@@ -90,7 +92,9 @@ export class RewardProgressRepository {
       }),
     ]);
     for (const o of cupOrders) result.set(o.customerId, (result.get(o.customerId) ?? 0) + 1);
-    for (const t of posTransactions) result.set(t.customerId, (result.get(t.customerId) ?? 0) + 1);
+    // Same type-narrowing note as sumQualifyingQuantityForCustomers above — customerId: { in: customerIds } already
+    // excludes null rows at the DB level.
+    for (const t of posTransactions) if (t.customerId) result.set(t.customerId, (result.get(t.customerId) ?? 0) + 1);
     return result;
   }
 

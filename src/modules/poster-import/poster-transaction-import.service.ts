@@ -10,9 +10,12 @@ import { normalizePosterTransaction, NormalizedTransaction } from './poster-tran
 // What it does: reads closed Poster receipts (READ-ONLY), attributes each to a CUP customer through the explicit chain
 //   transaction.client_id -> Customer.posterClientId,   transaction.spot_id -> Branch.posterSpotId,
 //   line.product_id -> Product.posterProductId,
-// and records it as a PosterImportedTransaction (its own model — never an Order). Dedupe authority is the Poster
-// transaction id (unique index). A receipt that a CUP order points at (documented incoming_order.transaction_id) is
-// CUP-originated and is never imported as an external sale.
+// and records it as a PosterImportedTransaction (its own model — never an Order). Customer attribution is the ONE
+// optional part of this chain (owner decision, 2026-09-24): a receipt with no Poster client, or an unlinked one, is
+// still imported with customerId: null so Analytics/Finance revenue reflects real total sales — see the model's own
+// schema comment for why every per-customer consumer stays unaffected. Branch and product resolution remain required.
+// Dedupe authority is the Poster transaction id (unique index). A receipt that a CUP order points at (documented
+// incoming_order.transaction_id) is CUP-originated and is never imported as an external sale.
 //
 // What it deliberately does NOT do: touch loyalty, rewards, orders or Poster; use order_source / auto_accept; match by phone, name, amount, time or
 // product similarity; treat any receipt as refunded/voided (that Poster behaviour is UNVERIFIED — see REFUND_UNVERIFIED); create customers, products or
@@ -32,7 +35,6 @@ export type ImportCategory =
   | 'UNRESOLVED'
   | 'UNSUPPORTED_LINE'
   | 'UNMAPPED_BRANCH'
-  | 'UNMAPPED_CUSTOMER'
   | 'UNPAID'
   | 'TOO_RECENT'
   | 'REFUND_UNVERIFIED'
@@ -46,7 +48,6 @@ export const IMPORT_CATEGORIES: ImportCategory[] = [
   'UNRESOLVED',
   'UNSUPPORTED_LINE',
   'UNMAPPED_BRANCH',
-  'UNMAPPED_CUSTOMER',
   'UNPAID',
   'TOO_RECENT',
   'REFUND_UNVERIFIED',
@@ -165,9 +166,6 @@ export function categoryOf(outcome: ImportOutcome, reason?: string): ImportCateg
         case 'BRANCH_NOT_MAPPED':
         case 'BRANCH_INACTIVE':
           return 'UNMAPPED_BRANCH';
-        case 'NO_CLIENT':
-        case 'CLIENT_NOT_LINKED':
-          return 'UNMAPPED_CUSTOMER';
         case 'NOT_A_PAID_SALE':
           return 'UNPAID';
         case 'TOO_RECENT':
@@ -359,7 +357,6 @@ export class PosterTransactionImportService {
       // Documented meaning only: status 2 = closed; pay_type 0 = closed without payment.
       if (tx.posterStatus !== '2') { skip('NOT_CLOSED'); continue; }
       if (tx.posterPayType === '0' || tx.paidMinor <= 0 || tx.totalMinor <= 0) { skip('NOT_A_PAID_SALE'); continue; }
-      if (tx.posterClientId === null) { skip('NO_CLIENT'); continue; }
       // Owner decision (2026-09-24): the settling wait exists ONLY to give Poster time to report a CUP-created order's
       // receipt link before this receipt might otherwise be imported as a bare POS sale and double-counted (see the
       // CUP_ORIGINATED check above and the APPLICATION_ID_UNLINKED skip below). Poster stamps EVERY receipt created
@@ -367,15 +364,21 @@ export class PosterTransactionImportService {
       // without it could never be a CUP order in the first place, so there is nothing for it to be confused with and no
       // reason to wait at all. Only an application_id-bearing receipt still needs the wait.
       if (hasApplicationId(raw) && now - tx.occurredAt.getTime() < settleMs) { skip('TOO_RECENT'); continue; }
+      // Safety net against double counting a CUP-created receipt whose link CUP could not resolve (lookback / lookup bounds): Poster stamps such receipts with an
+      // application_id (UNDOCUMENTED). It is used ONLY to skip — never to import or attribute. This is the ONE case still
+      // skipped rather than imported anonymously below: a receipt that LOOKS like it might be a CUP order gets the real
+      // link or nothing, never a guessed/anonymous attribution.
+      if (hasApplicationId(raw) && !customer) { skip('APPLICATION_ID_UNLINKED'); continue; }
 
-      if (!customer) { skip('CLIENT_NOT_LINKED'); continue; }
       if (!branch) { skip('BRANCH_NOT_MAPPED'); continue; }
       if (!branch.isActive) { skip('BRANCH_INACTIVE'); continue; }
-      // Safety net against double counting a CUP-created receipt whose link CUP could not resolve (lookback / lookup bounds): Poster stamps such receipts with an
-      // application_id (UNDOCUMENTED). It is used ONLY to skip — never to import or attribute.
-      if (hasApplicationId(raw)) { skip('APPLICATION_ID_UNLINKED'); continue; }
 
-      const header = { posterTransactionId: id, posterClientId: tx.posterClientId, customerId: customer.id, branchId: branch.id, posterSpotId: tx.posterSpotId, posterStatus: tx.posterStatus, posterPayType: tx.posterPayType, occurredAt: tx.occurredAt, totalMinor: tx.totalMinor, paidMinor: tx.paidMinor };
+      // Owner decision (2026-09-24): a receipt with no Poster client, or one whose client is not linked to a CUP
+      // customer, is now imported ANONYMOUSLY (customerId: null) instead of being skipped — so Analytics/Finance
+      // revenue reflects real total sales, not just the subset attributable to a known customer. Every per-customer
+      // consumer (rewards, loyalty2, automations, Customer 360) already filters by a specific real customerId, so
+      // an anonymous row is automatically excluded from all of those — see the model's own schema comment.
+      const header = { posterTransactionId: id, posterClientId: tx.posterClientId, customerId: customer?.id ?? null, branchId: branch.id, posterSpotId: tx.posterSpotId, posterStatus: tx.posterStatus, posterPayType: tx.posterPayType, occurredAt: tx.occurredAt, totalMinor: tx.totalMinor, paidMinor: tx.paidMinor };
 
       // Line resolution decides IMPORTED vs UNRESOLVED. An unresolved receipt is never "partly imported as complete".
       let status: 'IMPORTED' | 'UNRESOLVED' = 'IMPORTED';
