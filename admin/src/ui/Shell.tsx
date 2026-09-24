@@ -14,20 +14,37 @@ interface AdminShellProps {
 
 const STORAGE_KEY = 'cup-admin-sidebar-sections';
 
-function loadExpanded(): Set<string> {
+// Exclusive accordion: at most one top-level section is open at a time (string id, or null for none). Reads the
+// legacy multi-section format (a JSON array of open ids, from before this fix) and migrates it down to a single id —
+// the active route's own section first, else the array's first entry, else null — then persists the normalized
+// value back under the SAME key (no new storage key introduced).
+function loadOpenSection(activeGroupId: string | null): string | null {
+  let stored: unknown = null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? new Set(parsed.filter((v): v is string => typeof v === 'string')) : new Set();
+    if (raw) stored = JSON.parse(raw);
   } catch {
-    return new Set(); // blocked/unavailable storage — falls back to in-memory state (still works for the session)
+    stored = null; // blocked/unavailable storage — falls back to in-memory state (still works for the session)
   }
+
+  let normalized: string | null;
+  if (activeGroupId) {
+    normalized = activeGroupId; // the active route's section always wins over whatever was stored
+  } else if (typeof stored === 'string') {
+    normalized = stored;
+  } else if (Array.isArray(stored)) {
+    normalized = stored.find((v): v is string => typeof v === 'string') ?? null; // legacy multi-open array — keep only the first
+  } else {
+    normalized = null;
+  }
+
+  saveOpenSection(normalized);
+  return normalized;
 }
 
-function saveExpanded(ids: Set<string>): void {
+function saveOpenSection(id: string | null): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(id));
   } catch {
     // Ignore — persistence is a convenience, not a functional requirement.
   }
@@ -80,31 +97,21 @@ export function AdminShell({ page, onNavigate, onLogout, admin, children }: Admi
   const overall = overallState(health);
   const { item, group } = findNav(page);
 
-  // Part 4: only the section containing the initial route auto-opens. Part 6: everything after that is persisted.
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
-    const persisted = loadExpanded();
-    const active = groupOf(page);
-    if (active) persisted.add(active.id);
-    return persisted;
-  });
+  // Exclusive accordion: only the section containing the initial route auto-opens; everything after that is persisted.
+  const [openSection, setOpenSection] = useState<string | null>(() => loadOpenSection(groupOf(page)?.id ?? null));
 
-  useEffect(() => saveExpanded(expanded), [expanded]);
+  useEffect(() => saveOpenSection(openSection), [openSection]);
 
-  // Part 4/5: a route change always ensures its own section is open, but NEVER closes a section the user opened
-  // manually — this only ever adds to the set.
+  // A route change always makes its own section the (only) open one — this is what closes whichever section was
+  // open before, so two top-level sections can never be open at once.
   useEffect(() => {
     const active = groupOf(page);
     if (!active) return;
-    setExpanded((prev) => (prev.has(active.id) ? prev : new Set(prev).add(active.id)));
+    setOpenSection((prev) => (prev === active.id ? prev : active.id));
   }, [page]);
 
   const toggleSection = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setOpenSection((prev) => (prev === id ? null : id));
   };
 
   useEffect(() => {
@@ -169,7 +176,7 @@ export function AdminShell({ page, onNavigate, onLogout, admin, children }: Admi
                 ))}
               </div>
             ) : (
-              <NavSection active={page} attention={attention} g={g} key={g.id} onNavigate={go} onToggle={() => toggleSection(g.id)} open={expanded.has(g.id)} />
+              <NavSection active={page} attention={attention} g={g} key={g.id} onNavigate={go} onToggle={() => toggleSection(g.id)} open={openSection === g.id} />
             ),
           )}
         </nav>
