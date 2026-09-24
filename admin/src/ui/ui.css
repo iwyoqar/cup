@@ -75,6 +75,69 @@
   color: rgba(255, 255, 255, 0.42);
 }
 
+/* Accordion section header — a real <button>, so Enter/Space/focus all work natively. */
+.nav-section {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease);
+}
+
+.nav-section .nav-group__label {
+  padding: 0;
+}
+
+.nav-section:hover .nav-group__label {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.nav-section--active .nav-group__label {
+  color: var(--cup-cream);
+}
+
+.nav-section:focus-visible {
+  outline: 2px solid var(--cup-terracotta);
+  outline-offset: 2px;
+  border-radius: var(--cup-radius-sm);
+}
+
+.nav-section__chevron {
+  display: flex;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.38);
+  transition: transform var(--motion-fast) var(--ease);
+}
+
+.nav-section__chevron svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-section__chevron--open {
+  transform: rotate(90deg);
+}
+
+.nav-section__panel {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-section__panel--open {
+  display: flex;
+}
+
 .nav-item {
   position: relative;
   width: 100%;
@@ -460,6 +523,14 @@
   .nav-item--active::before {
     left: -10px;
   }
+  /* No room for a section label/chevron in icon-rail mode — every item stays visible as an icon,
+     exactly like before the accordion existed, regardless of expanded/collapsed state. */
+  .nav-section {
+    display: none;
+  }
+  .nav-section__panel {
+    display: flex !important;
+  }
   .nav-item__attention {
     position: absolute;
     top: 8px;
@@ -501,6 +572,17 @@
   }
   .sidebar__tag {
     display: inline;
+  }
+  /* Undo the icon-rail breakpoint's "no room for a header" fallback — the drawer has a full-width
+     column, so the accordion (header + real open/collapsed state) works exactly as on desktop. */
+  .nav-section {
+    display: flex;
+  }
+  .nav-section__panel {
+    display: none !important;
+  }
+  .nav-section__panel--open {
+    display: flex !important;
   }
   .sidebar__status-text {
     display: flex;

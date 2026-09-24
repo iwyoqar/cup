@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchMe } from './lib/adminAuth';
 import { clearStoredToken, getStoredToken } from './lib/api';
-import { AdminPage } from './lib/nav';
+import { useAdminRoute } from './lib/router';
 import { AdminProfile } from './lib/types';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -16,7 +16,14 @@ import { AutomationsPage } from './pages/AutomationsPage';
 import { ReferralsPage } from './pages/ReferralsPage';
 import { GrowthPage } from './pages/GrowthPage';
 import { BranchIntelligencePage } from './pages/BranchIntelligencePage';
-import { FinancePage } from './pages/FinancePage';
+import { FinanceOverviewPage } from './pages/FinanceOverviewPage';
+import { FinancePnlPage } from './pages/FinancePnlPage';
+import { FinanceCashFlowPage } from './pages/FinanceCashFlowPage';
+import { FinanceExpensesPage } from './pages/FinanceExpensesPage';
+import { FinanceLoansPage } from './pages/FinanceLoansPage';
+import { FinanceTaxesPage } from './pages/FinanceTaxesPage';
+import { FinanceInvestmentsPage } from './pages/FinanceInvestmentsPage';
+import { FinanceReconciliationPage } from './pages/FinanceReconciliationPage';
 import { BranchConfigPage } from './pages/BranchConfigPage';
 import { StaffPage } from './pages/StaffPage';
 import { PosterImportPage } from './pages/PosterImportPage';
@@ -31,7 +38,7 @@ type Phase = 'booting' | 'login' | 'authenticated';
 export function App() {
   const [phase, setPhase] = useState<Phase>('booting');
   const [admin, setAdmin] = useState<AdminProfile | null>(null);
-  const [page, setPage] = useState<AdminPage>('dashboard');
+  const { page, navigate } = useAdminRoute();
 
   useEffect(() => {
     const token = getStoredToken();
@@ -55,7 +62,7 @@ export function App() {
   const handleLogout = () => {
     clearStoredToken();
     setAdmin(null);
-    setPage('dashboard');
+    navigate('dashboard');
     setPhase('login');
   };
 
@@ -81,8 +88,8 @@ export function App() {
   }
 
   return (
-    <AdminShell admin={admin} onLogout={handleLogout} onNavigate={setPage} page={page}>
-      {page === 'dashboard' && <DashboardPage admin={admin} onNavigate={setPage} />}
+    <AdminShell admin={admin} onLogout={handleLogout} onNavigate={navigate} page={page}>
+      {page === 'dashboard' && <DashboardPage admin={admin} onNavigate={navigate} />}
       {page === 'sales' && <AnalyticsPage view="sales" />}
       {page === 'analytics' && <AnalyticsPage view="analytics" />}
       {page === 'customers' && <CustomersPage />}
@@ -93,15 +100,22 @@ export function App() {
       {page === 'referrals' && <ReferralsPage />}
       {page === 'campaigns' && <CampaignsPage />}
       {page === 'crm-automation' && <AutomationsPage />}
-      {page === 'pos-import' && <PosterImportPage onNavigate={setPage} />}
+      {page === 'pos-import' && <PosterImportPage onNavigate={navigate} />}
       {page === 'continuous-sync' && <ContinuousSyncPage />}
       {page === 'staff' && <StaffPage />}
       {page === 'growth' && <GrowthPage />}
       {page === 'branch-intelligence' && <BranchIntelligencePage />}
-      {page === 'finance' && <FinancePage />}
+      {page === 'finance' && <FinanceOverviewPage />}
+      {page === 'finance-pnl' && <FinancePnlPage />}
+      {page === 'finance-cash-flow' && <FinanceCashFlowPage />}
+      {page === 'finance-expenses' && <FinanceExpensesPage />}
+      {page === 'finance-loans' && <FinanceLoansPage />}
+      {page === 'finance-taxes' && <FinanceTaxesPage />}
+      {page === 'finance-investments' && <FinanceInvestmentsPage />}
+      {page === 'finance-reconciliation' && <FinanceReconciliationPage />}
       {page === 'branch-config' && <BranchConfigPage />}
       {page === 'system-health' && <SystemHealthPage />}
-      {page === 'errors' && <ErrorsPage onNavigate={setPage} />}
+      {page === 'errors' && <ErrorsPage onNavigate={navigate} />}
       {page === 'audit' && <AuditPage />}
     </AdminShell>
   );

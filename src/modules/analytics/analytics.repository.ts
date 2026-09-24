@@ -18,6 +18,7 @@ export interface SourceTotals {
 export interface DailyRow {
   day: string;
   revenue: number;
+  orders: number;
 }
 
 export interface ProductAggregate {
@@ -59,6 +60,13 @@ export class AnalyticsRepository {
 
   async posTotals(range: QueryRange): Promise<SourceTotals> {
     const r = await this.prisma.posterImportedTransaction.aggregate({ where: this.posWhere(range), _count: { _all: true }, _sum: { totalMinor: true } });
+    return { count: r._count._all, revenue: r._sum.totalMinor ?? 0 };
+  }
+
+  // Reports Phase A — the customer-less subset of posTotals above (same posWhere, plus customerId: null). Never a
+  // second revenue calculation: callers derive "identified POS" by subtracting this from posTotals's own total.
+  async posAnonymousTotals(range: QueryRange): Promise<SourceTotals> {
+    const r = await this.prisma.posterImportedTransaction.aggregate({ where: { ...this.posWhere(range), customerId: null }, _count: { _all: true }, _sum: { totalMinor: true } });
     return { count: r._count._all, revenue: r._sum.totalMinor ?? 0 };
   }
 
