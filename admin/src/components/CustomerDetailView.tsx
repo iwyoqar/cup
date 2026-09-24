@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useState } from 'react';
 import { deactivateCustomer, fetchCustomer360, fetchCustomerActivity, regenerateLoyaltyCode } from '../lib/adminCustomers';
 import { ApiError } from '../lib/api';
 import { errorMessage } from '../lib/errors';
@@ -6,7 +6,7 @@ import { LIFECYCLE_LABELS, OPPORTUNITY_LABELS, SIGNAL_LABELS } from '../lib/admi
 import { formatDate, formatDateTime, formatSom } from '../lib/format';
 import { REASON_LABELS } from '../lib/adminAutomations';
 import { AdminCustomer360, CustomerActivityItem } from '../lib/types';
-import { ConfirmDialog } from '../ui';
+import { Column, ConfirmDialog, DataTable, EmptyState, ErrorState, KeyValue, LoadingState, SectionCard, StatCard, StatGrid, StatusBadge, TabItem, Tabs } from '../ui';
 
 interface CustomerDetailViewProps {
   customerId: string;
@@ -39,6 +39,7 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [tab, setTab] = useState<C360Tab>('overview');
 
   // Phase 26: soft delete only (Customer.isActive = false) — no order/loyalty/reward/referral
   // history, and no Poster mapping, is ever touched or reversed.
@@ -92,273 +93,243 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
   }, [customerId, reloadKey]);
 
   return (
-    <div className="c360">
-      <button className="button-secondary" onClick={onBack} type="button" style={{ marginBottom: 16 }}>
-        ← {backLabel ?? 'Back to customers'}
-      </button>
+    <div className="flex flex-col gap-5">
+      <div>
+        <button className="btn btn-ghost btn-sm -ml-3" onClick={onBack} type="button">
+          ← {backLabel ?? 'Back to customers'}
+        </button>
+      </div>
 
-      {error && (
-        <div className="c360__error" role="alert">
-          <span>{error}</span>
-          <button className="button-secondary" onClick={() => setReloadKey((k) => k + 1)} type="button">
-            Retry
-          </button>
-        </div>
-      )}
-      {!data && !error && <Skeleton />}
+      {error && <ErrorState message={error} onRetry={() => setReloadKey((k) => k + 1)} title="Customer could not be loaded" />}
+      {!data && !error && <LoadingState label="Loading customer" variant="page" />}
 
       {data && (
         <>
-          <header className="c360__header">
-            <div className="c360__eyebrow">Customer</div>
-            <h1 className="c360__name">{data.profile.displayName ?? 'Customer'}</h1>
-            <div className="c360__chips">
-              <span className="c360__chip">{data.profile.phone ?? 'Phone not provided'}</span>
-              <span className="c360__chip">{data.profile.username ? `@${data.profile.username}` : 'No Telegram username'}</span>
-              <span className={`c360__chip${data.identity.posterLinked ? ' c360__chip--ok' : ''}`}>{data.identity.posterLinked ? 'Poster linked' : 'Poster not linked'}</span>
-              <span className="c360__chip">{data.summary.favoriteBranch ? `Favorite: ${data.summary.favoriteBranch.name}` : 'No favorite branch yet'}</span>
-            </div>
-          </header>
+          <ProfileHeader data={data} />
 
-          <section className="c360__kpis">
-            <Kpi label="Total spent" value={formatSom(data.summary.totalRevenueMinor)} strong />
-            <Kpi label="Purchases" value={data.summary.totalPurchases.toLocaleString('ru-RU')} />
-            <Kpi label="Average check" value={formatSom(data.summary.averageCheckMinor)} />
-            <Kpi label="Last purchase" value={data.summary.lastPurchaseAt ? formatDate(data.summary.lastPurchaseAt) : '—'} hint={data.summary.firstPurchaseAt ? `First: ${formatDate(data.summary.firstPurchaseAt)}` : undefined} />
-          </section>
+          <StatGrid>
+            <StatCard label="Total spent" strong value={formatSom(data.summary.totalRevenueMinor)} />
+            <StatCard label="Purchases" value={data.summary.totalPurchases.toLocaleString('ru-RU')} />
+            <StatCard label="Average check" value={formatSom(data.summary.averageCheckMinor)} />
+            <StatCard hint={data.summary.firstPurchaseAt ? `First: ${formatDate(data.summary.firstPurchaseAt)}` : undefined} label="Last purchase" value={data.summary.lastPurchaseAt ? formatDate(data.summary.lastPurchaseAt) : '—'} />
+          </StatGrid>
 
-          <section className="c360__grid3">
-            <SourceCard label="Total" count={data.summary.totalPurchases} unit="purchases" revenue={data.summary.totalRevenueMinor} empty="Xaridlar hali mavjud emas" />
-            <SourceCard label="CUP" count={data.summary.cupOrderCount} unit="orders" revenue={data.summary.cupRevenueMinor} empty="CUP buyurtmalari hali mavjud emas" />
-            <SourceCard label="POS" count={data.summary.posPurchaseCount} unit="purchases" revenue={data.summary.posRevenueMinor} empty="POS xaridlari hali mavjud emas" />
-          </section>
+          <Tabs active={tab} label="Customer sections" onChange={setTab} tabs={TABS} />
 
-          <section className="c360__grid2">
-            <div className="c360__card">
-              <h2 className="c360__h2">Loyalty</h2>
-              <div className="c360__stats">
-                <Stat label="Balance" value={`${data.loyalty.balance.toLocaleString('ru-RU')} points`} />
-                <Stat label="Lifetime earned" value={`${data.loyalty.lifetimeEarned.toLocaleString('ru-RU')}`} />
-                <Stat label="Lifetime spent" value={`${data.loyalty.lifetimeSpent.toLocaleString('ru-RU')}`} />
-              </div>
-            </div>
-
-            <div className="c360__card c360__card--cream">
-              <h2 className="c360__h2">Rewards</h2>
-              {data.rewards.length === 0 ? (
-                <p className="c360__empty">Faol bonus dasturlari yo'q</p>
-              ) : (
-                data.rewards.map((reward) => (
-                  <div className="c360__reward" key={reward.programName}>
-                    <div className="c360__reward-head">
-                      <span>{reward.programName}</span>
-                      <strong>
-                        {reward.qualifyingCount} / {reward.threshold}
-                      </strong>
-                    </div>
-                    <div className="c360__bar" aria-hidden="true">
-                      <span style={{ width: `${reward.threshold > 0 ? (reward.qualifyingCount / reward.threshold) * 100 : 0}%` }} />
-                    </div>
-                    <div className="c360__hint">{reward.availableRewards > 0 ? `${reward.availableRewards} reward${reward.availableRewards === 1 ? '' : 's'} available` : 'No reward available yet'}</div>
-                  </div>
-                ))
-              )}
-              {data.rewardHistory.length > 0 && (
-                <div className="c360__history">
-                  <div className="c360__label">Redeemed</div>
-                  {data.rewardHistory.map((r) => (
-                    <div className="c360__history-row" key={`${r.redeemedAt}-${r.programName}`}>
-                      <span>{r.productName ? `${r.productName} × ${r.quantity}` : r.programName}</span>
-                      <span className="c360__hint">{formatDate(r.redeemedAt)}</span>
-                    </div>
-                  ))}
+          <div className="flex animate-fade-in flex-col gap-5" key={tab}>
+            {tab === 'overview' && (
+              <>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <SourceCard count={data.summary.totalPurchases} empty="Xaridlar hali mavjud emas" label="All purchases" revenue={data.summary.totalRevenueMinor} unit="purchases" />
+                  <SourceCard count={data.summary.cupOrderCount} empty="CUP buyurtmalari hali mavjud emas" label="CUP orders" revenue={data.summary.cupRevenueMinor} unit="orders" />
+                  <SourceCard count={data.summary.posPurchaseCount} empty="POS xaridlari hali mavjud emas" label="POS purchases" revenue={data.summary.posRevenueMinor} unit="purchases" />
                 </div>
-              )}
-            </div>
-          </section>
+                <div className="grid-2">
+                  <LoyaltyCard data={data} />
+                  <RewardsCard data={data} />
+                </div>
+                <SectionCard description="Orders, POS purchases, loyalty and rewards — newest first." title="Recent activity">
+                  {data.recentActivity.length === 0 ? (
+                    <Empty text="Hozircha faollik yo'q" />
+                  ) : (
+                    <ol className="m-0 flex list-none flex-col p-0">
+                      {data.recentActivity.map((item, i) => (
+                        <TimelineRow item={item} key={`${item.type}-${item.at}-${i}`} />
+                      ))}
+                    </ol>
+                  )}
+                </SectionCard>
+              </>
+            )}
 
-          {data.membership.enabled && (
-            <section className="c360__card">
-              <h2 className="c360__h2">Membership</h2>
-              <div className="c360__stats" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-                <Stat label="Level" value={data.membership.level ? `${data.membership.level.icon} ${data.membership.level.name}` : '—'} />
-                <Stat label="Lifetime spend" value={formatSom(data.membership.lifetimeSpend)} />
-                <Stat label="XP" value={data.membership.xp.lifetimeXP.toLocaleString('ru-RU')} />
-                <Stat label="Cashback" value={data.membership.cashback.enabled ? formatSom(data.membership.cashback.balance) : 'Off'} />
-              </div>
-              <p className="c360__hint" style={{ margin: '10px 0 0' }}>
-                {data.membership.nextLevel ? `${formatSom(data.membership.nextLevel.spendToNext)} to ${data.membership.nextLevel.name}` : 'Top level reached'}
-                {data.membership.streak.enabled ? ` · Streak ${data.membership.streak.current} (best ${data.membership.streak.best})` : ''}
-                {data.membership.cashback.enabled ? ` · Cashback earned ${formatSom(data.membership.cashback.lifetimeEarned)}` : ''}
-              </p>
-              <div className="c360__chips" style={{ marginTop: 10 }}>
-                {data.membership.achievements.filter((a) => a.unlocked).length === 0 ? (
-                  <span className="c360__empty">Yutuqlar hali ochilmagan</span>
-                ) : (
-                  data.membership.achievements
-                    .filter((a) => a.unlocked)
-                    .map((a) => (
-                      <span className="c360__chip c360__chip--ok" key={a.code}>
-                        {a.icon} {a.name}
-                      </span>
-                    ))
+            {tab === 'purchases' && <PurchaseActivity customerId={customerId} key={customerId} />}
+
+            {tab === 'loyalty' && (
+              <>
+                <div className="grid-2">
+                  <LoyaltyCard data={data} />
+                  <RewardsCard data={data} />
+                </div>
+                {data.membership.enabled && (
+                  <SectionCard title="Membership">
+                    <StatRow
+                      items={[
+                        { label: 'Level', value: data.membership.level ? `${data.membership.level.icon} ${data.membership.level.name}` : '—' },
+                        { label: 'Lifetime spend', value: formatSom(data.membership.lifetimeSpend) },
+                        { label: 'XP', value: data.membership.xp.lifetimeXP.toLocaleString('ru-RU') },
+                        { label: 'Cashback', value: data.membership.cashback.enabled ? formatSom(data.membership.cashback.balance) : 'Off' },
+                      ]}
+                    />
+                    <p className="hint-text mt-3">
+                      {data.membership.nextLevel ? `${formatSom(data.membership.nextLevel.spendToNext)} to ${data.membership.nextLevel.name}` : 'Top level reached'}
+                      {data.membership.streak.enabled ? ` · Streak ${data.membership.streak.current} (best ${data.membership.streak.best})` : ''}
+                      {data.membership.cashback.enabled ? ` · Cashback earned ${formatSom(data.membership.cashback.lifetimeEarned)}` : ''}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {data.membership.achievements.filter((a) => a.unlocked).length === 0 ? (
+                        <Empty text="Yutuqlar hali ochilmagan" />
+                      ) : (
+                        data.membership.achievements
+                          .filter((a) => a.unlocked)
+                          .map((a) => (
+                            <StatusBadge key={a.code} tone="ok">
+                              {a.icon} {a.name}
+                            </StatusBadge>
+                          ))
+                      )}
+                    </div>
+                  </SectionCard>
                 )}
-              </div>
-            </section>
-          )}
-
-          <section className="c360__card">
-            <h2 className="c360__h2">Recent activity</h2>
-            {data.recentActivity.length === 0 ? <p className="c360__empty">Hozircha faollik yo'q</p> : <ol className="c360__timeline">{data.recentActivity.map((item, i) => <TimelineRow item={item} key={`${item.type}-${item.at}-${i}`} />)}</ol>}
-          </section>
-
-          <section className="c360__card">
-            <h2 className="c360__h2">CRM automation activity</h2>
-            {data.crmActivity.length === 0 ? (
-              <p className="c360__empty">Avtomatik xabarlar hali mavjud emas</p>
-            ) : (
-              <ul className="c360__list">
-                {data.crmActivity.map((a, i) => (
-                  <li className="c360__list-row" key={`${a.at}-${i}`}>
-                    <span className="c360__grow">{crmActivityText(a)}</span>
-                    <span className="c360__hint">{formatDate(a.at)}</span>
-                  </li>
-                ))}
-              </ul>
+                <SectionCard title="Loyalty activity">
+                  {data.loyalty.recent.length === 0 ? (
+                    <Empty text="Bonuslar tarixi mavjud emas" />
+                  ) : (
+                    <ListRows>
+                      {data.loyalty.recent.map((t) => (
+                        <ListRow key={`${t.at}-${t.points}-${t.balanceAfter}`} meta={formatDate(t.at)}>
+                          <span className={t.points < 0 ? 'font-semibold text-err' : 'font-semibold text-ok'}>
+                            {t.points > 0 ? '+' : ''}
+                            {t.points.toLocaleString('ru-RU')} points
+                          </span>
+                          <span className="text-muted">{t.description ?? t.type}</span>
+                        </ListRow>
+                      ))}
+                    </ListRows>
+                  )}
+                </SectionCard>
+              </>
             )}
-          </section>
 
-          <section className="c360__card">
-            <h2 className="c360__h2">Growth Intelligence</h2>
-            <div className="c360__stats">
-              <Stat label="Lifecycle" value={data.growth.lifecycleState ? LIFECYCLE_LABELS[data.growth.lifecycleState] : 'No purchase yet'} />
-              <Stat label="RFM" value={data.growth.rfm ? `${data.growth.rfm.score}  (R${data.growth.rfm.recency} F${data.growth.rfm.frequency} M${data.growth.rfm.monetary})` : '—'} />
-              <Stat label="Last purchase" value={data.growth.recencyDays === null ? '—' : data.growth.recencyDays === 0 ? 'Today' : `${data.growth.recencyDays} days ago`} />
-              <Stat label="Purchases (all time)" value={data.growth.lifetimePurchases.toLocaleString('ru-RU')} />
-              <Stat label="Revenue (all time)" value={formatSom(data.growth.lifetimeRevenue)} />
-              <Stat label={`Last ${data.growth.lookbackDays} days`} value={`${data.growth.frequency} purchases · ${formatSom(data.growth.monetary)}`} />
-            </div>
-            <h3 className="c360__h3" style={{ marginBottom: 6 }}>Signals</h3>
-            {data.growth.signals.length === 0 ? (
-              <p className="c360__empty">Hozircha signallar yo&apos;q</p>
-            ) : (
-              <ul className="c360__list">
-                {data.growth.signals.map((s) => (
-                  <li className="c360__list-row" key={s.type + s.reason}>
-                    <strong>{SIGNAL_LABELS[s.type]}</strong>
-                    <span className="c360__grow">{s.reason}</span>
-                    <span className="c360__hint">{s.detectedAt ? formatDate(s.detectedAt) : ''}</span>
-                  </li>
-                ))}
-              </ul>
+            {tab === 'growth' && (
+              <SectionCard description="Current state from Growth Intelligence (as of today)." title="Growth Intelligence">
+                <StatRow
+                  items={[
+                    { label: 'Lifecycle', value: data.growth.lifecycleState ? LIFECYCLE_LABELS[data.growth.lifecycleState] : 'No purchase yet' },
+                    { label: 'RFM', value: data.growth.rfm ? `${data.growth.rfm.score}  (R${data.growth.rfm.recency} F${data.growth.rfm.frequency} M${data.growth.rfm.monetary})` : '—' },
+                    { label: 'Last purchase', value: data.growth.recencyDays === null ? '—' : data.growth.recencyDays === 0 ? 'Today' : `${data.growth.recencyDays} days ago` },
+                    { label: 'Purchases (all time)', value: data.growth.lifetimePurchases.toLocaleString('ru-RU') },
+                    { label: 'Revenue (all time)', value: formatSom(data.growth.lifetimeRevenue) },
+                    { label: `Last ${data.growth.lookbackDays} days`, value: `${data.growth.frequency} purchases · ${formatSom(data.growth.monetary)}` },
+                  ]}
+                />
+                <SubHeading>Signals</SubHeading>
+                {data.growth.signals.length === 0 ? (
+                  <Empty text="Hozircha signallar yo'q" />
+                ) : (
+                  <ListRows>
+                    {data.growth.signals.map((s) => (
+                      <ListRow key={s.type + s.reason} meta={s.detectedAt ? formatDate(s.detectedAt) : ''}>
+                        <strong>{SIGNAL_LABELS[s.type]}</strong>
+                        <span className="text-muted">{s.reason}</span>
+                      </ListRow>
+                    ))}
+                  </ListRows>
+                )}
+                <SubHeading>Opportunities</SubHeading>
+                {data.growth.opportunities.length === 0 ? (
+                  <Empty text="Hozircha imkoniyatlar yo'q" />
+                ) : (
+                  <ListRows>
+                    {data.growth.opportunities.map((o) => (
+                      <ListRow key={o.type} meta={<StatusBadge tone={o.priority === 'HIGH' ? 'err' : o.priority === 'MEDIUM' ? 'warn' : 'neutral'}>{o.priority}</StatusBadge>}>
+                        <strong>{OPPORTUNITY_LABELS[o.type]}</strong>
+                        <span className="text-muted">
+                          {o.reason} Existing tool: {o.recommended.segment}
+                          {o.recommended.automationTrigger ? ` · trigger ${o.recommended.automationTrigger}` : ''}.
+                        </span>
+                      </ListRow>
+                    ))}
+                  </ListRows>
+                )}
+              </SectionCard>
             )}
-            <h3 className="c360__h3" style={{ marginBottom: 6 }}>Opportunities</h3>
-            {data.growth.opportunities.length === 0 ? (
-              <p className="c360__empty">Hozircha imkoniyatlar yo&apos;q</p>
-            ) : (
-              <ul className="c360__list">
-                {data.growth.opportunities.map((o) => (
-                  <li className="c360__list-row" key={o.type}>
-                    <strong>{OPPORTUNITY_LABELS[o.type]}</strong>
-                    <span className="c360__grow">
-                      {o.reason} <span className="c360__hint">Priority: {o.priority}. Existing tool: {o.recommended.segment}{o.recommended.automationTrigger ? ` · trigger ${o.recommended.automationTrigger}` : ''}.</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
 
-          <section className="c360__card">
-            <h2 className="c360__h2">Referrals</h2>
-            <div className="c360__stats">
-              <Stat label="Referral code" value={data.referral.referralCode ?? '—'} />
-              <Stat label="Successful referrals" value={String(data.referral.successfulReferrals)} />
-              <Stat label="Pending referrals" value={String(data.referral.pendingReferrals)} />
-              <Stat label="Referral points earned" value={data.referral.rewardPointsEarned.total.toLocaleString('ru-RU')} />
-            </div>
-            <p className="c360__hint" style={{ marginBottom: 0 }}>
-              {data.referral.referredBy
-                ? `Referred by ${data.referral.referredBy.referrerName ?? 'a customer'} — ${data.referral.referredBy.status}${data.referral.referredBy.at ? ` (since ${formatDate(data.referral.referredBy.at)})` : ''}.`
-                : 'Not referred by another customer.'}
-            </p>
-          </section>
-
-          <PurchaseActivity customerId={customerId} key={customerId} />
-
-          <section className="c360__card">
-            <h2 className="c360__h2">Loyalty activity</h2>
-            {data.loyalty.recent.length === 0 ? (
-              <p className="c360__empty">Bonuslar tarixi mavjud emas</p>
-            ) : (
-              <ul className="c360__list">
-                {data.loyalty.recent.map((t) => (
-                  <li className="c360__list-row" key={`${t.at}-${t.points}-${t.balanceAfter}`}>
-                    <span className={`c360__points${t.points < 0 ? ' c360__points--neg' : ''}`}>{t.points > 0 ? '+' : ''}{t.points.toLocaleString('ru-RU')} points</span>
-                    <span className="c360__grow">{t.description ?? t.type}</span>
-                    <span className="c360__hint">{formatDate(t.at)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="c360__grid2">
-            <div className="c360__card">
-              <h2 className="c360__h2">Promotions</h2>
-              {data.promotions.length === 0 ? (
-                <p className="c360__empty">Hozircha mos aksiyalar yo'q</p>
-              ) : (
-                <ul className="c360__list">
-                  {data.promotions.map((p) => (
-                    <li className="c360__list-row c360__list-row--stack" key={p.name}>
-                      <strong>{p.name}</strong>
-                      <span>{benefitLabel(p.benefit)}</span>
-                      <span className="c360__hint">
-                        {p.endsAt ? `Until ${formatDate(p.endsAt)}` : 'No end date'}
-                        {p.remainingUses !== null ? ` · ${p.remainingUses} use${p.remainingUses === 1 ? '' : 's'} left` : ''}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="c360__card">
-              <h2 className="c360__h2">Segments</h2>
-              {data.segments.length === 0 ? (
-                <p className="c360__empty">Mijoz hozircha hech qaysi segmentga kirmaydi</p>
-              ) : (
-                <div className="c360__chips">
-                  {data.segments.map((s) => (
-                    <span className="c360__chip c360__chip--ok" key={s.name} title={s.description ?? undefined}>
-                      {s.name}
-                    </span>
-                  ))}
+            {tab === 'marketing' && (
+              <>
+                <div className="grid-2">
+                  <SectionCard title="Promotions">
+                    {data.promotions.length === 0 ? (
+                      <Empty text="Hozircha mos aksiyalar yo'q" />
+                    ) : (
+                      <ListRows>
+                        {data.promotions.map((p) => (
+                          <ListRow key={p.name} meta={`${p.endsAt ? `Until ${formatDate(p.endsAt)}` : 'No end date'}${p.remainingUses !== null ? ` · ${p.remainingUses} use${p.remainingUses === 1 ? '' : 's'} left` : ''}`}>
+                            <strong>{p.name}</strong>
+                            <span className="text-muted">{benefitLabel(p.benefit)}</span>
+                          </ListRow>
+                        ))}
+                      </ListRows>
+                    )}
+                  </SectionCard>
+                  <SectionCard description="Segments are evaluated from CUP order data." title="Segments">
+                    {data.segments.length === 0 ? (
+                      <Empty text="Mijoz hozircha hech qaysi segmentga kirmaydi" />
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {data.segments.map((s) => (
+                          <span className="inline-flex items-center rounded-full bg-cream-soft px-3 py-1 text-[13px] font-semibold ring-1 ring-cream" key={s.name} title={s.description ?? undefined}>
+                            {s.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </SectionCard>
                 </div>
-              )}
-              <p className="c360__hint">Segments are evaluated from CUP order data.</p>
-            </div>
-          </section>
-
-          <section className="c360__card">
-            <h2 className="c360__h2">Identity</h2>
-            <div className="c360__list-row">
-              <span>CUP code</span>
-              <span className="c360__code">{data.identity.loyaltyCode ?? '—'}</span>
-            </div>
-            {!readOnly && (
-            <div className="row" style={{ gap: 8 }}>
-              <button className="button-secondary" disabled={regenerating} onClick={handleRegenerate} type="button">
-                {regenerating ? 'Regenerating...' : 'Regenerate code'}
-              </button>
-              <button className="button-secondary" onClick={() => setConfirmingDeactivate(true)} type="button">
-                Deactivate customer
-              </button>
-            </div>
+                <SectionCard title="Referrals">
+                  <StatRow
+                    items={[
+                      { label: 'Referral code', value: data.referral.referralCode ?? '—' },
+                      { label: 'Successful referrals', value: String(data.referral.successfulReferrals) },
+                      { label: 'Pending referrals', value: String(data.referral.pendingReferrals) },
+                      { label: 'Referral points earned', value: data.referral.rewardPointsEarned.total.toLocaleString('ru-RU') },
+                    ]}
+                  />
+                  <p className="hint-text mt-3">
+                    {data.referral.referredBy
+                      ? `Referred by ${data.referral.referredBy.referrerName ?? 'a customer'} — ${data.referral.referredBy.status}${data.referral.referredBy.at ? ` (since ${formatDate(data.referral.referredBy.at)})` : ''}.`
+                      : 'Not referred by another customer.'}
+                  </p>
+                </SectionCard>
+                <SectionCard title="CRM automation activity">
+                  {data.crmActivity.length === 0 ? (
+                    <Empty text="Avtomatik xabarlar hali mavjud emas" />
+                  ) : (
+                    <ListRows>
+                      {data.crmActivity.map((a, i) => (
+                        <ListRow key={`${a.at}-${i}`} meta={formatDate(a.at)}>
+                          <span>{crmActivityText(a)}</span>
+                        </ListRow>
+                      ))}
+                    </ListRows>
+                  )}
+                </SectionCard>
+              </>
             )}
-            {actionError && <p className="error-text">{actionError}</p>}
-          </section>
+
+            {tab === 'identity' && (
+              <SectionCard title="Identity">
+                <KeyValue
+                  rows={[
+                    { key: 'code', label: 'CUP code', value: <span className="rounded-sm bg-canvas px-2 py-1 font-mono text-sm tracking-wider ring-1 ring-line">{data.identity.loyaltyCode ?? '—'}</span> },
+                    { key: 'phone', label: 'Phone', value: data.profile.phone ?? 'Not provided' },
+                    { key: 'tg', label: 'Telegram', value: data.profile.username ? `@${data.profile.username}` : 'No username' },
+                    { key: 'poster', label: 'Poster', value: data.identity.posterLinked ? 'Linked' : 'Not linked' },
+                  ]}
+                />
+                {!readOnly && (
+                  <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
+                    <button className="btn btn-secondary" disabled={regenerating} onClick={handleRegenerate} type="button">
+                      {regenerating ? 'Regenerating...' : 'Regenerate code'}
+                    </button>
+                    <button className="btn btn-ghost text-err" onClick={() => setConfirmingDeactivate(true)} type="button">
+                      Deactivate customer
+                    </button>
+                  </div>
+                )}
+                {actionError && <p className="error-text mt-3">{actionError}</p>}
+              </SectionCard>
+            )}
+          </div>
         </>
       )}
 
@@ -381,6 +352,132 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
   );
 }
 
+type C360Tab = 'overview' | 'purchases' | 'loyalty' | 'growth' | 'marketing' | 'identity';
+const TABS: TabItem<C360Tab>[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'purchases', label: 'Purchases' },
+  { id: 'loyalty', label: 'Loyalty & rewards' },
+  { id: 'growth', label: 'Growth' },
+  { id: 'marketing', label: 'Marketing' },
+  { id: 'identity', label: 'Identity' },
+];
+
+function ProfileHeader({ data }: { data: AdminCustomer360 }) {
+  const name = data.profile.displayName ?? 'Customer';
+  const chip = 'inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[13px] text-muted-cream ring-1 ring-line';
+  return (
+    <header className="flex flex-wrap items-center gap-5 rounded-lg border border-line bg-white p-6">
+      <span aria-hidden="true" className="grid size-16 shrink-0 place-items-center rounded-full bg-black font-display text-2xl text-cream uppercase">
+        {name.slice(0, 1)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-semibold tracking-[0.12em] text-terracotta-deep uppercase">Customer</div>
+        <h1 className="mt-0.5 font-display text-[30px] leading-tight font-medium">{name}</h1>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className={chip}>{data.profile.phone ?? 'Phone not provided'}</span>
+          <span className={chip}>{data.profile.username ? `@${data.profile.username}` : 'No Telegram username'}</span>
+          <span className={data.identity.posterLinked ? 'inline-flex items-center rounded-full bg-ok-bg px-3 py-1 text-[13px] font-semibold text-ok' : chip}>{data.identity.posterLinked ? 'Poster linked' : 'Poster not linked'}</span>
+          <span className={chip}>{data.summary.favoriteBranch ? `Favorite: ${data.summary.favoriteBranch.name}` : 'No favorite branch yet'}</span>
+        </div>
+      </div>
+      {data.growth.lifecycleState && (
+        <div className="text-right">
+          <div className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">Current lifecycle</div>
+          <div className="mt-1">
+            <StatusBadge tone="info">{LIFECYCLE_LABELS[data.growth.lifecycleState]}</StatusBadge>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+}
+
+function LoyaltyCard({ data }: { data: AdminCustomer360 }) {
+  return (
+    <SectionCard title="Loyalty">
+      <StatRow
+        items={[
+          { label: 'Balance', value: `${data.loyalty.balance.toLocaleString('ru-RU')} points` },
+          { label: 'Lifetime earned', value: data.loyalty.lifetimeEarned.toLocaleString('ru-RU') },
+          { label: 'Lifetime spent', value: data.loyalty.lifetimeSpent.toLocaleString('ru-RU') },
+        ]}
+      />
+    </SectionCard>
+  );
+}
+
+function RewardsCard({ data }: { data: AdminCustomer360 }) {
+  return (
+    <SectionCard title="Rewards" tone="cream">
+      {data.rewards.length === 0 ? (
+        <Empty text="Faol bonus dasturlari yo'q" />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {data.rewards.map((reward) => (
+            <div key={reward.programName}>
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="font-semibold">{reward.programName}</span>
+                <span className="font-display text-lg tabular-nums">
+                  {reward.qualifyingCount} / {reward.threshold}
+                </span>
+              </div>
+              <div aria-hidden="true" className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                <div className="h-full rounded-full bg-terracotta transition-[width] duration-500 ease-out" style={{ width: `${reward.threshold > 0 ? Math.min(100, (reward.qualifyingCount / reward.threshold) * 100) : 0}%` }} />
+              </div>
+              <div className="mt-1.5 text-xs text-muted-cream">{reward.availableRewards > 0 ? `${reward.availableRewards} reward${reward.availableRewards === 1 ? '' : 's'} available` : 'No reward available yet'}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {data.rewardHistory.length > 0 && (
+        <div className="mt-4 border-t border-cream pt-3">
+          <div className="mb-1 text-[11px] font-semibold tracking-[0.08em] text-muted-cream uppercase">Redeemed</div>
+          {data.rewardHistory.map((r) => (
+            <div className="flex justify-between gap-3 py-1 text-[13px]" key={`${r.redeemedAt}-${r.programName}`}>
+              <span>{r.productName ? `${r.productName} × ${r.quantity}` : r.programName}</span>
+              <span className="text-muted-cream">{formatDate(r.redeemedAt)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function StatRow({ items }: { items: { label: string; value: string }[] }) {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-x-6 gap-y-4">
+      {items.map((i) => (
+        <div className="min-w-0" key={i.label}>
+          <div className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">{i.label}</div>
+          <div className="mt-1 text-[15px] font-semibold [overflow-wrap:anywhere]">{i.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SubHeading({ children }: { children: ReactNode }) {
+  return <h3 className="mt-6 mb-2 text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">{children}</h3>;
+}
+
+function ListRows({ children }: { children: ReactNode }) {
+  return <ul className="m-0 flex list-none flex-col divide-y divide-line p-0">{children}</ul>;
+}
+
+function ListRow({ children, meta }: { children: ReactNode; meta?: ReactNode }) {
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 py-2.5 text-sm first:pt-0 last:pb-0">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">{children}</div>
+      {meta && <div className="shrink-0 text-[13px] text-muted">{meta}</div>}
+    </li>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return <p className="m-0 text-[13px] text-muted">{text}</p>;
+}
+
 const TRIGGER_TEXT: Record<string, string> = {
   FIRST_PURCHASE: 'First-purchase',
   REWARD_UNLOCKED: 'Reward notification',
@@ -400,35 +497,16 @@ function crmActivityText(a: AdminCustomer360['crmActivity'][number]): string {
   return `${base} o'tkazib yuborildi${a.reason ? ` — ${REASON_LABELS[a.reason] ?? a.reason}` : ''}`;
 }
 
-function Kpi({ label, value, hint, strong }: { label: string; value: string; hint?: string; strong?: boolean }) {
-  return (
-    <div className={`c360__kpi${strong ? ' c360__kpi--strong' : ''}`}>
-      <div className="c360__label">{label}</div>
-      <div className="c360__kpi-value">{value}</div>
-      {hint && <div className="c360__hint">{hint}</div>}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="c360__label">{label}</div>
-      <div className="c360__stat-value">{value}</div>
-    </div>
-  );
-}
-
 function SourceCard({ label, count, unit, revenue, empty }: { label: string; count: number; unit: string; revenue: number; empty: string }) {
   return (
-    <div className="c360__card c360__source">
-      <div className="c360__label">{label}</div>
+    <div className="rounded-lg border border-line bg-white p-5">
+      <div className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">{label}</div>
       {count === 0 ? (
-        <p className="c360__empty">{empty}</p>
+        <p className="mt-2 mb-0 text-[13px] text-muted">{empty}</p>
       ) : (
         <>
-          <div className="c360__kpi-value">{formatSom(revenue)}</div>
-          <div className="c360__hint">
+          <div className="mt-2 font-display text-2xl tabular-nums">{formatSom(revenue)}</div>
+          <div className="mt-1 text-xs text-muted">
             {count.toLocaleString('ru-RU')} {unit}
           </div>
         </>
@@ -466,14 +544,17 @@ function TimelineRow({ item }: { item: CustomerActivityItem }) {
       title = 'Reward redeemed';
       detail = item.lines.length > 0 ? `${item.lines[0].productName ?? NO_PRODUCT}${item.label ? ` · ${item.label}` : ''}` : (item.label ?? '');
   }
+  const dot = item.type === 'CUP_ORDER' ? 'bg-black' : item.type === 'POS_PURCHASE' ? 'bg-muted' : item.type === 'LOYALTY' ? 'bg-ok' : 'bg-terracotta';
   return (
-    <li className="c360__event">
-      <div className="c360__event-date">{formatDateTime(item.at)}</div>
-      <div className="c360__event-body">
-        <strong>{title}</strong>
-        <span className="c360__hint">{detail}</span>
+    <li className="group/tl relative grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-4 pb-4 pl-5 last:pb-0">
+      <span aria-hidden="true" className="absolute top-1.5 bottom-0 left-[3px] w-px bg-line group-last/tl:hidden" />
+      <span aria-hidden="true" className={`absolute top-1.5 left-0 size-2 rounded-full ring-4 ring-white ${dot}`} />
+      <div className="col-span-3 text-xs text-muted sm:col-span-1 sm:w-36">{formatDateTime(item.at)}</div>
+      <div className="col-span-2 min-w-0 sm:col-span-1">
+        <div className="text-sm font-semibold">{title}</div>
+        <div className="text-[13px] text-muted">{detail}</div>
       </div>
-      {right && <div className="c360__event-amount">{right}</div>}
+      {right ? <div className="text-sm font-semibold whitespace-nowrap tabular-nums">{right}</div> : <div />}
     </li>
   );
 }
@@ -519,59 +600,34 @@ function PurchaseActivity({ customerId }: { customerId: string }) {
     }
   }, [customerId, nextCursor]);
 
+  const columns: Column<CustomerActivityItem>[] = [
+    { key: 'd', header: 'Date', cell: (item) => formatDateTime(item.at) },
+    { key: 's', header: 'Source', cell: (item) => <StatusBadge tone={item.source === 'POS' ? 'neutral' : 'info'}>{item.source}</StatusBadge> },
+    { key: 'b', header: 'Branch', low: true, cell: (item) => item.branchName ?? NO_BRANCH },
+    { key: 'i', header: 'Items', cell: (item) => <span className="text-muted">{linesSummary(item)}</span> },
+    { key: 'a', header: 'Amount', numeric: true, cell: (item) => (item.amountMinor !== null ? formatSom(item.amountMinor) : '—') },
+    { key: 'st', header: 'Status', low: true, cell: (item) => item.status ?? '—' },
+  ];
   return (
-    <section className="c360__card">
-      <h2 className="c360__h2">Purchase activity</h2>
+    <SectionCard description="CUP orders and POS purchases, newest first." flush title="Purchase activity">
       {error && (
-        <div className="c360__error" role="alert">
-          <span>{error}</span>
-          <button className="button-secondary" onClick={() => (items ? loadMore() : setReloadKey((k) => k + 1))} type="button">
-            Retry
+        <div className="p-4">
+          <ErrorState message={error} onRetry={() => (items ? loadMore() : setReloadKey((k) => k + 1))} title="Purchases could not be loaded" />
+        </div>
+      )}
+      {items === null && !error && <LoadingState variant="table" />}
+      {items !== null && (
+        <DataTable columns={columns} empty={<EmptyState text="Xaridlar hali mavjud emas" title="No purchases yet" variant="inline" />} rowKey={(item) => `${item.type}-${item.at}-${item.source}-${item.amountMinor}`} rows={items} />
+      )}
+      {items !== null && nextCursor && (
+        <div className="border-t border-line px-4 py-3">
+          <button className="btn btn-secondary btn-sm" disabled={loadingMore} onClick={loadMore} type="button">
+            {loadingMore && <span aria-hidden="true" className="btn-spinner" />}
+            {loadingMore ? 'Loading...' : 'Load more'}
           </button>
         </div>
       )}
-      {items === null && !error && <div className="c360__skeleton" style={{ height: 120 }} />}
-      {items !== null && items.length === 0 && <p className="c360__empty">Xaridlar hali mavjud emas</p>}
-      {items !== null && items.length > 0 && (
-        <>
-          <div className="c360__scroll">
-            <table className="data-table c360__table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Source</th>
-                  <th>Branch</th>
-                  <th>Items</th>
-                  <th className="c360__num">Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={`${item.type}-${item.at}-${i}`}>
-                    <td>{formatDateTime(item.at)}</td>
-                    <td>
-                      <span className={`c360__badge c360__badge--${item.source === 'POS' ? 'pos' : 'cup'}`}>{item.source}</span>
-                    </td>
-                    <td>{item.branchName ?? NO_BRANCH}</td>
-                    <td>{linesSummary(item)}</td>
-                    <td className="c360__num">{item.amountMinor !== null ? formatSom(item.amountMinor) : '—'}</td>
-                    <td>{item.status ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {nextCursor && (
-            <div style={{ marginTop: 12 }}>
-              <button className="button-secondary" disabled={loadingMore} onClick={loadMore} type="button">
-                {loadingMore ? 'Loading...' : 'Load more'}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-    </section>
+    </SectionCard>
   );
 }
 
@@ -589,18 +645,4 @@ function benefitLabel(benefit: AdminCustomer360['promotions'][number]['benefit']
     default:
       return 'Benefit';
   }
-}
-
-function Skeleton() {
-  return (
-    <div aria-busy="true">
-      <div className="c360__skeleton" style={{ height: 72, width: '55%' }} />
-      <div className="c360__kpis">
-        {[0, 1, 2, 3].map((n) => (
-          <div className="c360__skeleton" key={n} style={{ height: 86 }} />
-        ))}
-      </div>
-      <div className="c360__skeleton" style={{ height: 160, marginTop: 16 }} />
-    </div>
-  );
 }

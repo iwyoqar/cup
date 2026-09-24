@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -6,7 +7,7 @@ import { defineConfig } from 'vite';
 // app. No router library: the scope (Dashboard, Settings > Loyalty, Logout) is small enough for
 // plain component-swap state — see src/App.tsx.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   build: {
     outDir: 'dist',
   },

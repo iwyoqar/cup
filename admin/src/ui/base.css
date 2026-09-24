@@ -1,3 +1,5 @@
+/* LEGACY (Design System 2.0): loaded into the `legacy` cascade layer by src/index.css. Colour/font/motion values
+   now alias the Tailwind @theme tokens defined there; remaining rules are removed as their consumers migrate. */
 /* =====================================================================================
    CUP Admin — foundation (tokens, base, shared form / button / table primitives).
 
@@ -12,36 +14,36 @@
 
 :root {
   /* --- Brand palette (identical to the Mini App) ------------------------------------ */
-  --cup-black: #0b0b0b;
-  --cup-terracotta: #d84b1f;
-  --cup-cream: #f6ddb0;
-  --cup-white: #ffffff;
-  --cup-terracotta-deep: #b23a12; /* terracotta as TEXT on white / cream */
-  --cup-cream-soft: #fbf0d9;
-  --cup-muted-on-cream: #57524b;
+  --cup-black: var(--color-black);
+  --cup-terracotta: var(--color-terracotta);
+  --cup-cream: var(--color-cream);
+  --cup-white: var(--color-white);
+  --cup-terracotta-deep: var(--color-terracotta-deep); /* terracotta as TEXT on white / cream */
+  --cup-cream-soft: var(--color-cream-soft);
+  --cup-muted-on-cream: var(--color-muted-cream);
 
   /* --- Semantic aliases (Mini App names) ------------------------------------------- */
-  --cup-muted: #6f6a63;
+  --cup-muted: var(--color-muted);
   --cup-border: rgba(11, 11, 11, 0.1);
   --cup-border-strong: rgba(11, 11, 11, 0.85);
-  --cup-skeleton: #f1ece4;
+  --cup-skeleton: var(--color-skeleton);
   --cup-track: rgba(11, 11, 11, 0.14);
 
   /* --- Admin surfaces ---------------------------------------------------------------- */
-  --cup-canvas: #faf8f4; /* page background: a hair warmer than white so white cards separate without shadows */
+  --cup-canvas: var(--color-canvas); /* page background: a hair warmer than white so white cards separate without shadows */
   --cup-panel: #ffffff;
   --cup-hover: rgba(11, 11, 11, 0.04);
   --cup-hover-strong: rgba(11, 11, 11, 0.07);
 
   /* --- Status tones: restrained, never bright ------------------------------------------ */
-  --cup-ok: #2f5d43;
-  --cup-ok-bg: #e4ede7;
-  --cup-warn: #7a4f0c;
+  --cup-ok: var(--color-ok);
+  --cup-ok-bg: var(--color-ok-bg);
+  --cup-warn: var(--color-warn);
   --cup-warn-bg: var(--cup-cream);
   --cup-err: var(--cup-terracotta-deep);
-  --cup-err-bg: #f9e3da;
+  --cup-err-bg: var(--color-err-bg);
   --cup-neutral: var(--cup-muted-on-cream);
-  --cup-neutral-bg: #efebe4;
+  --cup-neutral-bg: var(--color-neutral-bg);
 
   /* --- Radius / shadow ------------------------------------------------------------------ */
   --cup-radius-sm: 8px;
@@ -52,8 +54,8 @@
   --cup-shadow-pop: 0 16px 40px rgba(11, 11, 11, 0.2); /* modals and menus only */
 
   /* --- Typography -------------------------------------------------------------------------- */
-  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Noto Serif', serif;
-  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* --font-display is defined once, in index.css's @theme. */
+  --font-body: var(--font-sans);
   --fs-page: clamp(26px, 3.2vw, 34px);
   --fs-section: 20px;
   --fs-lead: 16px;
@@ -75,10 +77,10 @@
   --content-max: 1440px;
 
   /* --- Motion: subtle, 120–220 ms ---------------------------------------------------------- */
-  --motion-fast: 120ms;
-  --motion-base: 180ms;
-  --motion-slow: 220ms;
-  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --motion-fast: 140ms;
+  --motion-base: 200ms;
+  --motion-slow: 280ms;
+  --ease: var(--ease-out);
 
   /* --- Legacy aliases: the per-phase page styles (styles.css) keep working and now speak the same palette --- */
   --cup-accent: var(--cup-terracotta);
@@ -129,427 +131,9 @@ textarea {
   color: inherit;
 }
 
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--cup-black);
-  outline-offset: 2px;
-}
+/* Focus ring and reduced-motion rules live in index.css (@layer base). */
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* =====================================================================================
-   Buttons — primary = terracotta (action), secondary = black outline, danger = deep terracotta (writes / destructive),
-   text = quiet. The Mini App's tracked-uppercase primary, sized for a dense tool (40 px, not 44).
-   ===================================================================================== */
-
-.button-primary,
-.button-secondary,
-.button-danger,
-.button-text {
-  appearance: none;
-  font-family: var(--font-body);
-  min-height: 40px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  transition:
-    transform var(--motion-fast) var(--ease),
-    opacity var(--motion-fast) var(--ease),
-    background-color var(--motion-fast) var(--ease),
-    border-color var(--motion-fast) var(--ease);
-}
-
-.button-primary {
-  border: none;
-  border-radius: var(--cup-radius-sm);
-  background: var(--cup-terracotta);
-  color: var(--cup-black);
-  font-size: var(--fs-small);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0 18px;
-}
-
-.button-primary:hover:not(:disabled) {
-  background: #c7431a;
-}
-
-.button-secondary {
-  border: 1.5px solid var(--cup-border-strong);
-  border-radius: var(--cup-radius-sm);
-  background: transparent;
-  color: var(--cup-black);
-  font-size: var(--fs-small);
-  font-weight: 600;
-  padding: 0 16px;
-}
-
-.button-secondary:hover:not(:disabled) {
-  background: var(--cup-hover);
-}
-
-.button-danger {
-  border: none;
-  border-radius: var(--cup-radius-sm);
-  background: var(--cup-terracotta-deep);
-  color: var(--cup-white);
-  font-size: var(--fs-small);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0 18px;
-}
-
-.button-danger:hover:not(:disabled) {
-  background: #9a3210;
-}
-
-.button-text {
-  border: none;
-  background: none;
-  color: var(--cup-muted);
-  font-size: var(--fs-small);
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  padding: 0 4px;
-}
-
-.button-text:hover:not(:disabled) {
-  color: var(--cup-black);
-}
-
-.button--sm {
-  min-height: 32px;
-  padding: 0 12px;
-  font-size: 12px;
-}
-
-.button-primary:active:not(:disabled),
-.button-secondary:active:not(:disabled),
-.button-danger:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.button-primary:disabled,
-.button-secondary:disabled,
-.button-danger:disabled,
-.button-text:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-/* =====================================================================================
-   Forms
-   ===================================================================================== */
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--cup-muted);
-}
-
-.field input,
-.field select,
-.field textarea,
-.input,
-.select {
-  min-height: 40px;
-  border: 1px solid var(--cup-border-strong);
-  border-radius: var(--cup-radius-sm);
-  background: var(--cup-white);
-  color: var(--cup-black);
-  padding: 0 12px;
-  font: inherit;
-  font-size: var(--fs-body);
-  transition: border-color var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease);
-}
-
-.field textarea {
-  padding: 10px 12px;
-  min-height: 96px;
-}
-
-.field input:focus,
-.field select:focus,
-.input:focus,
-.select:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--cup-black);
-}
-
-.field input:disabled,
-.field select:disabled,
-.input:disabled,
-.select:disabled {
-  background: var(--cup-neutral-bg);
-  color: var(--cup-muted);
-}
-
-.error-text {
-  color: var(--cup-err);
-  font-size: var(--fs-small);
-  font-weight: 600;
-}
-
-.success-text {
-  color: var(--cup-ok);
-  font-size: var(--fs-small);
-  font-weight: 600;
-}
-
-.hint-text {
-  color: var(--cup-muted);
-  font-size: var(--fs-small);
-}
-
-/* =====================================================================================
-   Login
-   ===================================================================================== */
-
-.login-screen {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-5) var(--space-4);
-  background: var(--cup-black);
-}
-
-.login-card {
-  background: var(--cup-white);
-  border-radius: var(--cup-radius-lg);
-  padding: var(--space-6) var(--space-5);
-  width: min(400px, 100%);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.login-card__mark {
-  font-family: var(--font-display);
-  font-size: 26px;
-  letter-spacing: 0.32em;
-  padding-left: 0.32em;
-  text-align: center;
-  margin-bottom: 2px;
-}
-
-.login-card h1 {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 26px;
-  line-height: 1.1;
-  text-align: center;
-}
-
-.login-card .hint-text {
-  text-align: center;
-}
-
-.login-card .button-primary {
-  width: 100%;
-}
-
-/* =====================================================================================
-   Settings rows / toggles (the configuration primitives every settings page shares)
-   ===================================================================================== */
-
-.settings-card {
-  background: var(--cup-panel);
-  border: 1px solid var(--cup-border);
-  border-radius: var(--cup-radius-lg);
-  padding: var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-top: var(--space-4);
-}
-
-.settings-card > h3 {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: var(--fs-section);
-}
-
-.settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.settings-row__label {
-  font-size: var(--fs-body);
-  font-weight: 600;
-}
-
-.settings-row__control {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--fs-body);
-}
-
-.settings-row__control input[type='number'],
-.settings-row__control input[type='text'],
-.settings-row__control select {
-  min-height: 36px;
-  border: 1px solid var(--cup-border-strong);
-  border-radius: var(--cup-radius-sm);
-  padding: 0 10px;
-  font: inherit;
-  font-size: var(--fs-body);
-  background: var(--cup-white);
-}
-
-.settings-row__control input[type='number'] {
-  width: 96px;
-}
-
-.toggle {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 26px;
-  flex-shrink: 0;
-}
-
-.toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle__track {
-  position: absolute;
-  inset: 0;
-  background: var(--cup-track);
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background var(--motion-base) var(--ease);
-}
-
-.toggle__track::before {
-  content: '';
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  left: 3px;
-  top: 3px;
-  background: var(--cup-white);
-  border-radius: 50%;
-  box-shadow: var(--cup-shadow-soft);
-  transition: transform var(--motion-base) var(--ease);
-}
-
-.toggle input:checked + .toggle__track {
-  background: var(--cup-black);
-}
-
-.toggle input:checked + .toggle__track::before {
-  transform: translateX(18px);
-}
-
-.toggle input:focus-visible + .toggle__track {
-  outline: 2px solid var(--cup-black);
-  outline-offset: 2px;
-}
-
-.settings-divider {
-  border: none;
-  border-top: 1px solid var(--cup-border);
-  margin: 0;
-}
-
-.settings-footer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.unsaved-badge {
-  font-size: 12px;
-  color: var(--cup-warn);
-  background: var(--cup-warn-bg);
-  border-radius: 999px;
-  padding: 3px 10px;
-  font-weight: 700;
-}
-
-/* =====================================================================================
-   Legacy table (kept for pages not yet on <DataTable>; same look)
-   ===================================================================================== */
-
-.data-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  margin-top: var(--space-4);
-  background: var(--cup-panel);
-  border: 1px solid var(--cup-border);
-  border-radius: var(--cup-radius-md);
-  overflow: hidden;
-}
-
-.data-table th,
-.data-table td {
-  text-align: left;
-  padding: 12px 16px;
-  font-size: var(--fs-body);
-  border-bottom: 1px solid var(--cup-border);
-  vertical-align: middle;
-}
-
-.data-table th {
-  background: var(--cup-canvas);
-  font-weight: 700;
-  color: var(--cup-muted);
-  font-size: var(--fs-micro);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  white-space: nowrap;
-}
-
-.data-table tbody tr {
-  transition: background var(--motion-fast) var(--ease);
-}
-
-.data-table tbody tr.data-table__row--clickable {
-  cursor: pointer;
-}
-
-.data-table tbody tr.data-table__row--clickable:hover {
-  background: var(--cup-hover);
-}
-
-.data-table tbody tr:last-child td {
-  border-bottom: none;
-}
+/* Buttons, forms, login, settings rows, toggles and .data-table moved to ui/components.css (Design System 2.0). */
 
 .sr-only {
   position: absolute;

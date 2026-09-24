@@ -1,4 +1,60 @@
-import { ReactNode, useEffect, useId } from 'react';
+import { ReactNode, useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { cx } from './cx';
+
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+// Shared dialog behaviour: focus moves into the panel, Tab is trapped inside it, Escape closes (when dismissible), and
+// focus returns to the element that opened it. Body scroll is locked while it is open.
+function useDialogFocus(panel: React.RefObject<HTMLDivElement>, dismissible: boolean, onClose: () => void) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const dismissibleRef = useRef(dismissible);
+  dismissibleRef.current = dismissible;
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const root = panel.current;
+    (root?.querySelector<HTMLElement>('[data-autofocus]') ?? root)?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && dismissibleRef.current) {
+        e.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== 'Tab' || !root) return;
+      const items = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null);
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === root)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      opener?.focus?.();
+    };
+    // Runs once per open dialog: the latest onClose/dismissible are read through refs.
+  }, [panel]);
+}
+
+function CloseButton({ onClose, disabled }: { onClose: () => void; disabled?: boolean }) {
+  return (
+    <button aria-label="Close" className="btn btn-icon btn-sm -mr-2 shrink-0" disabled={disabled} onClick={onClose} type="button">
+      <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth={1.8} viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+  );
+}
 
 interface ModalProps {
   title: string;
@@ -10,29 +66,47 @@ interface ModalProps {
   dismissible?: boolean;
 }
 
+// Dialog: fade + subtle scale (220 ms), centred, scrolls internally.
 export function Modal({ title, onClose, children, footer, wide, dismissible = true }: ModalProps) {
   const titleId = useId();
-  useEffect(() => {
-    if (!dismissible) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [dismissible, onClose]);
-
-  return (
-    <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && dismissible && onClose()}>
-      <div aria-labelledby={titleId} aria-modal="true" className={`modal${wide ? ' modal--wide' : ''}`} role="dialog">
-        <div className="modal__head">
-          <h2 className="modal__title" id={titleId}>
+  const panel = useRef<HTMLDivElement>(null);
+  useDialogFocus(panel, dismissible, onClose);
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex animate-fade-in items-end justify-center bg-black/45 p-0 sm:items-center sm:p-6" onMouseDown={(e) => e.target === e.currentTarget && dismissible && onClose()}>
+      <div aria-labelledby={titleId} aria-modal="true" className={cx('flex max-h-[92dvh] w-full animate-dialog-in flex-col overflow-hidden rounded-t-xl bg-white shadow-pop outline-none sm:rounded-lg', wide ? 'sm:max-w-3xl' : 'sm:max-w-lg')} ref={panel} role="dialog" tabIndex={-1}>
+        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+          <h2 className="m-0 font-display text-xl leading-tight font-medium" id={titleId}>
             {title}
           </h2>
+          <CloseButton disabled={!dismissible} onClose={onClose} />
         </div>
-        <div className="modal__body">{children}</div>
-        {footer && <div className="modal__foot">{footer}</div>}
+        <div className="min-h-0 overflow-y-auto px-6 py-5 text-sm">{children}</div>
+        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line bg-canvas/60 px-6 py-3.5">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
+  );
+}
+
+// Drawer: a read-only side panel (fade + slide from the right, 250 ms). Same focus rules as the dialog.
+export function Drawer({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+  const titleId = useId();
+  const panel = useRef<HTMLDivElement>(null);
+  useDialogFocus(panel, true, onClose);
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex animate-fade-in justify-end bg-black/35" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div aria-labelledby={titleId} aria-modal="true" className="flex h-full w-full max-w-xl animate-drawer-in flex-col bg-white shadow-pop outline-none" ref={panel} role="dialog" tabIndex={-1}>
+        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+          <h2 className="m-0 font-display text-xl leading-tight font-medium" id={titleId}>
+            {title}
+          </h2>
+          <CloseButton onClose={onClose} />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 text-sm">{children}</div>
+        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-3.5">{footer}</div>}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -56,10 +130,11 @@ export function ConfirmDialog({ title, message, confirmLabel, cancelLabel = 'Can
       dismissible={!busy}
       footer={
         <>
-          <button className="button-secondary" disabled={busy} onClick={onCancel} type="button">
+          <button className="btn btn-secondary" data-autofocus disabled={busy} onClick={onCancel} type="button">
             {cancelLabel}
           </button>
-          <button className={tone === 'danger' ? 'button-danger' : 'button-primary'} disabled={busy} onClick={onConfirm} type="button">
+          <button aria-busy={busy || undefined} className={cx('btn', tone === 'danger' ? 'btn-danger' : 'btn-primary')} disabled={busy} onClick={onConfirm} type="button">
+            {busy && <span aria-hidden="true" className="btn-spinner" />}
             {busy ? 'Working…' : confirmLabel}
           </button>
         </>
@@ -67,8 +142,8 @@ export function ConfirmDialog({ title, message, confirmLabel, cancelLabel = 'Can
       onClose={onCancel}
       title={title}
     >
-      <div>{message}</div>
-      {error && <p className="error-text">{error}</p>}
+      <div className="leading-relaxed text-muted-cream">{message}</div>
+      {error && <p className="error-text mt-3">{error}</p>}
     </Modal>
   );
 }

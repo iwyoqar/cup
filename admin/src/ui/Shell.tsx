@@ -2,7 +2,9 @@ import { ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { deriveHealth, overallState, PulseContext, pulseAttention, useSystemPulse } from '../lib/health';
 import { AdminPage, findNav, groupOf, NavGroup, NAV_GROUPS, NavItem } from '../lib/nav';
 import { AdminProfile } from '../lib/types';
+import { cx } from './cx';
 import { Icon } from './icons';
+import { HEALTH_DOT } from './StatusBadge';
 
 interface AdminShellProps {
   page: AdminPage;
@@ -50,43 +52,60 @@ function saveOpenSection(id: string | null): void {
   }
 }
 
-function NavLink({ it, active, attention, onClick }: { it: NavItem; active: boolean; attention: boolean; onClick: () => void }) {
+function NavLink({ it, active, attention, onClick, tabbable = true }: { it: NavItem; active: boolean; attention: boolean; onClick: () => void; tabbable?: boolean }) {
   return (
-    <button aria-current={active ? 'page' : undefined} className={`nav-item${active ? ' nav-item--active' : ''}`} onClick={onClick} title={it.label} type="button">
-      <Icon name={it.icon} />
-      <span className="nav-item__label">{it.label}</span>
-      {attention && <span aria-label="Needs attention" className="nav-item__attention" />}
+    <button
+      aria-current={active ? 'page' : undefined}
+      className={cx(
+        'group relative flex h-9 w-full items-center gap-3 rounded-sm px-3 text-left text-[13.5px] transition-colors duration-150',
+        active ? 'bg-white/10 font-semibold text-white' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white',
+      )}
+      onClick={onClick}
+      tabIndex={tabbable ? 0 : -1}
+      title={it.label}
+      type="button"
+    >
+      {active && <span aria-hidden="true" className="absolute top-2 bottom-2 -left-3 w-[3px] rounded-r-full bg-terracotta" />}
+      <Icon className={cx('size-[17px]', active ? 'text-cream' : 'text-white/55 group-hover:text-white/80')} name={it.icon} />
+      <span className="min-w-0 flex-1 truncate">{it.label}</span>
+      {attention && <span aria-label="Needs attention" className="size-2 shrink-0 rounded-full bg-terracotta" />}
     </button>
   );
 }
 
-// One collapsible section: a real <button> header (Part 3's accessibility requirement — aria-expanded/aria-
-// controls, keyboard-reachable, Enter/Space toggles it natively since it's a <button>) plus its children, hidden
-// via CSS (not unmounted) when collapsed so the icon-rail breakpoint can force them visible regardless of state.
+// One collapsible section: a real <button> header (aria-expanded / aria-controls, keyboard-operable) plus its items. The
+// panel animates open with a grid-rows + opacity transition; collapsed items leave the tab order.
 function NavSection({ g, active, open, attention, onToggle, onNavigate }: { g: NavGroup; active: AdminPage; open: boolean; attention: Partial<Record<AdminPage, boolean>>; onToggle: () => void; onNavigate: (id: AdminPage) => void }) {
   const panelId = useId();
   const hasActive = g.items.some((i) => i.id === active);
+  const hasAttention = g.items.some((i) => attention[i.id]);
   return (
-    <div className="nav-group">
-      <button aria-controls={panelId} aria-expanded={open} className={`nav-section${hasActive ? ' nav-section--active' : ''}`} onClick={onToggle} type="button">
-        <span className="nav-group__label">{g.label}</span>
-        <span className={`nav-section__chevron${open ? ' nav-section__chevron--open' : ''}`}>
-          <Icon name="chevron" />
-        </span>
+    <div className="mt-1">
+      <button
+        aria-controls={panelId}
+        aria-expanded={open}
+        className={cx('flex h-8 w-full items-center gap-2 rounded-sm px-3 text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors duration-150', hasActive ? 'text-cream' : 'text-white/45 hover:text-white/80')}
+        onClick={onToggle}
+        type="button"
+      >
+        <span className="flex-1 text-left">{g.label}</span>
+        {!open && hasAttention && <span aria-hidden="true" className="size-1.5 rounded-full bg-terracotta" />}
+        <Icon className={cx('size-3.5 transition-transform duration-200 ease-out', open && 'rotate-90')} name="chevron" />
       </button>
-      <div className={`nav-section__panel${open ? ' nav-section__panel--open' : ''}`} id={panelId}>
-        {g.items.map((it) => (
-          <NavLink attention={!!attention[it.id]} active={it.id === active} it={it} key={it.id} onClick={() => onNavigate(it.id)} />
-        ))}
+      <div className={cx('grid transition-[grid-template-rows,opacity] duration-200 ease-out', open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0')} id={panelId}>
+        <div className="flex min-h-0 flex-col gap-0.5 overflow-hidden pt-0.5 pb-1.5 pl-3">
+          {g.items.map((it) => (
+            <NavLink attention={!!attention[it.id]} active={it.id === active} it={it} key={it.id} onClick={() => onNavigate(it.id)} tabbable={open} />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-// The Admin frame: a black sidebar (the Mini App's structural black) with an accordion of grouped navigation, a
-// quiet top bar with breadcrumb + account, and a centred content column. Below 1100 px the sidebar collapses to an
-// icon rail (labels hidden — every item stays visible there regardless of accordion state, since there is no
-// group-label text to click); below 760 px it becomes a drawer opened from the top bar.
+// The Admin frame: a black sidebar (CUP's structural black) with an exclusive accordion of grouped navigation, a quiet
+// sticky top bar with breadcrumb + account menu, and a centred content column. Below 1024 px the sidebar becomes a drawer
+// opened from the top bar.
 export function AdminShell({ page, onNavigate, onLogout, admin, children }: AdminShellProps) {
   const [navOpen, setNavOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -130,12 +149,15 @@ export function AdminShell({ page, onNavigate, onLogout, admin, children }: Admi
   }, [page]);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !navOpen) return;
     const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      if (menuOpen && menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        setNavOpen(false);
+      }
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
@@ -143,7 +165,7 @@ export function AdminShell({ page, onNavigate, onLogout, admin, children }: Admi
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [menuOpen]);
+  }, [menuOpen, navOpen]);
 
   const go = (id: AdminPage) => {
     onNavigate(id);
@@ -160,77 +182,84 @@ export function AdminShell({ page, onNavigate, onLogout, admin, children }: Admi
 
   return (
     <PulseContext.Provider value={pulse}>
-    <div className={`shell${navOpen ? ' shell--nav-open' : ''}`}>
-      <aside aria-label="Primary" className="sidebar">
-        <div className="sidebar__brand">
-          <span className="sidebar__mark">CUP</span>
-          <span className="sidebar__tag">Admin</span>
-        </div>
-        <nav className="sidebar__nav">
-          {NAV_GROUPS.map((g) =>
-            g.label === null ? (
-              // The one non-collapsible group (Dashboard) — no header, always rendered, exactly as before the accordion.
-              <div className="nav-group" key={g.id}>
-                {g.items.map((it) => (
-                  <NavLink attention={!!attention[it.id]} active={it.id === page} it={it} key={it.id} onClick={() => go(it.id)} />
-                ))}
-              </div>
-            ) : (
-              <NavSection active={page} attention={attention} g={g} key={g.id} onNavigate={go} onToggle={() => toggleSection(g.id)} open={openSection === g.id} />
-            ),
+      <div className="min-h-dvh bg-canvas lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
+        <aside
+          aria-label="Primary"
+          className={cx(
+            'fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col bg-black text-white transition-transform duration-250 ease-out lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-auto lg:translate-x-0',
+            navOpen ? 'translate-x-0 shadow-pop' : '-translate-x-full',
           )}
-        </nav>
-        <button className="sidebar__status" onClick={() => go('system-health')} title="Open System Health" type="button">
-          <span className={`dot dot--${pulse.loading ? 'unknown' : overall}`} />
-          <span className="sidebar__status-text">
-            <span className="sidebar__status-title">{statusTitle}</span>
-            <span className="sidebar__status-sub">{statusSub}</span>
-          </span>
-        </button>
-      </aside>
-      <div className="scrim" onClick={() => setNavOpen(false)} />
-
-      <div className="shell__main">
-        <div className="topbar">
-          <button aria-label="Open navigation" className="topbar__menu" onClick={() => setNavOpen(true)} type="button">
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
-          </button>
-          <div className="crumbs">
-            {group.label && <span>{group.label}</span>}
-            {group.label && <span aria-hidden="true">/</span>}
-            <strong>{item.label}</strong>
+        >
+          <div className="flex h-16 shrink-0 items-center gap-3 px-6">
+            <span className="font-display text-[22px] tracking-[0.3em] text-white">CUP</span>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold tracking-[0.14em] text-cream uppercase">Admin</span>
           </div>
-          <div className="topbar__spacer" />
-          <div className="profile" ref={menuRef}>
-            <button aria-expanded={menuOpen} aria-haspopup="menu" className="profile__btn" onClick={() => setMenuOpen((o) => !o)} type="button">
-              <span className="avatar">{admin.email.slice(0, 1)}</span>
-              <span className="profile__who">
-                <span className="profile__email">{admin.email}</span>
-                <span className="profile__role">{admin.role}</span>
-              </span>
-            </button>
-            {menuOpen && (
-              <div className="menu" role="menu">
-                <div className="menu__meta">
-                  Signed in as
-                  <br />
-                  <strong style={{ color: 'var(--cup-black)' }}>{admin.email}</strong>
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 [scrollbar-color:rgb(255_255_255/0.15)_transparent] [scrollbar-width:thin]">
+            {NAV_GROUPS.map((g) =>
+              g.label === null ? (
+                // The one non-collapsible group (Dashboard) — no header, always rendered.
+                <div className="mb-2 flex flex-col gap-0.5 pl-3" key={g.id}>
+                  {g.items.map((it) => (
+                    <NavLink attention={!!attention[it.id]} active={it.id === page} it={it} key={it.id} onClick={() => go(it.id)} />
+                  ))}
                 </div>
-                <button className="menu__item" onClick={onLogout} role="menuitem" type="button">
-                  <Icon name="logout" />
-                  Log out
-                </button>
-              </div>
+              ) : (
+                <NavSection active={page} attention={attention} g={g} key={g.id} onNavigate={go} onToggle={() => toggleSection(g.id)} open={openSection === g.id} />
+              ),
             )}
-          </div>
+          </nav>
+          <button className="m-3 flex items-center gap-3 rounded-md border border-sidebar-line px-3 py-2.5 text-left transition-colors duration-150 hover:bg-sidebar-hover" onClick={() => go('system-health')} title="Open System Health" type="button">
+            <span aria-hidden="true" className={cx('size-2 shrink-0 rounded-full', HEALTH_DOT[pulse.loading ? 'unknown' : overall])} />
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-semibold text-white">{statusTitle}</span>
+              <span className="block truncate text-[11px] text-white/50">{statusSub}</span>
+            </span>
+          </button>
+        </aside>
+        <div aria-hidden="true" className={cx('fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 lg:hidden', navOpen ? 'opacity-100' : 'pointer-events-none opacity-0')} onClick={() => setNavOpen(false)} />
+
+        <div className="flex min-w-0 flex-col">
+          <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur-md md:px-8">
+            <button aria-expanded={navOpen} aria-label="Open navigation" className="btn btn-icon -ml-2 lg:hidden" onClick={() => setNavOpen(true)} type="button">
+              <Icon name="menu" />
+            </button>
+            <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[13px] text-muted">
+              {group.label && <span className="hidden truncate sm:inline">{group.label}</span>}
+              {group.label && (
+                <span aria-hidden="true" className="hidden text-line-strong sm:inline">
+                  /
+                </span>
+              )}
+              <strong className="truncate font-semibold text-black">{item.label}</strong>
+            </nav>
+            <div className="flex-1" />
+            <div className="relative" ref={menuRef}>
+              <button aria-expanded={menuOpen} aria-haspopup="menu" className="flex items-center gap-2.5 rounded-full border border-line bg-white py-1 pr-3 pl-1 transition-colors duration-150 hover:border-line-strong" onClick={() => setMenuOpen((o) => !o)} type="button">
+                <span className="grid size-7 place-items-center rounded-full bg-black font-display text-sm text-cream uppercase">{admin.email.slice(0, 1)}</span>
+                <span className="hidden flex-col text-left leading-tight sm:flex">
+                  <span className="max-w-[200px] truncate text-[13px] font-semibold">{admin.email}</span>
+                  <span className="text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">{admin.role}</span>
+                </span>
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 mt-2 w-64 animate-menu-in rounded-md border border-line bg-white p-1.5 shadow-menu" role="menu">
+                  <div className="border-b border-line px-3 py-2.5 text-xs text-muted">
+                    Signed in as
+                    <strong className="mt-0.5 block truncate text-sm text-black">{admin.email}</strong>
+                  </div>
+                  <button className="mt-1 flex h-9 w-full items-center gap-2.5 rounded-sm px-3 text-left text-sm transition-colors duration-150 hover:bg-hover" onClick={onLogout} role="menuitem" type="button">
+                    <Icon className="size-4 text-muted" name="logout" />
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
+          </header>
+          <main className="mx-auto w-full max-w-[1440px] min-w-0 animate-rise-in px-4 py-6 md:px-8 md:py-8" key={page}>
+            {children}
+          </main>
         </div>
-        <main className="page" key={page}>
-          {children}
-        </main>
       </div>
-    </div>
     </PulseContext.Provider>
   );
 }

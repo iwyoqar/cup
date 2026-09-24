@@ -1,0 +1,200 @@
+/* =====================================================================================
+   CUP Admin — Design System 2.0 entry point (Tailwind CSS v4).
+
+   Cascade layers, lowest to highest priority:
+     theme      — Tailwind's @theme tokens (the ONE place CUP's colours, radii, fonts and motion are defined)
+     base       — element defaults (font, focus ring, reduced motion)
+     legacy     — pre-Tailwind CSS still in use: ui/base.css (token aliases, element base) and styles.css (the scoped
+                  page namespaces .analytics / .c360 / .growth / .bi / .pi that un-migrated pages still render)
+     components — the shared class vocabulary pages still use (buttons, fields, callouts…), rebuilt on the tokens
+     utilities  — Tailwind utilities, so a utility class always wins over legacy CSS without !important
+   Tailwind's preflight is deliberately NOT imported: legacy CSS already has its own reset and relies on it.
+   ===================================================================================== */
+@layer theme, base, legacy, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@import './ui/base.css' layer(legacy);
+@import './styles.css' layer(legacy);
+
+@import './ui/components.css';
+
+@theme static {
+  /* Only CUP colours exist — Tailwind's default palette is removed so no second palette can creep in. */
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-black: #0b0b0b;
+  --color-white: #ffffff;
+  --color-terracotta: #d84b1f;
+  --color-terracotta-deep: #b23a12;
+  --color-cream: #f6ddb0;
+  --color-cream-soft: #fbf0d9;
+  --color-muted: #6f6a63;
+  --color-muted-cream: #57524b;
+  --color-canvas: #faf8f4;
+  --color-skeleton: #f1ece4;
+
+  --color-ok: #2f5d43;
+  --color-ok-bg: #e4ede7;
+  --color-warn: #7a4f0c;
+  --color-warn-bg: #f6ddb0;
+  --color-err: #b23a12;
+  --color-err-bg: #f9e3da;
+  --color-neutral: #57524b;
+  --color-neutral-bg: #efece4;
+
+  /* Hairlines and fills are the black at low opacity, so they sit correctly on white, canvas and cream alike. */
+  --color-line: rgb(11 11 11 / 0.08);
+  --color-line-strong: rgb(11 11 11 / 0.16);
+  --color-hover: rgb(11 11 11 / 0.04);
+  --color-hover-strong: rgb(11 11 11 / 0.07);
+  --color-sidebar-line: rgb(255 255 255 / 0.08);
+  --color-sidebar-text: rgb(255 255 255 / 0.62);
+  --color-sidebar-hover: rgb(255 255 255 / 0.06);
+
+  /* Typography: the existing intentional pairing is preserved — a serif for brand, titles and figures, the system sans for information. */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Noto Serif', serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --text-kpi: 2rem;
+  --text-kpi--line-height: 1.1;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  --shadow-soft: 0 1px 2px rgb(11 11 11 / 0.05);
+  --shadow-menu: 0 12px 32px -8px rgb(11 11 11 / 0.22), 0 0 0 1px rgb(11 11 11 / 0.06);
+  --shadow-pop: 0 24px 64px -16px rgb(11 11 11 / 0.35);
+
+  /* Motion: fast 140 ms, normal 200 ms, slow 280 ms; ease-out for entrances, ease-in for exits. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --default-transition-duration: 200ms;
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-fade-in: fade-in 200ms var(--ease-out) both;
+  --animate-dialog-in: dialog-in 220ms var(--ease-out) both;
+  --animate-drawer-in: drawer-in 250ms var(--ease-out) both;
+  --animate-menu-in: menu-in 150ms var(--ease-out) both;
+  --animate-toast-in: toast-in 220ms var(--ease-out) both;
+  --animate-rise-in: rise-in 280ms var(--ease-out) both;
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes dialog-in {
+    from { opacity: 0; transform: translateY(6px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes drawer-in {
+    from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes menu-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-canvas);
+    color: var(--color-black);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Minimal element reset (Tailwind's full preflight is not used — see the header). Every class in the legacy and
+     components layers still wins over these, so only unclassed / utility-styled elements are affected. */
+  button {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  dl,
+  dd {
+    margin: 0;
+  }
+  svg {
+    display: block;
+  }
+
+  /* Unclassed form controls (several settings/filter forms write a bare <select>/<input>) get the same field look as
+     `.input` / `.select` in ui/components.css. Base layer = lowest priority, so any class — including the scoped
+     legacy page styles — still overrides this. */
+  select:not([multiple]),
+  textarea,
+  input:is([type='text'], [type='number'], [type='email'], [type='password'], [type='date'], [type='datetime-local'], [type='time'], [type='search'], [type='tel'], [type='url'], :not([type])) {
+    @apply h-10 min-w-0 rounded-sm border border-line-strong bg-white px-3 text-sm text-black transition-[border-color,box-shadow] duration-150 ease-out;
+    @apply hover:not-disabled:border-black/30 focus:border-terracotta focus:outline-none disabled:cursor-not-allowed disabled:bg-neutral-bg disabled:text-muted;
+  }
+  select:not([multiple]):focus,
+  textarea:focus,
+  input:focus {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-terracotta) 18%, transparent);
+  }
+  textarea {
+    @apply h-auto min-h-24 py-2.5 leading-relaxed;
+  }
+  select:not([multiple]) {
+    @apply appearance-none pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236f6a63' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 16px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-terracotta);
+    outline-offset: 2px;
+  }
+
+  /* Reduced motion: every animation and transition collapses to an instant change — nothing is hidden behind motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

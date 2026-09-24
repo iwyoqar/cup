@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-// Line icons in the Mini App's own style (frontend/src/app/icons.tsx): inline SVG, no icon library, no extra request. Stroke / fill come from CSS.
+// Line icons in the Mini App's own style (frontend/src/app/icons.tsx): inline SVG, no icon library, no extra request. Stroke/fill are set on the <svg> (Design System 2.0).
 const PATHS = {
   dashboard: (
     <>
@@ -132,9 +132,10 @@ const PATHS = {
 
 export type IconName = keyof typeof PATHS;
 
-export function Icon({ name }: { name: IconName }) {
+// Stroke styling lives on the SVG itself (Design System 2.0), so an icon renders correctly anywhere; size via className.
+export function Icon({ name, className = 'size-[18px]' }: { name: IconName; className?: string }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
+    <svg aria-hidden="true" className={`shrink-0 ${className}`} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} viewBox="0 0 24 24">
       {PATHS[name]}
     </svg>
   );

@@ -1,5 +1,7 @@
 import { ReactNode } from 'react';
+import { cx } from './cx';
 import { EmptyState } from './States';
+import { TableSkeleton } from './Skeleton';
 
 export interface Column<T> {
   key: string;
@@ -23,17 +25,22 @@ interface DataTableProps<T> {
   /** Wrap the table in its own bordered box (when it is not inside a SectionCard). */
   boxed?: boolean;
   caption?: string;
+  /** Show skeleton rows instead of the table (first load only — reloads keep the old rows visible). */
+  loading?: boolean;
+  /** Long tables: the table scrolls inside a 70vh box with a sticky header. */
+  stickyHeader?: boolean;
 }
 
-// One table for the whole Admin: sticky-feeling header row, hairline separators, hover fill, right-aligned figures, and it scrolls sideways
-// inside its own wrapper instead of stretching the page.
-export function DataTable<T>({ columns, rows, rowKey, onRowClick, empty, boxed, caption }: DataTableProps<T>) {
+// One table for the whole Admin (styles: `.table*` in ui/components.css, shared with raw tables in pages): quiet
+// uppercase header, 48 px rows, subtle hover, right-aligned tabular figures, horizontal scroll inside its own wrapper.
+export function DataTable<T>({ columns, rows, rowKey, onRowClick, empty, boxed, caption, loading, stickyHeader }: DataTableProps<T>) {
+  if (loading && rows.length === 0) return <TableSkeleton />;
   if (rows.length === 0) {
     return <>{empty ?? <EmptyState title="Nothing here yet" variant="inline" />}</>;
   }
-  const cls = (c: Column<T>) => [c.numeric ? 'table__num' : '', c.actions ? 'table__actions' : '', c.low ? 'table__col--low' : ''].filter(Boolean).join(' ') || undefined;
+  const cls = (c: Column<T>) => cx(c.numeric && 'table__num', c.actions && 'table__actions', c.low && 'table__col--low') || undefined;
   return (
-    <div className={`table-wrap${boxed ? ' table-wrap--boxed' : ''}`}>
+    <div className={cx('table-wrap', boxed && 'table-wrap--boxed', stickyHeader && 'table-wrap--sticky')}>
       <table className="table">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
@@ -54,7 +61,10 @@ export function DataTable<T>({ columns, rows, rowKey, onRowClick, empty, boxed, 
               onKeyDown={
                 onRowClick
                   ? (e) => {
-                      if (e.key === 'Enter') onRowClick(row);
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onRowClick(row);
+                      }
                     }
                   : undefined
               }
