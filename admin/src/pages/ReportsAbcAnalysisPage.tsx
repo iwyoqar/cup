@@ -13,7 +13,7 @@ const CLASS_TONE = { A: 'ok', B: 'warn', C: 'neutral' } as const;
 
 const columns: Column<Row>[] = [
   { key: 'c', header: 'Class', cell: (r) => <StatusBadge tone={CLASS_TONE[r.classification]}>{r.classification}</StatusBadge> },
-  { key: 'n', header: 'Product', cell: (r) => <span className="table__primary">{r.productName}</span> },
+  { key: 'n', header: 'Product', cell: (r) => <span className="font-semibold text-black">{r.productName}</span> },
   { key: 'cat', header: 'Category', low: true, cell: (r) => r.categoryName },
   { key: 'u', header: 'Units', numeric: true, cell: (r) => num(r.units) },
   { key: 'r', header: 'Revenue', numeric: true, cell: (r) => formatSom(r.revenueMinor) },
@@ -42,7 +42,7 @@ export function ReportsAbcAnalysisPage() {
         <DateRangePicker onChange={setRange} value={range} />
         <BranchSelect branches={data?.filters.branches ?? []} onChange={setBranchId} value={branchId} />
         <FilterField label="Category">
-          <select className="select" onChange={(e) => setCategoryId(e.target.value)} value={categoryId}>
+          <select className="" onChange={(e) => setCategoryId(e.target.value)} value={categoryId}>
             <option value="">All categories</option>
             {(data?.filters.categories ?? []).map((c) => (
               <option key={c.id} value={c.id}>

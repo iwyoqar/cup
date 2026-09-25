@@ -134,7 +134,7 @@ export function GrowthPage() {
       {!data && !error && <LoadingState variant="page" />}
 
       {data && (
-        <div className="flex min-w-0 flex-col gap-5" style={{ opacity: loading ? 0.6 : 1 }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <StatGrid>
             <StatCard hint="New + active + loyal" label="Active customers" strong value={number(data.kpis.activeCustomers)} />
             <StatCard label="New" value={number(data.kpis.newCustomers)} />

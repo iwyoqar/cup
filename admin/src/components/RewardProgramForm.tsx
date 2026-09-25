@@ -3,6 +3,7 @@ import { createRewardProgram, RewardProgramInput, updateRewardProgram } from '..
 import { ApiError } from '../lib/api';
 import { CatalogCategory, fetchActiveCategories } from '../lib/adminCatalog';
 import { RewardProgram } from '../lib/types';
+import { Button, Toggle } from '../ui';
 
 interface RewardProgramFormProps {
   existing?: RewardProgram;
@@ -88,25 +89,25 @@ export function RewardProgramForm({ existing, onSaved, onCancel }: RewardProgram
     <form onSubmit={handleSubmit}>
       <h1>{existing ? 'Edit reward program' : 'Create reward program'}</h1>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="reward-name">Name</label>
         <input id="reward-name" onChange={(e) => setName(e.target.value)} type="text" value={name} />
       </div>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="reward-description">Description</label>
         <input id="reward-description" onChange={(e) => setDescription(e.target.value)} type="text" value={description} />
       </div>
 
       <h3>Rule (Buy X, Get Y)</h3>
       {rewardLocked && (
-        <p className="hint-text">This program has existing redemptions — its qualifying category/buy quantity/reward quantity can no longer be changed.</p>
+        <p className="text-[13px] leading-snug text-muted">This program has existing redemptions — its qualifying category/buy quantity/reward quantity can no longer be changed.</p>
       )}
 
-      <div className="field" style={{ maxWidth: 320 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[320px]">
         <label htmlFor="reward-category">Qualifying category</label>
         {categories === null ? (
-          <p className="hint-text">Loading categories...</p>
+          <p className="text-[13px] leading-snug text-muted">Loading categories...</p>
         ) : (
           <select
             disabled={rewardLocked}
@@ -124,12 +125,12 @@ export function RewardProgramForm({ existing, onSaved, onCancel }: RewardProgram
         )}
       </div>
 
-      <div className="field" style={{ maxWidth: 160 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[160px]">
         <label htmlFor="reward-buy-quantity">Buy quantity</label>
         <input disabled={rewardLocked} id="reward-buy-quantity" min={1} onChange={(e) => setBuyQuantity(e.target.value)} type="number" value={buyQuantity} />
       </div>
 
-      <div className="field" style={{ maxWidth: 160 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[160px]">
         <label htmlFor="reward-reward-quantity">Reward quantity</label>
         <input
           disabled={rewardLocked}
@@ -141,39 +142,36 @@ export function RewardProgramForm({ existing, onSaved, onCancel }: RewardProgram
         />
       </div>
 
-      <p className="hint-text">Reward scope: any active product from the same qualifying category — the customer chooses which one.</p>
+      <p className="text-[13px] leading-snug text-muted">Reward scope: any active product from the same qualifying category — the customer chooses which one.</p>
 
       <h3>Validity</h3>
-      <div className="field" style={{ maxWidth: 260 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[260px]">
         <label htmlFor="reward-starts-at">Starts at</label>
         <input id="reward-starts-at" onChange={(e) => setStartsAt(e.target.value)} type="datetime-local" value={startsAt} />
       </div>
-      <div className="field" style={{ maxWidth: 260 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[260px]">
         <label htmlFor="reward-ends-at">Ends at (optional)</label>
         <input id="reward-ends-at" onChange={(e) => setEndsAt(e.target.value)} type="datetime-local" value={endsAt} />
       </div>
 
-      <div className="settings-row" style={{ maxWidth: 320, marginTop: 12 }}>
-        <span className="settings-row__label">Active</span>
-        <label className="toggle">
-          <input checked={isActive} onChange={(e) => setIsActive(e.target.checked)} type="checkbox" />
-          <span className="toggle__track" />
-        </label>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0 max-w-[320px] mt-3">
+        <span className="text-sm font-semibold">Active</span>
+        <Toggle checked={isActive} label="Active" onChange={setIsActive} />
       </div>
 
       {error && (
-        <p className="error-text" style={{ marginTop: 16 }}>
+        <p className="text-[13px] font-semibold text-err mt-4">
           {error}
         </p>
       )}
 
-      <div className="settings-footer">
-        <button className="button-primary" disabled={isSaving} type="submit">
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <Button disabled={isSaving} type="submit" variant="primary">
           {isSaving ? 'Saving...' : 'Save'}
-        </button>
-        <button className="button-secondary" disabled={isSaving} onClick={onCancel} type="button">
+        </Button>
+        <Button disabled={isSaving} onClick={onCancel} variant="secondary">
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

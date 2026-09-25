@@ -3,6 +3,8 @@ import { fetchMyReferrals } from '../../lib/api/referrals';
 import { getTelegramWebApp } from '../../lib/telegram/webapp';
 import { ReferralOverview } from '../../types/api';
 import { SectionSkeleton } from '../../app/SectionSkeleton';
+import { buttonPrimary, buttonSecondary } from '../../app/buttonStyles';
+import { cx } from '../../lib/cx';
 
 type Enabled = Extract<ReferralOverview, { eligible: true }>;
 
@@ -76,48 +78,48 @@ function Body({ data, copied, setCopied }: { data: Enabled; copied: 'code' | 'li
           ? 'Siz do‘stingiz taklifi bilan keldingiz — birinchi xaridingizdan keyin sovg‘a ballar beriladi.'
           : '';
   return (
-    <section className="account-section rf">
-      <h2 className="section-title">Do‘stingizni taklif qiling</h2>
-      <p className="hint-text">
+    <section className="flex flex-col gap-3">
+      <h2 className="font-display text-section leading-[1.2] font-medium">Do‘stingizni taklif qiling</h2>
+      <p className="text-small leading-[1.45] text-muted">
         Do‘stingiz birinchi xaridini qilganda siz {data.reward.referrerPoints > 0 ? `${fmt(data.reward.referrerPoints)} ball` : 'bonus'}, do‘stingiz esa{' '}
         {data.reward.friendPoints > 0 ? `${fmt(data.reward.friendPoints)} ball` : 'bonus'} oladi.
       </p>
 
-      <div className="rf-code">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line-strong px-4 py-3">
         <div>
-          <div className="lx-eyebrow">Sizning kodingiz</div>
-          <div className="rf-code__value">{data.referralCode}</div>
+          <div className="text-micro font-bold tracking-[0.1em] text-muted uppercase">Sizning kodingiz</div>
+          <div className="mt-1 font-display text-[24px] font-medium tracking-[0.06em] tabular-nums [overflow-wrap:anywhere]">{data.referralCode}</div>
         </div>
-        <button className="button-secondary" onClick={() => copy(data.referralCode, 'code')} type="button">
+        <button className={buttonSecondary} onClick={() => copy(data.referralCode, 'code')} type="button">
           {copied === 'code' ? 'Nusxa olindi' : 'Nusxa olish'}
         </button>
       </div>
 
-      <button className="button-primary" disabled={!data.referralLink} onClick={share} type="button">
+      <button className={cx(buttonPrimary, 'w-full')} disabled={!data.referralLink} onClick={share} type="button">
         {copied === 'link' ? 'Havola nusxa olindi' : 'Do‘stni taklif qilish'}
       </button>
-      {!data.referralLink && <p className="hint-text">Taklif havolasi tez orada tayyor bo‘ladi.</p>}
-      {data.limitReached && <p className="hint-text">Siz taklif bonuslarining maksimal miqdoriga yetdingiz.</p>}
+      {!data.referralLink && <p className="text-small leading-[1.45] text-muted">Taklif havolasi tez orada tayyor bo‘ladi.</p>}
+      {data.limitReached && <p className="text-small leading-[1.45] text-muted">Siz taklif bonuslarining maksimal miqdoriga yetdingiz.</p>}
 
-      <div className="lx-wallets">
-        <div className="lx-tile">
-          <div className="lx-eyebrow">Muvaffaqiyatli</div>
-          <div className="lx-tile__value">{fmt(data.successfulReferrals)}</div>
-          <div className="lx-tile__hint">taklif</div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3">
+        <div className="min-w-0 rounded-lg bg-cream p-4">
+          <div className="text-micro font-bold tracking-[0.1em] text-muted-cream uppercase">Muvaffaqiyatli</div>
+          <div className="mt-1 font-display text-[26px] leading-[1.1] font-medium tabular-nums [overflow-wrap:anywhere]">{fmt(data.successfulReferrals)}</div>
+          <div className="text-small text-muted-cream">taklif</div>
         </div>
-        <div className="lx-tile">
-          <div className="lx-eyebrow">Kutilmoqda</div>
-          <div className="lx-tile__value">{fmt(data.pendingReferrals)}</div>
-          <div className="lx-tile__hint">taklif</div>
+        <div className="min-w-0 rounded-lg bg-cream p-4">
+          <div className="text-micro font-bold tracking-[0.1em] text-muted-cream uppercase">Kutilmoqda</div>
+          <div className="mt-1 font-display text-[26px] leading-[1.1] font-medium tabular-nums [overflow-wrap:anywhere]">{fmt(data.pendingReferrals)}</div>
+          <div className="text-small text-muted-cream">taklif</div>
         </div>
-        <div className="lx-tile">
-          <div className="lx-eyebrow">Olingan ballar</div>
-          <div className="lx-tile__value">{fmt(data.totalRewardsEarned)}</div>
-          <div className="lx-tile__hint">taklif bonuslari</div>
+        <div className="min-w-0 rounded-lg bg-cream p-4">
+          <div className="text-micro font-bold tracking-[0.1em] text-muted-cream uppercase">Olingan ballar</div>
+          <div className="mt-1 font-display text-[26px] leading-[1.1] font-medium tabular-nums [overflow-wrap:anywhere]">{fmt(data.totalRewardsEarned)}</div>
+          <div className="text-small text-muted-cream">taklif bonuslari</div>
         </div>
       </div>
 
-      {ownText && <p className="hint-text">{ownText}</p>}
+      {ownText && <p className="text-small leading-[1.45] text-muted">{ownText}</p>}
     </section>
   );
 }

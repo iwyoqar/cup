@@ -7,7 +7,7 @@ import { RewardProgramForm } from '../components/RewardProgramForm';
 import { RewardProgramDetailView } from '../components/RewardProgramDetailView';
 
 import { findNav } from '../lib/nav';
-import { Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '../ui';
+import { Button, Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '../ui';
 type View = { kind: 'list' } | { kind: 'create' } | { kind: 'edit'; program: RewardProgram } | { kind: 'detail'; programId: string };
 
 export function RewardProgramsPage() {
@@ -77,7 +77,7 @@ export function RewardProgramsPage() {
   }
 
   const columns: Column<RewardProgramListItem>[] = [
-    { key: 'name', header: 'Program', cell: (program) => <span className="table__primary">{program.name}</span> },
+    { key: 'name', header: 'Program', cell: (program) => <span className="font-semibold text-black">{program.name}</span> },
     { key: 'rule', header: 'Qualifying condition', cell: (program) => `Buy ${program.buyQuantity}, get ${program.rewardQuantity} free — ${program.qualifyingCategory.name}` },
     { key: 'status', header: 'Status', cell: (program) => (program.isActive ? <StatusBadge dot tone="ok">Active</StatusBadge> : <StatusBadge dot>Inactive</StatusBadge>) },
     { key: 'updated', header: 'Updated', low: true, cell: (program) => formatDate(program.updatedAt) },
@@ -87,9 +87,9 @@ export function RewardProgramsPage() {
     <>
       <PageHeader
         actions={
-          <button className="button-primary" onClick={() => setView({ kind: 'create' })} type="button">
+          <Button onClick={() => setView({ kind: 'create' })} variant="primary">
             + Create reward program
-          </button>
+          </Button>
         }
         description={findNav('rewards').item.description}
         title={findNav('rewards').item.label}
@@ -102,9 +102,9 @@ export function RewardProgramsPage() {
         flush
         footer={
           nextCursor ? (
-            <button className="button-secondary" disabled={isLoadingMore} onClick={handleLoadMore} type="button">
+            <Button disabled={isLoadingMore} onClick={handleLoadMore} variant="secondary">
               {isLoadingMore ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           ) : undefined
         }
         title="Reward programs"
@@ -117,9 +117,9 @@ export function RewardProgramsPage() {
             empty={
               <EmptyState
                 action={
-                  <button className="button-primary" onClick={() => setView({ kind: 'create' })} type="button">
+                  <Button onClick={() => setView({ kind: 'create' })} variant="primary">
                     + Create reward program
-                  </button>
+                  </Button>
                 }
                 text="A reward program gives customers a free item after they buy a set number. Create the first one."
                 title="No reward programs yet"

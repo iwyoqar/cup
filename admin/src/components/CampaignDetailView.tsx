@@ -9,6 +9,7 @@ import {
 import { ApiError } from '../lib/api';
 import { formatDateTime } from '../lib/format';
 import { AudiencePreviewPage, Campaign, CampaignRecipientItem } from '../lib/types';
+import { Button, tableClass } from '../ui';
 
 interface CampaignDetailViewProps {
   campaignId: string;
@@ -139,74 +140,74 @@ export function CampaignDetailView({ campaignId, onBack, onEdit, onDeleted }: Ca
 
   return (
     <div>
-      <button className="button-secondary" onClick={onBack} style={{ marginBottom: 16 }} type="button">
+      <Button onClick={onBack} className="mb-4" variant="secondary">
         ← Back to campaigns
-      </button>
+      </Button>
 
-      {error && <p className="error-text">{error}</p>}
-      {!campaign && !error && <p className="hint-text">Loading...</p>}
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      {!campaign && !error && <p className="text-[13px] leading-snug text-muted">Loading...</p>}
 
       {campaign && (
         <>
           <h1>{campaign.name}</h1>
-          {campaign.description && <p className="hint-text">{campaign.description}</p>}
+          {campaign.description && <p className="text-[13px] leading-snug text-muted">{campaign.description}</p>}
 
-          <div className="settings-card">
-            <div className="settings-row">
-              <span className="settings-row__label">Status</span>
+          <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Status</span>
               <span>{STATUS_LABELS[campaign.status] ?? campaign.status}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Segment</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Segment</span>
               <span>{campaign.segment.name}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Channel</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Channel</span>
               <span>Telegram</span>
             </div>
-            <hr className="settings-divider" />
+            <hr className="m-0 h-px border-0 bg-line" />
             <div>
-              <span className="settings-row__label">Message</span>
-              <p style={{ whiteSpace: 'pre-wrap', marginTop: 8 }}>{campaign.messageText}</p>
+              <span className="text-sm font-semibold">Message</span>
+              <p className="whitespace-pre-wrap mt-2">{campaign.messageText}</p>
             </div>
           </div>
 
           {campaign.status !== 'draft' && (
-            <div className="settings-card">
-              <h3 style={{ margin: 0 }}>Delivery results</h3>
-              <div className="settings-row">
-                <span className="settings-row__label">Sent</span>
+            <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+              <h3 className="m-0">Delivery results</h3>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                <span className="text-sm font-semibold">Sent</span>
                 <span>{campaign.stats.sent}</span>
               </div>
-              <div className="settings-row">
-                <span className="settings-row__label">Failed</span>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                <span className="text-sm font-semibold">Failed</span>
                 <span>{campaign.stats.failed}</span>
               </div>
-              <div className="settings-row">
-                <span className="settings-row__label">Skipped (no Telegram account)</span>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                <span className="text-sm font-semibold">Skipped (no Telegram account)</span>
                 <span>{campaign.stats.skipped}</span>
               </div>
-              <div className="settings-row">
-                <span className="settings-row__label">Pending / uncertain</span>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                <span className="text-sm font-semibold">Pending / uncertain</span>
                 <span>{campaign.stats.pending}</span>
               </div>
             </div>
           )}
 
           {campaign.status === 'draft' && (
-            <div className="settings-footer">
-              <button className="button-secondary" onClick={() => onEdit(campaign)} type="button">
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Button onClick={() => onEdit(campaign)} variant="secondary">
                 Edit
-              </button>
-              <button className="button-secondary" onClick={handleLoadAudience} type="button">
+              </Button>
+              <Button onClick={handleLoadAudience} variant="secondary">
                 Preview audience
-              </button>
-              <button className="button-primary" onClick={handleOpenSendConfirmation} type="button">
+              </Button>
+              <Button onClick={handleOpenSendConfirmation} variant="primary">
                 Send
-              </button>
-              <button className="button-secondary" disabled={isDeleting} onClick={handleDelete} type="button">
+              </Button>
+              <Button disabled={isDeleting} onClick={handleDelete} variant="secondary">
                 {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
+              </Button>
             </div>
           )}
 
@@ -215,37 +216,37 @@ export function CampaignDetailView({ campaignId, onBack, onEdit, onDeleted }: Ca
           )}
 
           {confirmingSend && (
-            <div className="settings-card" style={{ borderColor: 'var(--cup-danger)' }}>
-              <h3 style={{ margin: 0 }}>Confirm sending this campaign</h3>
-              <p className="hint-text">
+            <div className="mt-4 flex flex-col gap-4 rounded-lg border border-err bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+              <h3 className="m-0">Confirm sending this campaign</h3>
+              <p className="text-[13px] leading-snug text-muted">
                 This will send a real Telegram message to every eligible recipient below. This cannot be undone, and this campaign
                 cannot be sent again afterward.
               </p>
-              <div className="settings-row">
-                <span className="settings-row__label">Campaign</span>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                <span className="text-sm font-semibold">Campaign</span>
                 <span>{campaign.name}</span>
               </div>
-              <div className="settings-row">
-                <span className="settings-row__label">Segment</span>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                <span className="text-sm font-semibold">Segment</span>
                 <span>{campaign.segment.name}</span>
               </div>
-              <div className="settings-row">
-                <span className="settings-row__label">Current eligible recipients</span>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                <span className="text-sm font-semibold">Current eligible recipients</span>
                 <span>{audience ? audience.telegramEligibleCount : 'Loading...'}</span>
               </div>
               {audience && audience.skippedCount > 0 && (
-                <p className="hint-text">{audience.skippedCount} matching customer(s) will be skipped (no Telegram account).</p>
+                <p className="text-[13px] leading-snug text-muted">{audience.skippedCount} matching customer(s) will be skipped (no Telegram account).</p>
               )}
-              <p className="hint-text">Message preview:</p>
-              <p style={{ whiteSpace: 'pre-wrap' }}>{campaign.messageText}</p>
-              {sendError && <p className="error-text">{sendError}</p>}
-              <div className="settings-footer">
-                <button className="button-primary" disabled={isSending || !audience} onClick={handleConfirmSend} type="button">
+              <p className="text-[13px] leading-snug text-muted">Message preview:</p>
+              <p className="whitespace-pre-wrap">{campaign.messageText}</p>
+              {sendError && <p className="text-[13px] font-semibold text-err">{sendError}</p>}
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <Button disabled={isSending || !audience} onClick={handleConfirmSend} variant="primary">
                   {isSending ? 'Sending...' : `Yes, send to ${audience?.telegramEligibleCount ?? 0} recipient(s)`}
-                </button>
-                <button className="button-secondary" disabled={isSending} onClick={() => setConfirmingSend(false)} type="button">
+                </Button>
+                <Button disabled={isSending} onClick={() => setConfirmingSend(false)} variant="secondary">
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -254,43 +255,37 @@ export function CampaignDetailView({ campaignId, onBack, onEdit, onDeleted }: Ca
             <>
               <h3>Recipients</h3>
               {recipients === null ? (
-                <p className="hint-text">Loading...</p>
+                <p className="text-[13px] leading-snug text-muted">Loading...</p>
               ) : recipients.length === 0 ? (
-                <p className="hint-text">No recipients.</p>
+                <p className="text-[13px] leading-snug text-muted">No recipients.</p>
               ) : (
                 <>
-                  <table className="data-table">
+                  <table className={tableClass.table}>
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>Status</th>
-                        <th>Sent</th>
-                        <th>Reason</th>
+                        <th className={tableClass.th}>Name</th>
+                        <th className={tableClass.th}>Phone</th>
+                        <th className={tableClass.th}>Status</th>
+                        <th className={tableClass.th}>Sent</th>
+                        <th className={tableClass.th}>Reason</th>
                       </tr>
                     </thead>
                     <tbody>
                       {recipients.map((recipient) => (
-                        <tr key={recipient.customerId}>
-                          <td>{recipient.displayName ?? '—'}</td>
-                          <td>{recipient.phone ?? '—'}</td>
-                          <td>{RECIPIENT_STATUS_LABELS[recipient.status] ?? recipient.status}</td>
-                          <td>{recipient.sentAt ? formatDateTime(recipient.sentAt) : '—'}</td>
-                          <td>{recipient.errorCode ?? '—'}</td>
+                        <tr className={tableClass.tr} key={recipient.customerId}>
+                          <td className={tableClass.td}>{recipient.displayName ?? '—'}</td>
+                          <td className={tableClass.td}>{recipient.phone ?? '—'}</td>
+                          <td className={tableClass.td}>{RECIPIENT_STATUS_LABELS[recipient.status] ?? recipient.status}</td>
+                          <td className={tableClass.td}>{recipient.sentAt ? formatDateTime(recipient.sentAt) : '—'}</td>
+                          <td className={tableClass.td}>{recipient.errorCode ?? '—'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   {recipientsCursor && (
-                    <button
-                      className="button-secondary"
-                      disabled={isLoadingMoreRecipients}
-                      onClick={handleLoadMoreRecipients}
-                      style={{ marginTop: 12 }}
-                      type="button"
-                    >
+                    <Button disabled={isLoadingMoreRecipients} onClick={handleLoadMoreRecipients} className="mt-3" variant="secondary">
                       {isLoadingMoreRecipients ? 'Loading...' : 'Load more'}
-                    </button>
+                    </Button>
                   )}
                 </>
               )}
@@ -305,41 +300,41 @@ export function CampaignDetailView({ campaignId, onBack, onEdit, onDeleted }: Ca
 function AudiencePreviewCard({ audience }: { audience: AudiencePreviewPage | null }) {
   if (!audience) {
     return (
-      <div className="settings-card">
-        <p className="hint-text">Loading audience...</p>
+      <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+        <p className="text-[13px] leading-snug text-muted">Loading audience...</p>
       </div>
     );
   }
   return (
-    <div className="settings-card">
-      <h3 style={{ margin: 0 }}>Current audience</h3>
-      <div className="settings-row">
-        <span className="settings-row__label">Segment matches</span>
+    <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+      <h3 className="m-0">Current audience</h3>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+        <span className="text-sm font-semibold">Segment matches</span>
         <span>{audience.segmentMatchCount}</span>
       </div>
-      <div className="settings-row">
-        <span className="settings-row__label">Telegram-eligible</span>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+        <span className="text-sm font-semibold">Telegram-eligible</span>
         <span>{audience.telegramEligibleCount}</span>
       </div>
-      <div className="settings-row">
-        <span className="settings-row__label">Skipped (no Telegram account)</span>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+        <span className="text-sm font-semibold">Skipped (no Telegram account)</span>
         <span>{audience.skippedCount}</span>
       </div>
       {audience.items.length > 0 && (
-        <table className="data-table">
+        <table className={tableClass.table}>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Eligibility</th>
+              <th className={tableClass.th}>Name</th>
+              <th className={tableClass.th}>Phone</th>
+              <th className={tableClass.th}>Eligibility</th>
             </tr>
           </thead>
           <tbody>
             {audience.items.map((candidate) => (
-              <tr key={candidate.customerId}>
-                <td>{candidate.displayName ?? '—'}</td>
-                <td>{candidate.phone ?? '—'}</td>
-                <td>{candidate.eligible ? 'Eligible' : 'Skipped — no Telegram account'}</td>
+              <tr className={tableClass.tr} key={candidate.customerId}>
+                <td className={tableClass.td}>{candidate.displayName ?? '—'}</td>
+                <td className={tableClass.td}>{candidate.phone ?? '—'}</td>
+                <td className={tableClass.td}>{candidate.eligible ? 'Eligible' : 'Skipped — no Telegram account'}</td>
               </tr>
             ))}
           </tbody>

@@ -6,7 +6,7 @@ import { FinanceCogsBanner } from '../components/FinanceCogsBanner';
 import { FinanceFilterBar } from '../components/FinanceFilterBar';
 import { FinanceRangeValue, isFinanceRangeReady } from '../components/FinancePeriodPicker';
 import { useFinanceData } from '../components/useFinanceData';
-import { ErrorState, KeyValue, LoadingState, PageHeader, SectionCard } from '../ui';
+import { cx, ErrorState, KeyValue, LoadingState, PageHeader, SectionCard } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
 
@@ -34,7 +34,7 @@ export function FinancePnlPage() {
       {!data && !error && <LoadingState variant="page" />}
 
       {data && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1 }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <FinanceCogsBanner data={data} />
           <SectionCard description={`${data.period.startDate} → ${data.period.endDate}${data.branch ? ` · ${data.branch.name}` : ' · All branches'}`} title="Profit & Loss statement">
             <KeyValue

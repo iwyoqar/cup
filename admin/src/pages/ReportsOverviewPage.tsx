@@ -3,7 +3,7 @@ import { formatSom } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { useReportsOverview } from '../lib/useReportsOverview';
 import { ReportsOverview } from '../lib/types';
-import { BarChart, ChartContainer, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, FilterField, HBarList, isRangeReady, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
+import { BarChart, ChartContainer, cx, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, FilterField, HBarList, isRangeReady, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
 const percent = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—');
@@ -28,7 +28,7 @@ function SourceBreakdown({ data }: { data: ReportsOverview }) {
       ) : (
         <EmptyState text="No revenue was recorded in this period." title="No sales" variant="inline" />
       )}
-      {!data.sourceBreakdown.importedDataExists && <p className="hint-text">No Poster POS receipts have been imported for this period yet.</p>}
+      {!data.sourceBreakdown.importedDataExists && <p className="text-[13px] leading-snug text-muted">No Poster POS receipts have been imported for this period yet.</p>}
     </SectionCard>
   );
 }
@@ -49,7 +49,7 @@ export function ReportsOverviewPage() {
       <FilterBar>
         <DateRangePicker onChange={setRange} value={range} />
         <FilterField label="Branch">
-          <select className="select" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
+          <select className="" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
             <option value="">All branches</option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -59,7 +59,7 @@ export function ReportsOverviewPage() {
           </select>
         </FilterField>
         {data && !error && (
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
+          <span className="text-[13px] leading-snug text-muted self-center">
             {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
             {data.branch ? ` · ${data.branch.name}` : ' · All branches'}
             {loading && ' · updating…'}
@@ -71,7 +71,7 @@ export function ReportsOverviewPage() {
       {!data && !error && ready && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity var(--motion-base) var(--ease)' }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <StatGrid>
             <StatCard hint="CUP + independent POS" label="Revenue" strong value={formatSom(data.revenue)} />
             <StatCard label="Orders / Receipts" value={number(data.orders)} />
@@ -82,7 +82,7 @@ export function ReportsOverviewPage() {
           </StatGrid>
 
           {data.notes.length > 0 && (
-            <div className="callout">
+            <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">
               {data.notes.map((n) => (
                 <p key={n}>{n}</p>
               ))}
@@ -96,7 +96,7 @@ export function ReportsOverviewPage() {
             <BarChart ariaLabel="Daily orders" data={data.ordersByDay.map((d) => ({ label: d.date, value: d.orders }))} format={number} />
           </ChartContainer>
 
-          <div className="grid-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <SectionCard description="Who bought in this period (identified customers only)." title="Customer mix">
               {totalCustomers > 0 ? (
                 <HBarList

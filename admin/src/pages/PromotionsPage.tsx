@@ -7,7 +7,7 @@ import { PromotionForm } from '../components/PromotionForm';
 import { PromotionDetailView } from '../components/PromotionDetailView';
 
 import { findNav } from '../lib/nav';
-import { Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '../ui';
+import { Button, Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '../ui';
 type View = { kind: 'list' } | { kind: 'create' } | { kind: 'edit'; promotion: Promotion } | { kind: 'detail'; promotionId: string };
 
 function describeBenefit(item: PromotionListItem): string {
@@ -92,7 +92,7 @@ export function PromotionsPage() {
   }
 
   const columns: Column<PromotionListItem>[] = [
-    { key: 'name', header: 'Promotion', cell: (promotion) => <span className="table__primary">{promotion.name}</span> },
+    { key: 'name', header: 'Promotion', cell: (promotion) => <span className="font-semibold text-black">{promotion.name}</span> },
     { key: 'segment', header: 'Audience', low: true, cell: (promotion) => (promotion.segment ? promotion.segment.name : 'Everyone') },
     { key: 'benefit', header: 'Benefit', cell: (promotion) => describeBenefit(promotion) },
     { key: 'status', header: 'Status', cell: (promotion) => (promotion.isActive ? <StatusBadge dot tone="ok">Active</StatusBadge> : <StatusBadge dot>Inactive</StatusBadge>) },
@@ -115,9 +115,9 @@ export function PromotionsPage() {
     <>
       <PageHeader
         actions={
-          <button className="button-primary" onClick={() => setView({ kind: 'create' })} type="button">
+          <Button onClick={() => setView({ kind: 'create' })} variant="primary">
             + Create promotion
-          </button>
+          </Button>
         }
         description={findNav('promotions').item.description}
         title={findNav('promotions').item.label}
@@ -130,9 +130,9 @@ export function PromotionsPage() {
         flush
         footer={
           nextCursor ? (
-            <button className="button-secondary" disabled={isLoadingMore} onClick={handleLoadMore} type="button">
+            <Button disabled={isLoadingMore} onClick={handleLoadMore} variant="secondary">
               {isLoadingMore ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           ) : undefined
         }
         title="Promotions"
@@ -145,9 +145,9 @@ export function PromotionsPage() {
             empty={
               <EmptyState
                 action={
-                  <button className="button-primary" onClick={() => setView({ kind: 'create' })} type="button">
+                  <Button onClick={() => setView({ kind: 'create' })} variant="primary">
                     + Create promotion
-                  </button>
+                  </Button>
                 }
                 text="Promotions give a chosen segment a discount or a free item for a period. Create the first one."
                 title="No promotions yet"

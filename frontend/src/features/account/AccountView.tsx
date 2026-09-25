@@ -44,31 +44,31 @@ export function AccountView({ onOpenOrder, onBack }: AccountViewProps) {
 
   if (showLoyaltyTransactions) {
     return (
-      <div className="app-shell">
+      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <LoyaltyTransactionsList onBack={() => setShowLoyaltyTransactions(false)} />
       </div>
     );
   }
 
   return (
-    <div className="app-shell">
-      <div className="screen">
-        <div className="top-bar">
-          <button className="top-bar__back" onClick={onBack} type="button">
+    <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <div className="flex flex-1 flex-col gap-6 px-4 pt-3 pb-8">
+        <div className="-mx-4 flex min-h-11 items-center gap-2 px-4">
+          <button className="min-h-11 cursor-pointer py-2.5 text-small font-semibold tracking-[0.02em] text-black" onClick={onBack} type="button">
             ← Menyu
           </button>
         </div>
 
-        <section className="account-section">
-          <div className="eyebrow">Hisobim</div>
+        <section className="flex flex-col gap-3">
+          <div className="text-micro font-bold tracking-[0.14em] text-muted uppercase">Hisobim</div>
           {profile ? (
             <div>
-              <h1 className="profile__name">{profile.displayName ?? 'CUP Coffee'}</h1>
-              {profile.phone && <p className="profile__meta">{profile.phone}</p>}
-              {profile.username && <p className="profile__meta">@{profile.username}</p>}
+              <h1 className="font-display text-title leading-[1.1] font-medium">{profile.displayName ?? 'CUP Coffee'}</h1>
+              {profile.phone && <p className="mt-1 text-small text-muted">{profile.phone}</p>}
+              {profile.username && <p className="mt-1 text-small text-muted">@{profile.username}</p>}
             </div>
           ) : profileError ? (
-            <p className="hint-text">{profileError}</p>
+            <p className="text-small leading-[1.45] text-muted">{profileError}</p>
           ) : (
             <SectionSkeleton height={64} />
           )}
@@ -84,8 +84,8 @@ export function AccountView({ onOpenOrder, onBack }: AccountViewProps) {
 
         <PromotionsSection />
 
-        <section className="account-section">
-          <h2 className="section-title">Mening buyurtmalarim</h2>
+        <section className="flex flex-col gap-3">
+          <h2 className="font-display text-section leading-[1.2] font-medium">Mening buyurtmalarim</h2>
           <OrderHistoryList onOpenOrder={onOpenOrder} onGoToCatalog={onBack} />
         </section>
       </div>

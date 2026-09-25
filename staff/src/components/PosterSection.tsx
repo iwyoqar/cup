@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ApiError, toUserMessage } from '../lib/api';
 import { fetchPosterCandidates, linkPosterClient, PosterCandidates } from '../lib/staffApi';
+import { Button } from './ui';
+import { cx } from '../lib/cx';
 
 interface PosterSectionProps {
   publicCode: string;
@@ -43,43 +45,43 @@ export function PosterSection({ publicCode, phoneLast4, state, onLinked }: Poste
   };
 
   return (
-    <section className="block">
-      <div className="eyebrow">Poster</div>
-      <p className={`poster-state poster-state--${state === 'LINKED' ? 'linked' : 'unlinked'}`}>
+    <section className="flex flex-col gap-2 rounded-md border border-line p-4">
+      <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Poster</div>
+      <p className={cx("font-bold before:mr-2 before:inline-block before:size-[9px] before:rounded-full before:content-['']", state === 'LINKED' ? 'before:bg-black' : 'before:bg-terracotta')}>
         {state === 'LINKED' ? 'Poster bilan bog‘langan' : 'Poster bilan bog‘lanmagan'}
       </p>
 
       {state === 'NOT_LINKED' && (
         <>
-          <p className="hint">
+          <p className="text-[13px] text-muted">
             Poster kassada mijozni telefon raqamining oxirgi 4 raqami{phoneLast4 ? ` (${phoneLast4})` : ''} yoki ismi bo‘yicha qo‘lda tanlang.
           </p>
 
           {!candidates && (
-            <button className="button button--secondary" disabled={busy} onClick={findMatches} type="button">
+            <Button disabled={busy} onClick={findMatches} variant="secondary">
               {busy ? 'Qidirilmoqda...' : 'Poster mijozni topish'}
-            </button>
+            </Button>
           )}
 
-          {candidates && candidates.candidates.length === 0 && <p className="hint">Poster’da mos mijoz topilmadi.</p>}
+          {candidates && candidates.candidates.length === 0 && <p className="text-[13px] text-muted">Poster’da mos mijoz topilmadi.</p>}
 
-          {candidates && candidates.candidates.length > 1 && <p className="hint hint--strong">Bir nechta Poster mijoz topildi. To‘g‘risini tanlang.</p>}
+          {candidates && candidates.candidates.length > 1 && <p className="text-[13px] font-bold text-black">Bir nechta Poster mijoz topildi. To‘g‘risini tanlang.</p>}
 
           {candidates?.candidates.map((candidate) => (
-            <div className="candidate" key={candidate.choice}>
+            <div className="flex items-center justify-between gap-3 rounded-sm border border-line px-3 py-2.5" key={candidate.choice}>
               <div>
-                <div className="candidate__name">{candidate.displayName}</div>
-                <div className="hint">•••• {candidate.phoneLast4}</div>
+                <div className="font-semibold">{candidate.displayName}</div>
+                <div className="text-[13px] text-muted">•••• {candidate.phoneLast4}</div>
               </div>
-              <button className="button button--primary button--compact" disabled={busy} onClick={() => link(candidate.choice)} type="button">
+              <Button disabled={busy} onClick={() => link(candidate.choice)} size="compact" variant="primary">
                 Bog‘lash
-              </button>
+              </Button>
             </div>
           ))}
         </>
       )}
 
-      {error && <p className="error-text">{error}</p>}
+      {error && <p className="text-[14px] font-semibold text-terracotta-deep">{error}</p>}
     </section>
   );
 }

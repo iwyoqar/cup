@@ -4,6 +4,8 @@ import { PosterSection } from '../components/PosterSection';
 import { ApiError, toUserMessage } from '../lib/api';
 import { goScan } from '../lib/route';
 import { CustomerProfile, fetchProfile, Scope, StaffProfile } from '../lib/staffApi';
+import { Button } from '../components/ui';
+import { cx } from '../lib/cx';
 
 type State = { kind: 'loading' } | { kind: 'error'; status: number; message: string } | { kind: 'ready'; profile: CustomerProfile };
 
@@ -43,29 +45,29 @@ export function ProfilePage({ code, staff, onSessionExpired }: { code: string; s
 
   if (state.kind === 'loading') {
     return (
-      <div className="profile" aria-busy="true">
-        <div className="skeleton skeleton--head" />
-        <div className="skeleton" />
-        <div className="skeleton" />
+      <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-3 px-4 pt-4 pb-8" aria-busy="true">
+        <div className="h-[190px] animate-staff-pulse rounded-md bg-cream" />
+        <div className="h-[140px] animate-staff-pulse rounded-md bg-skeleton" />
+        <div className="h-[140px] animate-staff-pulse rounded-md bg-skeleton" />
       </div>
     );
   }
 
   if (state.kind === 'error') {
     return (
-      <div className="profile">
-        <section className="block">
-          <div className="eyebrow">Xatolik</div>
-          <p className="error-text">{state.message}</p>
-          <div className="actions">
+      <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-3 px-4 pt-4 pb-8">
+        <section className="flex flex-col gap-2 rounded-md border border-line p-4">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Xatolik</div>
+          <p className="text-[14px] font-semibold text-terracotta-deep">{state.message}</p>
+          <div className="flex flex-wrap gap-2.5">
             {state.status !== 404 && (
-              <button className="button button--primary" onClick={() => void load(false)} type="button">
+              <Button onClick={() => void load(false)} variant="primary">
                 Qayta urinish
-              </button>
+              </Button>
             )}
-            <button className="button button--secondary" onClick={goScan} type="button">
+            <Button onClick={goScan} variant="secondary">
               Skanerlashga qaytish
-            </button>
+            </Button>
           </div>
         </section>
       </div>
@@ -77,30 +79,30 @@ export function ProfilePage({ code, staff, onSessionExpired }: { code: string; s
   const viewingAll = profile.scope.kind === 'ALL';
 
   return (
-    <div className="profile">
+    <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-3 px-4 pt-4 pb-8">
       <HeaderCard busy={busy} onRefresh={() => void load(true)} profile={profile} />
 
       {refreshError && (
-        <div className="banner" role="alert">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-sm border-[1.5px] border-terracotta-deep px-3 py-2.5 font-semibold text-terracotta-deep" role="alert">
           <span>{refreshError}</span>
-          <button className="button button--secondary button--compact" onClick={() => void load(true)} type="button">
+          <Button onClick={() => void load(true)} size="compact" variant="secondary">
             Qayta urinish
-          </button>
+          </Button>
         </div>
       )}
 
       {hasBranch && (
-        <div className="scopebar" role="group" aria-label="Filial ko‘rinishi">
-          <button aria-pressed={!viewingAll} className={`scopebar__btn${!viewingAll ? ' scopebar__btn--on' : ''}`} onClick={() => setScope('branch')} type="button">
+        <div className="flex overflow-hidden rounded-sm border-[1.5px] border-black" role="group" aria-label="Filial ko‘rinishi">
+          <button aria-pressed={!viewingAll} className={cx('font-[inherit] leading-[inherit] min-h-12 flex-1 cursor-pointer text-[14px] font-bold border-0', !viewingAll ? 'bg-black text-cream' : 'bg-white')} onClick={() => setScope('branch')} type="button">
             Mening filialim
           </button>
-          <button aria-pressed={viewingAll} className={`scopebar__btn${viewingAll ? ' scopebar__btn--on' : ''}`} onClick={() => setScope('all')} type="button">
+          <button aria-pressed={viewingAll} className={cx('font-[inherit] leading-[inherit] min-h-12 flex-1 cursor-pointer text-[14px] font-bold border-y-0 border-r-0 border-l-[1.5px] border-black', viewingAll ? 'bg-black text-cream' : 'bg-white')} onClick={() => setScope('all')} type="button">
             Barcha filiallar
           </button>
         </div>
       )}
 
-      <div className="profile__grid">
+      <div className="grid grid-cols-1 items-start gap-3 min-[700px]:grid-cols-2">
         <RewardsCard rewards={profile.rewards} />
         <LoyaltyCard loyalty={profile.loyalty} />
         <PromotionsCard promotions={profile.promotions} />
@@ -111,13 +113,13 @@ export function ProfilePage({ code, staff, onSessionExpired }: { code: string; s
 
       <PosterSection onLinked={() => void load(true)} phoneLast4={profile.identity.phoneMasked ? profile.identity.phoneMasked.slice(-4) : null} publicCode={profile.identity.publicCode} state={profile.identity.poster.state} />
 
-      <p className="footnote">
+      <p className="text-[12px] leading-[1.5] text-muted">
         Bu ekran faqat ma‘lumot beradi — ball, bonus, xarid yoki taklif qo‘shmaydi. Xaridlar Poster kassasida amalga oshiriladi; CUP buyurtmalari va Poster’dan import qilingan xaridlar hisobga olinadi.
       </p>
 
-      <button className="button button--primary" onClick={goScan} type="button">
+      <Button onClick={goScan} variant="primary">
         Keyingi mijoz
-      </button>
+      </Button>
     </div>
   );
 }

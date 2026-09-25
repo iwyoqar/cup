@@ -84,8 +84,8 @@ export function App() {
 
   if (phase === 'booting') {
     return (
-      <div className="login-screen">
-        <div style={{ width: 200 }}>
+      <div className="flex min-h-dvh items-center justify-center bg-black bg-[radial-gradient(60rem_30rem_at_50%_-10%,color-mix(in_srgb,var(--color-terracotta)_18%,transparent),transparent)] px-4 py-6">
+        <div className="w-[200px]">
           <LoadingState variant="inline" />
         </div>
       </div>

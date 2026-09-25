@@ -3,7 +3,7 @@ import { fetchImportHistory, fetchSyncStatus, fetchWebhookEvents } from '../lib/
 import { errorMessage } from '../lib/errors';
 import { formatAgo, formatDateTime } from '../lib/format';
 import { AdminPage, findNav } from '../lib/nav';
-import { Column, DataTable, EmptyState, ErrorState, FilterBar, FilterField, LoadingState, PageHeader, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
+import { Button, Column, DataTable, EmptyState, ErrorState, FilterBar, FilterField, LoadingState, PageHeader, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
 
 type Severity = 'error' | 'warning';
 
@@ -77,10 +77,10 @@ export function ErrorsPage({ onNavigate }: { onNavigate: (page: AdminPage) => vo
 
   const columns: Column<ErrorRow>[] = [
     { key: 'sev', header: 'Severity', cell: (r) => <StatusBadge dot tone={r.severity === 'error' ? 'err' : 'warn'}>{r.severity === 'error' ? 'Error' : 'Warning'}</StatusBadge> },
-    { key: 'msg', header: 'What happened', cell: (r) => <span className="table__primary">{r.message}</span> },
+    { key: 'msg', header: 'What happened', cell: (r) => <span className="font-semibold text-black">{r.message}</span> },
     { key: 'cat', header: 'Category', low: true, cell: (r) => r.category },
     { key: 'src', header: 'Source', low: true, cell: (r) => r.source },
-    { key: 'at', header: 'When', low: true, cell: (r) => (r.at ? <>{formatDateTime(r.at)}<span className="table__sub">{formatAgo(r.at)}</span></> : '—') },
+    { key: 'at', header: 'When', low: true, cell: (r) => (r.at ? <>{formatDateTime(r.at)}<span className="mt-0.5 block text-xs font-normal text-muted">{formatAgo(r.at)}</span></> : '—') },
     { key: 'status', header: 'Status', cell: (r) => <StatusBadge tone={r.status === 'Open' ? 'info' : 'ok'}>{r.status}</StatusBadge> },
   ];
 
@@ -89,12 +89,12 @@ export function ErrorsPage({ onNavigate }: { onNavigate: (page: AdminPage) => vo
       <PageHeader
         actions={
           <>
-            <button className="button-secondary" onClick={() => onNavigate('continuous-sync')} type="button">
+            <Button onClick={() => onNavigate('continuous-sync')} variant="secondary">
               Open Continuous Sync
-            </button>
-            <button className="button-secondary" disabled={loading} onClick={load} type="button">
+            </Button>
+            <Button disabled={loading} onClick={load} variant="secondary">
               {loading ? 'Loading…' : 'Refresh'}
-            </button>
+            </Button>
           </>
         }
         description={item.description}
@@ -114,17 +114,17 @@ export function ErrorsPage({ onNavigate }: { onNavigate: (page: AdminPage) => vo
           </StatGrid>
 
           {moreDead > 0 && (
-            <div className="callout callout--warn">
+            <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-terracotta bg-cream-soft text-warn">
               {moreDead} more dead webhook event{moreDead === 1 ? '' : 's'} are not listed here — open Continuous Sync to see and retry all of them.
             </div>
           )}
-          {failedSources.length > 0 && <div className="callout callout--warn">Could not read: {failedSources.join(', ')}. The list below may be incomplete.</div>}
+          {failedSources.length > 0 && <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-terracotta bg-cream-soft text-warn">Could not read: {failedSources.join(', ')}. The list below may be incomplete.</div>}
 
           <SectionCard
             actions={
               <FilterBar>
                 <FilterField label="Severity">
-                  <select className="select" onChange={(e) => setSeverity(e.target.value as '' | Severity)} value={severity}>
+                  <select className="" onChange={(e) => setSeverity(e.target.value as '' | Severity)} value={severity}>
                     <option value="">All</option>
                     <option value="error">Errors</option>
                     <option value="warning">Warnings</option>

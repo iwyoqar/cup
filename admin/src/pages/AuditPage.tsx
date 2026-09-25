@@ -3,7 +3,7 @@ import { fetchImportHistory, fetchWebhookEvents, ImportHistoryPage } from '../li
 import { errorMessage } from '../lib/errors';
 import { formatDateTime, formatSom } from '../lib/format';
 import { findNav } from '../lib/nav';
-import { Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, Pagination, SectionCard, StatusBadge, Tabs } from '../ui';
+import { Button, Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, Pagination, SectionCard, StatusBadge, Tabs } from '../ui';
 import { WebhookEventsPage } from '../lib/adminPosterImport';
 
 type Tab = 'imports' | 'webhooks';
@@ -47,19 +47,19 @@ export function AuditPage() {
 
   const importCols: Column<ImportRow>[] = [
     { key: 'when', header: 'When', cell: (r) => formatDateTime(r.importedAt) },
-    { key: 'action', header: 'Action', cell: (r) => <span className="table__primary">{r.status === 'IMPORTED' ? 'Receipt imported' : 'Receipt held'}</span> },
-    { key: 'target', header: 'Target', cell: (r) => <>Poster #{r.posterTransactionId}<span className="table__sub">{r.branchName} · {r.customerName ?? 'no customer'}</span></> },
+    { key: 'action', header: 'Action', cell: (r) => <span className="font-semibold text-black">{r.status === 'IMPORTED' ? 'Receipt imported' : 'Receipt held'}</span> },
+    { key: 'target', header: 'Target', cell: (r) => <>Poster #{r.posterTransactionId}<span className="mt-0.5 block text-xs font-normal text-muted">{r.branchName} · {r.customerName ?? 'no customer'}</span></> },
     { key: 'amount', header: 'Paid', numeric: true, low: true, cell: (r) => formatSom(r.paidMinor) },
     { key: 'source', header: 'Source', low: true, cell: (r) => r.source },
-    { key: 'result', header: 'Result', cell: (r) => (r.status === 'IMPORTED' ? <StatusBadge tone="ok">Imported</StatusBadge> : <><StatusBadge tone="warn">Unresolved</StatusBadge>{r.unresolvedReason && <span className="table__sub">{r.unresolvedReason}</span>}</>) },
+    { key: 'result', header: 'Result', cell: (r) => (r.status === 'IMPORTED' ? <StatusBadge tone="ok">Imported</StatusBadge> : <><StatusBadge tone="warn">Unresolved</StatusBadge>{r.unresolvedReason && <span className="mt-0.5 block text-xs font-normal text-muted">{r.unresolvedReason}</span>}</>) },
   ];
 
   const hookCols: Column<WebhookRow>[] = [
     { key: 'when', header: 'When', cell: (r) => formatDateTime(r.receivedAt) },
-    { key: 'action', header: 'Action', cell: (r) => <span className="table__primary">Webhook: {r.action}</span> },
+    { key: 'action', header: 'Action', cell: (r) => <span className="font-semibold text-black">Webhook: {r.action}</span> },
     { key: 'target', header: 'Target', cell: (r) => `Poster #${r.transactionId}` },
     { key: 'source', header: 'Source', low: true, cell: () => 'Poster (webhook)' },
-    { key: 'result', header: 'Result', cell: (r) => <>{r.outcome ? OUTCOME[r.outcome] ?? r.outcome : r.status === 'DEAD' ? 'Failed' : 'Pending'}{r.lastError && <span className="table__sub">{r.lastError}</span>}</> },
+    { key: 'result', header: 'Result', cell: (r) => <>{r.outcome ? OUTCOME[r.outcome] ?? r.outcome : r.status === 'DEAD' ? 'Failed' : 'Pending'}{r.lastError && <span className="mt-0.5 block text-xs font-normal text-muted">{r.lastError}</span>}</> },
     { key: 'status', header: 'Status', low: true, cell: (r) => (r.status === 'DONE' ? <StatusBadge tone="ok">Done</StatusBadge> : r.status === 'DEAD' ? <StatusBadge tone="err">Dead</StatusBadge> : <StatusBadge>{r.status === 'QUEUED' ? 'Waiting' : 'Processing'}</StatusBadge>) },
   ];
 
@@ -69,9 +69,9 @@ export function AuditPage() {
     <>
       <PageHeader
         actions={
-          <button className="button-secondary" disabled={loading} onClick={() => setTick((t) => t + 1)} type="button">
+          <Button disabled={loading} onClick={() => setTick((t) => t + 1)} variant="secondary">
             {loading ? 'Loading…' : 'Refresh'}
-          </button>
+          </Button>
         }
         description={item.description}
         title={item.label}
@@ -90,7 +90,7 @@ export function AuditPage() {
         ]}
       />
 
-      <div className="callout">Admin actions and staff scans are not exposed to the Admin by the API yet, so they are not part of this trail.</div>
+      <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">Admin actions and staff scans are not exposed to the Admin by the API yet, so they are not part of this trail.</div>
 
       {error && <ErrorState message={error} onRetry={() => setTick((t) => t + 1)} title="The audit trail could not be loaded" />}
 

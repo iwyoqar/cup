@@ -3,6 +3,7 @@ import { createSegment, SegmentInput, updateSegment } from '../lib/adminSegments
 import { ApiError } from '../lib/api';
 import { Segment, SegmentCondition } from '../lib/types';
 import { SegmentConditionBuilder } from './SegmentConditionBuilder';
+import { Button } from '../ui';
 
 interface SegmentFormProps {
   existing?: Segment; // present when editing, absent when creating
@@ -53,17 +54,17 @@ export function SegmentForm({ existing, onSaved, onCancel }: SegmentFormProps) {
     <form onSubmit={handleSubmit}>
       <h1>{existing ? 'Edit segment' : 'Create segment'}</h1>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="segment-name">Name</label>
         <input id="segment-name" onChange={(e) => setName(e.target.value)} type="text" value={name} />
       </div>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="segment-description">Description</label>
         <input id="segment-description" onChange={(e) => setDescription(e.target.value)} type="text" value={description} />
       </div>
 
-      <div className="field" style={{ maxWidth: 200 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[200px]">
         <label htmlFor="segment-logic">Logic</label>
         <select id="segment-logic" onChange={(e) => setLogic(e.target.value as 'AND' | 'OR')} value={logic}>
           <option value="AND">Match ALL conditions (AND)</option>
@@ -75,18 +76,18 @@ export function SegmentForm({ existing, onSaved, onCancel }: SegmentFormProps) {
       <SegmentConditionBuilder conditions={conditions} onChange={setConditions} />
 
       {error && (
-        <p className="error-text" style={{ marginTop: 16 }}>
+        <p className="text-[13px] font-semibold text-err mt-4">
           {error}
         </p>
       )}
 
-      <div className="settings-footer">
-        <button className="button-primary" disabled={isSaving} type="submit">
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <Button disabled={isSaving} type="submit" variant="primary">
           {isSaving ? 'Saving...' : 'Save'}
-        </button>
-        <button className="button-secondary" disabled={isSaving} onClick={onCancel} type="button">
+        </Button>
+        <Button disabled={isSaving} onClick={onCancel} variant="secondary">
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -3,7 +3,7 @@ import { formatSom } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { ReportsEmployeesOverview } from '../lib/reportsTypes';
 import { rangeParams, useReport } from '../lib/useReport';
-import { Column, DataTable, DateRangePicker, DateRangeValue, EmptyState, FilterBar, isRangeReady, PageHeader, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
+import { Button, Column, DataTable, DateRangePicker, DateRangeValue, EmptyState, FilterBar, isRangeReady, PageHeader, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
 import { Notes, num, PeriodHint, ReportBody } from './reportsShared';
 import { SortSelect, SortState } from './reportsProductShared';
 
@@ -21,7 +21,7 @@ const columns: Column<Row>[] = [
     key: 'name',
     header: 'Employee',
     cell: (r) => (
-      <span className="table__primary">
+      <span className="font-semibold text-black">
         {r.employeeName}
         {r.inEmployeeList === false && ' · Historical / Unknown'}
       </span>
@@ -50,7 +50,7 @@ export function ReportsEmployeesPage() {
         <DateRangePicker onChange={setRange} value={range} />
         <SortSelect onChange={setSort} options={SORT_OPTIONS} value={sort} />
         <PeriodHint loading={loading} period={data?.period} />
-        <span style={{ alignSelf: 'center' }}>
+        <span className="self-center">
           <StatusBadge>Source: Poster POS</StatusBadge>
         </span>
       </FilterBar>
@@ -59,7 +59,7 @@ export function ReportsEmployeesPage() {
         {(d) =>
           !d.available || !d.summary ? (
             <SectionCard title="Employee sales">
-              <EmptyState action={<button className="button-secondary" onClick={reload} type="button">Try again</button>} text={d.unavailableReason === 'malformed_response' ? 'Poster returned a report CUP could not read reliably, so no figures are shown.' : 'Poster could not be reached. No figures are shown rather than zeros.'} title="Employee report is temporarily unavailable." variant="inline" />
+              <EmptyState action={<Button onClick={reload} variant="secondary">Try again</Button>} text={d.unavailableReason === 'malformed_response' ? 'Poster returned a report CUP could not read reliably, so no figures are shown.' : 'Poster could not be reached. No figures are shown rather than zeros.'} title="Employee report is temporarily unavailable." variant="inline" />
             </SectionCard>
           ) : (
             <>

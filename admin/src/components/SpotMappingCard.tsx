@@ -1,5 +1,5 @@
 import { SpotMappingReport } from '../lib/adminPosterImport';
-import { Column, DataTable, EmptyState, ErrorState, LoadingState, SectionCard, StatusBadge } from '../ui';
+import { Button, Column, DataTable, EmptyState, ErrorState, LoadingState, SectionCard, StatusBadge, cx } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
 type Spot = SpotMappingReport['spots'][number];
@@ -17,7 +17,7 @@ interface SpotMappingCardProps {
 // of the staged import) and Branch Configuration, so the two can never disagree.
 export function SpotMappingCard({ title, description, mapping, loading, error, onReload }: SpotMappingCardProps) {
   const columns: Column<Spot>[] = [
-    { key: 'spot', header: 'Poster spot', cell: (s) => <span className="table__primary">#{s.posterSpotId}</span> },
+    { key: 'spot', header: 'Poster spot', cell: (s) => <span className="font-semibold text-black">#{s.posterSpotId}</span> },
     { key: 'name', header: 'Poster name', low: true, cell: (s) => s.posterName ?? '—' },
     {
       key: 'branch',
@@ -25,8 +25,8 @@ export function SpotMappingCard({ title, description, mapping, loading, error, o
       cell: (s) => (
         <>
           {s.branch ? s.branch.name : '—'}
-          {s.branch && !s.branch.isActive && <span className="table__sub">Branch is inactive</span>}
-          {s.nameDiffers && <span className="table__sub">Name differs from Poster (the id mapping is what counts)</span>}
+          {s.branch && !s.branch.isActive && <span className="mt-0.5 block text-xs font-normal text-muted">Branch is inactive</span>}
+          {s.nameDiffers && <span className="mt-0.5 block text-xs font-normal text-muted">Name differs from Poster (the id mapping is what counts)</span>}
         </>
       ),
     },
@@ -52,9 +52,9 @@ export function SpotMappingCard({ title, description, mapping, loading, error, o
   return (
     <SectionCard
       actions={
-        <button className="button-secondary button--sm" disabled={loading} onClick={onReload} type="button">
+        <Button disabled={loading} onClick={onReload} size="sm" variant="secondary">
           {loading ? 'Checking…' : 'Re-check'}
-        </button>
+        </Button>
       }
       description={description}
       title={title}
@@ -63,25 +63,25 @@ export function SpotMappingCard({ title, description, mapping, loading, error, o
       {!mapping && !error && <LoadingState variant="table" rows={3} />}
       {mapping && (
         <>
-          <div className={`callout ${mapping.importReady ? 'callout--ok' : 'callout--warn'}`}>
+          <div className={cx('block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0', mapping.importReady ? 'border-ok bg-ok-bg text-ok' : 'border-terracotta bg-cream-soft text-warn')}>
             {mapping.importReady ? 'Every Poster spot maps to exactly one active CUP branch.' : 'Some Poster spots are not ready: receipts from them will not be imported.'}
           </div>
           <DataTable boxed columns={columns} empty={<EmptyState text="Poster reported no spots." title="No spots" variant="inline" />} rowKey={(s) => String(s.posterSpotId)} rows={mapping.spots} />
           {mapping.unmappedBranches.length > 0 && (
-            <div className="stack stack--tight">
+            <div className="flex min-w-0 flex-col gap-2">
               <strong>CUP branches without a Poster spot</strong>
               {mapping.unmappedBranches.map((b) => (
-                <div className="row row--between" key={b.id}>
+                <div className="flex flex-wrap items-center gap-2 justify-between" key={b.id}>
                   <span>
                     {b.name} (spot #{b.posterSpotId}){b.isActive ? '' : ' — inactive'}
                   </span>
-                  <span className="hint-text">{number(b.orders)} orders</span>
+                  <span className="text-[13px] leading-snug text-muted">{number(b.orders)} orders</span>
                 </div>
               ))}
             </div>
           )}
           {mapping.rules.length > 0 && (
-            <ul className="hint-text" style={{ margin: 0, paddingLeft: 18 }}>
+            <ul className="text-[13px] leading-snug text-muted m-0 pl-4.5">
               {mapping.rules.map((r) => (
                 <li key={r}>{r}</li>
               ))}

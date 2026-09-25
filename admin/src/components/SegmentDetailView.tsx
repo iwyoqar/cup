@@ -3,6 +3,7 @@ import { deleteSegment, fetchSegment, fetchSegmentCustomers } from '../lib/admin
 import { ApiError } from '../lib/api';
 import { formatDateTime, formatSom } from '../lib/format';
 import { Segment, SEGMENT_FIELD_META, SEGMENT_OPERATOR_LABELS, SegmentMatchingCustomer } from '../lib/types';
+import { Button, tableClass } from '../ui';
 
 interface SegmentDetailViewProps {
   segmentId: string;
@@ -68,24 +69,24 @@ export function SegmentDetailView({ segmentId, onBack, onEdit, onDeleted }: Segm
 
   return (
     <div>
-      <button className="button-secondary" onClick={onBack} type="button" style={{ marginBottom: 16 }}>
+      <Button onClick={onBack} className="mb-4" variant="secondary">
         ← Back to segments
-      </button>
+      </Button>
 
-      {error && <p className="error-text">{error}</p>}
-      {!segment && !error && <p className="hint-text">Loading...</p>}
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      {!segment && !error && <p className="text-[13px] leading-snug text-muted">Loading...</p>}
 
       {segment && (
         <>
           <h1>{segment.name}</h1>
-          {segment.description && <p className="hint-text">{segment.description}</p>}
-          <p className="hint-text">{segment.isActive ? 'Active' : 'Inactive'}</p>
+          {segment.description && <p className="text-[13px] leading-snug text-muted">{segment.description}</p>}
+          <p className="text-[13px] leading-snug text-muted">{segment.isActive ? 'Active' : 'Inactive'}</p>
 
-          <div className="settings-card">
-            <h3 style={{ margin: 0 }}>Conditions ({segment.logic === 'AND' ? 'match ALL' : 'match ANY'})</h3>
+          <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+            <h3 className="m-0">Conditions ({segment.logic === 'AND' ? 'match ALL' : 'match ANY'})</h3>
             {segment.conditions.map((condition, index) => (
-              <div className="settings-row" key={index}>
-                <span className="settings-row__label">{SEGMENT_FIELD_META[condition.field].label}</span>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0" key={index}>
+                <span className="text-sm font-semibold">{SEGMENT_FIELD_META[condition.field].label}</span>
                 <span>
                   {SEGMENT_OPERATOR_LABELS[condition.operator]} {condition.value}
                   {SEGMENT_FIELD_META[condition.field].valueType === 'number' &&
@@ -97,60 +98,54 @@ export function SegmentDetailView({ segmentId, onBack, onEdit, onDeleted }: Segm
             ))}
           </div>
 
-          <div className="settings-footer">
-            <button className="button-primary" onClick={() => onEdit(segment)} type="button">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Button onClick={() => onEdit(segment)} variant="primary">
               Edit
-            </button>
-            <button className="button-secondary" disabled={isDeleting} onClick={handleDelete} type="button">
+            </Button>
+            <Button disabled={isDeleting} onClick={handleDelete} variant="secondary">
               {isDeleting ? 'Deleting...' : 'Delete'}
-            </button>
+            </Button>
           </div>
 
           <h3>Matching customers</h3>
           {customers === null ? (
-            <p className="hint-text">Loading...</p>
+            <p className="text-[13px] leading-snug text-muted">Loading...</p>
           ) : customers.length === 0 ? (
-            <p className="hint-text">No customers currently match this segment.</p>
+            <p className="text-[13px] leading-snug text-muted">No customers currently match this segment.</p>
           ) : (
             <>
-              <table className="data-table">
+              <table className={tableClass.table}>
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>Orders</th>
-                    <th>Total spent</th>
-                    <th>Average order</th>
-                    <th>Last order</th>
-                    <th>Favorite branch</th>
-                    <th>Loyalty</th>
+                    <th className={tableClass.th}>Name</th>
+                    <th className={tableClass.th}>Phone</th>
+                    <th className={tableClass.th}>Orders</th>
+                    <th className={tableClass.th}>Total spent</th>
+                    <th className={tableClass.th}>Average order</th>
+                    <th className={tableClass.th}>Last order</th>
+                    <th className={tableClass.th}>Favorite branch</th>
+                    <th className={tableClass.th}>Loyalty</th>
                   </tr>
                 </thead>
                 <tbody>
                   {customers.map((customer) => (
-                    <tr key={customer.id}>
-                      <td>{customer.displayName ?? '—'}</td>
-                      <td>{customer.phone ?? '—'}</td>
-                      <td>{customer.orderCount}</td>
-                      <td>{formatSom(customer.totalSpentMinor)}</td>
-                      <td>{formatSom(customer.averageOrderMinor)}</td>
-                      <td>{customer.lastOrderAt ? formatDateTime(customer.lastOrderAt) : '—'}</td>
-                      <td>{customer.favoriteBranch ?? '—'}</td>
-                      <td>{customer.loyaltyBalance.toLocaleString('ru-RU')}</td>
+                    <tr className={tableClass.tr} key={customer.id}>
+                      <td className={tableClass.td}>{customer.displayName ?? '—'}</td>
+                      <td className={tableClass.td}>{customer.phone ?? '—'}</td>
+                      <td className={tableClass.td}>{customer.orderCount}</td>
+                      <td className={tableClass.td}>{formatSom(customer.totalSpentMinor)}</td>
+                      <td className={tableClass.td}>{formatSom(customer.averageOrderMinor)}</td>
+                      <td className={tableClass.td}>{customer.lastOrderAt ? formatDateTime(customer.lastOrderAt) : '—'}</td>
+                      <td className={tableClass.td}>{customer.favoriteBranch ?? '—'}</td>
+                      <td className={tableClass.td}>{customer.loyaltyBalance.toLocaleString('ru-RU')}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {nextCursor && (
-                <button
-                  className="button-secondary"
-                  disabled={isLoadingMore}
-                  onClick={handleLoadMore}
-                  style={{ marginTop: 12 }}
-                  type="button"
-                >
+                <Button disabled={isLoadingMore} onClick={handleLoadMore} className="mt-3" variant="secondary">
                   {isLoadingMore ? 'Loading...' : 'Load more'}
-                </button>
+                </Button>
               )}
             </>
           )}

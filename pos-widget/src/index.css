@@ -1,0 +1,50 @@
+/* CUP POS widget — compact, touch-first, POS-popup sized (~520 x 600). Brand: black / cream / terracotta, the same tokens as the Mini App
+   and the Staff panel (Tailwind CSS v4).
+
+   This stylesheet is injected into Poster's POS page (vite-plugin-css-injected-by-js), so two things differ from the other apps:
+   - Utilities are NOT wrapped in a cascade layer. Any unlayered CSS on Poster's page would beat every layered rule regardless of
+     specificity; unlayered utilities keep the same footing the widget's old hand-written CSS had.
+   - The theme is `inline`: utilities carry their literal values instead of reading `--color-*` / `--spacing` variables from :root,
+     so nothing on Poster's page can re-theme the widget through a same-named custom property.
+   Tailwind's preflight is deliberately not imported. */
+@import 'tailwindcss/theme.css' layer(theme) theme(inline);
+@import 'tailwindcss/utilities.css';
+
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-black: #0b0b0b;
+  --color-white: #ffffff;
+  --color-terracotta: #d84b1f;
+  --color-terracotta-deep: #b23a12;
+  --color-cream: #f6ddb0;
+  --color-muted: #6f6a63;
+  --color-muted-cream: #57524b;
+  --color-line: rgb(11 11 11 / 0.14);
+  --color-ready: #4caf50; /* header dot: the widget is connected and showing a customer */
+
+  --radius-xl: 12px;
+
+  --animate-cw-pulse: cwpulse 1.3s ease-in-out infinite;
+
+  @keyframes cwpulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+}
+
+/* The host container Poster provides (or main.tsx creates): page font and colour for everything inside the widget. */
+#app-container {
+  font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: #0b0b0b;
+  font-size: 16px;
+  line-height: 1.35;
+  -webkit-text-size-adjust: 100%;
+}
+#app-container *,
+#app-container *::before,
+#app-container *::after {
+  box-sizing: border-box;
+}

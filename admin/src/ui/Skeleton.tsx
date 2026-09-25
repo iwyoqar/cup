@@ -3,7 +3,7 @@ import { cx } from './cx';
 
 // Loading placeholders in the CUP skeleton tone (#F1ECE4) with a gentle shimmer (static under reduced motion).
 export function Skeleton({ className, style }: { className?: string; style?: CSSProperties }) {
-  return <div aria-hidden="true" className={cx('skeleton', className)} style={style} />;
+  return <div aria-hidden="true" className={cx('animate-shimmer rounded-sm bg-skeleton', className)} style={style} />;
 }
 
 export function CardSkeleton({ className }: { className?: string }) {

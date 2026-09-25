@@ -2,7 +2,7 @@ import { forwardRef, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, Texta
 import { cx } from './cx';
 import { Icon } from './icons';
 
-// Form controls — pure Tailwind (no ui/components.css `.input`/`.select`). Shared field chrome (border/hover/focus
+// Form controls — pure Tailwind. Shared field chrome (border/hover/focus
 // ring/disabled/invalid) lives in FIELD_BASE so Input/Select/Textarea render identically to before.
 const FIELD_BASE =
   'h-10 min-w-0 rounded-sm border border-line-strong bg-white px-3 text-sm text-black transition-[border-color,box-shadow] duration-150 ease-out hover:not-disabled:border-black/30 disabled:cursor-not-allowed disabled:bg-neutral-bg disabled:text-muted placeholder:text-muted/70 focus:border-terracotta focus:outline-none focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-terracotta)_18%,transparent)] aria-invalid:border-err';

@@ -15,7 +15,18 @@ import {
   startRedeem,
   useWidget,
 } from './store';
+import type { Phase } from './store';
+import { cx } from './cx';
 import type { EligibleRewardProduct, ErrorKind, Overview, PromotionRedemptionFailureReason, PromotionView, RedemptionFailureReason, RewardProgramView } from './types';
+
+// Header status dot per widget phase — #4caf50 is the one "ready" green the widget uses (a colour Poster staff read at a glance).
+const PHASE_DOT: Record<Phase, string> = {
+  NO_POSTER: 'bg-terracotta',
+  IDLE: 'bg-[#8b857c]',
+  LOADING: 'bg-cream',
+  READY: 'bg-ready',
+  ERROR: 'bg-terracotta',
+};
 
 const formatSom = (n: number) => `${n.toLocaleString('ru-RU')} so'm`;
 
@@ -44,14 +55,14 @@ const ERROR_TEXT: Record<ErrorKind, { title: string; hint: string; retry: boolea
 export function App() {
   const w = useWidget();
   return (
-    <div className="cw">
-      <header className="cw__head">
-        <span className="cw__brand">CUP</span>
-        <span className="cw__who">{w.posterClient?.name ?? w.overview?.customer?.displayName ?? ''}</span>
-        <span className={`cw__dot cw__dot--${w.phase.toLowerCase()}`} title={w.phase} />
+    <div className="flex h-[min(100vh,560px)] flex-col overflow-hidden bg-[#faf7f2]">
+      <header className="flex items-center gap-2.5 bg-black px-3.5 py-2.5 text-white">
+        <span className="font-extrabold tracking-[0.18em] text-cream">CUP</span>
+        <span className="min-w-0 flex-1 overflow-hidden text-[15px] text-ellipsis whitespace-nowrap">{w.posterClient?.name ?? w.overview?.customer?.displayName ?? ''}</span>
+        <span className={cx('size-2.5 rounded-full', PHASE_DOT[w.phase])} title={w.phase} />
       </header>
 
-      <main className="cw__body">
+      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3.5 py-3 [-webkit-overflow-scrolling:touch]">
         {w.phase === 'NO_POSTER' && <Notice tone="warn" title="Poster konteksti topilmadi" hint="Vidjet Poster kassasi ichida ishga tushirilishi kerak. Poster ishiga ta’sir qilmaydi." />}
         {w.phase === 'IDLE' && <Idle />}
         {w.phase === 'LOADING' && <Loading />}
@@ -65,10 +76,10 @@ export function App() {
         )}
       </main>
 
-      <footer className="cw__foot">
+      <footer className="flex justify-between gap-2 border-t border-line px-3.5 py-1.5 text-[11px] text-muted">
         <span>{w.employee ?? ''}</span>
         <span>{w.orderItems !== null ? `Buyurtma: ${w.orderItems} ta mahsulot` : ''}</span>
-        <span className="cw__where">{w.where}</span>
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap">{w.where}</span>
       </footer>
     </div>
   );
@@ -79,10 +90,10 @@ export function App() {
 function Idle() {
   const w = useWidget();
   return (
-    <div className="cw__stack">
+    <div className="flex flex-col gap-2.5">
       <Notice tone="muted" title="Mijoz tanlanmagan" hint="Poster buyurtmasiga mijoz qo‘shilganda CUP ma’lumoti o‘zi chiqadi. Yoki quyida qidiring — bu buyurtmaga hech narsa qo‘shmaydi." />
       <Search />
-      {w.inputError && <p className="cw__error">{w.inputError}</p>}
+      {w.inputError && <p className="m-0 text-[14px] font-semibold text-terracotta-deep">{w.inputError}</p>}
     </div>
   );
 }
@@ -90,14 +101,14 @@ function Idle() {
 function Loading() {
   const w = useWidget();
   return (
-    <div className="cw__stack" aria-busy="true">
-      <div className="cw__card cw__card--strong">
-        <div className="cw__label">Mijoz</div>
-        <div className="cw__name">{w.posterClient?.name ?? 'Yuklanmoqda…'}</div>
-        <div className="cw__muted">CUP ma’lumoti olinmoqda…</div>
+    <div className="flex flex-col gap-2.5" aria-busy="true">
+      <div className="rounded-xl border border-black bg-black px-3.5 py-3 text-white">
+        <div className="text-[11px] font-bold tracking-[0.14em] text-cream uppercase">Mijoz</div>
+        <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{w.posterClient?.name ?? 'Yuklanmoqda…'}</div>
+        <div className="text-[14px] text-[#d9d3c8] [overflow-wrap:anywhere]">CUP ma’lumoti olinmoqda…</div>
       </div>
-      <div className="cw__skel" />
-      <div className="cw__skel cw__skel--short" />
+      <div className="h-[84px] animate-cw-pulse rounded-xl bg-[#ece6da]" />
+      <div className="h-[52px] animate-cw-pulse rounded-xl bg-[#ece6da]" />
     </div>
   );
 }
@@ -105,15 +116,15 @@ function Loading() {
 function ErrorView({ kind }: { kind: ErrorKind }) {
   const t = ERROR_TEXT[kind];
   return (
-    <div className="cw__stack">
+    <div className="flex flex-col gap-2.5">
       <Notice tone="warn" title={t.title} hint={t.hint} />
-      <div className="cw__row">
+      <div className="flex flex-wrap gap-2">
         {t.retry && (
-          <button className="cw__btn" onClick={retry} type="button">
+          <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={retry} type="button">
             Qayta urinish
           </button>
         )}
-        <button className="cw__btn cw__btn--ghost" onClick={clearManual} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep" onClick={clearManual} type="button">
           Qidirish
         </button>
       </div>
@@ -125,7 +136,7 @@ function Ready({ overview }: { overview: Overview }) {
   const w = useWidget();
   if (overview.state === 'NOT_FOUND') {
     return (
-      <div className="cw__stack">
+      <div className="flex flex-col gap-2.5">
         <Notice tone="warn" title="Mijoz topilmadi" hint="Bu kod yoki raqam CUP da ro‘yxatdan o‘tmagan. Mijoz CUP ilovasida ro‘yxatdan o‘tishi kerak." />
         <Search />
       </div>
@@ -133,7 +144,7 @@ function Ready({ overview }: { overview: Overview }) {
   }
   if (overview.state === 'AMBIGUOUS') {
     return (
-      <div className="cw__stack">
+      <div className="flex flex-col gap-2.5">
         <Notice tone="warn" title="Bu raqamda bir nechta mijoz bor" hint="Adashmaslik uchun mijozning CUP kodini kiriting (CUP-XXXXXXXX)." />
         <Search />
       </div>
@@ -141,11 +152,11 @@ function Ready({ overview }: { overview: Overview }) {
   }
   if (overview.state === 'NOT_LINKED') {
     return (
-      <div className="cw__stack">
-        <div className="cw__card">
-          <div className="cw__label">Poster mijozi</div>
-          <div className="cw__name">{w.posterClient?.name ?? '—'}</div>
-          {w.posterClient?.phone && <div className="cw__muted">{w.posterClient.phone}</div>}
+      <div className="flex flex-col gap-2.5">
+        <div className="rounded-xl border border-line bg-white px-3.5 py-3">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Poster mijozi</div>
+          <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{w.posterClient?.name ?? '—'}</div>
+          {w.posterClient?.phone && <div className="text-[14px] text-muted [overflow-wrap:anywhere]">{w.posterClient.phone}</div>}
         </div>
         <Notice tone="warn" title="CUP profili bog‘lanmagan" hint="Bu Poster mijozi CUP mijozi bilan bog‘lanmagan, shuning uchun bonus ko‘rsatilmaydi. Mijozdan CUP kodini so‘rab qidiring. Bog‘lash faqat Staff panelda qo‘lda amalga oshiriladi." />
         <Search />
@@ -163,73 +174,73 @@ function Found({ overview }: { overview: Overview }) {
   const availableProgram = rewards?.programs.find((p) => p.available > 0) ?? null;
   const activity = overview.activity;
   return (
-    <div className="cw__stack">
-      <div className="cw__card cw__card--strong">
-        <div className="cw__label">CUP mijozi</div>
-        <div className="cw__name">{c?.displayName ?? 'Ismsiz mijoz'}</div>
-        <div className="cw__muted">
+    <div className="flex flex-col gap-2.5">
+      <div className="rounded-xl border border-black bg-black px-3.5 py-3 text-white">
+        <div className="text-[11px] font-bold tracking-[0.14em] text-cream uppercase">CUP mijozi</div>
+        <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{c?.displayName ?? 'Ismsiz mijoz'}</div>
+        <div className="text-[14px] text-[#d9d3c8] [overflow-wrap:anywhere]">
           {c?.phoneMasked ?? '—'}
-          {c?.code ? <span className="cw__chip">{c.code}</span> : null}
-          {!overview.linkedToPoster && <span className="cw__chip cw__chip--warn">Poster bilan bog‘lanmagan</span>}
+          {c?.code ? <span className="ml-2 inline-block rounded-full border border-white/30 bg-white/18 px-[9px] py-px text-[12px] font-semibold">{c.code}</span> : null}
+          {!overview.linkedToPoster && <span className="ml-2 inline-block rounded-full border border-terracotta bg-terracotta px-[9px] py-px text-[12px] font-semibold text-white">Poster bilan bog‘lanmagan</span>}
         </div>
       </div>
 
       {availableProgram && rewards ? (
-        <div className="cw__card cw__card--reward" role="status">
-          <div className="cw__label">Sovg‘a mavjud</div>
-          <div className="cw__big">{rewards.availableTotal} ta bepul mahsulot mavjud</div>
+        <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Sovg‘a mavjud</div>
+          <div className="mt-1 mb-2 text-[22px] font-bold">{rewards.availableTotal} ta bepul mahsulot mavjud</div>
           <Progress program={availableProgram} />
-          <div className="cw__row">
+          <div className="flex flex-wrap gap-2">
             {/* Phase 22.2: ONE Poster order = max one redemption. w.redeemedOrderId === w.orderId means THIS order already used its one reward (either
                 this click did, or the server already said so) — hide the button rather than let a cashier click into a guaranteed
                 REWARD_ALREADY_REDEEMED_FOR_ORDER. This is UX only; the backend enforces the rule regardless of what the widget shows. */}
             {rewards.redemption.enabled && w.redeemedOrderId !== w.orderId && (
               <button
-                className="cw__btn"
+                className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep"
                 onClick={() => startRedeem(availableProgram.programId, availableProgram.name, availableProgram.eligibleProducts)}
                 type="button"
               >
                 Sovg‘ani ishlatish
               </button>
             )}
-            <button className="cw__btn cw__btn--ghost" onClick={() => setDetails((v) => !v)} type="button" aria-expanded={details}>
+            <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep" onClick={() => setDetails((v) => !v)} type="button" aria-expanded={details}>
               {details ? 'Yopish' : 'Batafsil'}
             </button>
           </div>
           {details && <RewardDetails programs={rewards.programs} />}
-          {!rewards.redemption.enabled && <p className="cw__note">Bu yerda sovg‘a ishlatilmaydi. Hozircha faqat ko‘rsatiladi.</p>}
-          {rewards.redemption.enabled && w.redeemedOrderId === w.orderId && <p className="cw__note">Bu buyurtma uchun sovg‘a allaqachon ishlatilgan.</p>}
+          {!rewards.redemption.enabled && <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Bu yerda sovg‘a ishlatilmaydi. Hozircha faqat ko‘rsatiladi.</p>}
+          {rewards.redemption.enabled && w.redeemedOrderId === w.orderId && <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Bu buyurtma uchun sovg‘a allaqachon ishlatilgan.</p>}
         </div>
       ) : rewards && rewards.programs.length > 0 ? (
-        <div className="cw__card">
-          <div className="cw__label">Sovg‘a</div>
-          <div className="cw__muted">Hozir mavjud sovg‘a yo‘q</div>
+        <div className="rounded-xl border border-line bg-white px-3.5 py-3">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Sovg‘a</div>
+          <div className="text-[14px] text-muted [overflow-wrap:anywhere]">Hozir mavjud sovg‘a yo‘q</div>
           {rewards.programs.map((p) => (
             <Progress key={p.name} program={p} />
           ))}
         </div>
       ) : (
-        <div className="cw__card">
-          <div className="cw__label">Sovg‘a</div>
-          <div className="cw__muted">Faol sovg‘a dasturi yo‘q</div>
+        <div className="rounded-xl border border-line bg-white px-3.5 py-3">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Sovg‘a</div>
+          <div className="text-[14px] text-muted [overflow-wrap:anywhere]">Faol sovg‘a dasturi yo‘q</div>
         </div>
       )}
 
       <LoyaltyCard overview={overview} />
       <Promotions promotions={overview.promotions} redeemedOrderId={w.redeemedPromotionOrderId} orderId={w.orderId} />
 
-      <div className="cw__card cw__grid2">
+      <div className="grid grid-cols-2 gap-x-3.5 gap-y-2.5 rounded-xl border border-line bg-white px-3.5 py-3">
         <div>
-          <div className="cw__label">Tashriflar</div>
-          <div className="cw__value">{activity ? activity.visits : 0}</div>
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Tashriflar</div>
+          <div className="mt-0.5 text-[19px] font-semibold [overflow-wrap:anywhere]">{activity ? activity.visits : 0}</div>
         </div>
         <div>
-          <div className="cw__label">Oxirgi tashrif</div>
-          <div className="cw__value">{activity && activity.visits > 0 ? lastVisitText(activity.lastVisitAt) : 'Tarix yo‘q'}</div>
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Oxirgi tashrif</div>
+          <div className="mt-0.5 text-[19px] font-semibold [overflow-wrap:anywhere]">{activity && activity.visits > 0 ? lastVisitText(activity.lastVisitAt) : 'Tarix yo‘q'}</div>
         </div>
       </div>
 
-      <button className="cw__btn cw__btn--ghost" onClick={clearManual} type="button">
+      <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep" onClick={clearManual} type="button">
         Boshqa mijozni qidirish
       </button>
     </div>
@@ -239,14 +250,14 @@ function Found({ overview }: { overview: Overview }) {
 function Progress({ program }: { program: RewardProgramView }) {
   const pct = Math.min(100, Math.round((program.progress / Math.max(1, program.threshold)) * 100));
   return (
-    <div className="cw__progress">
-      <div className="cw__progress-top">
+    <div className="my-1.5">
+      <div className="flex justify-between gap-2 text-[14px]">
         <span>{program.name}</span>
         <strong>
           {program.progress} / {program.threshold}
         </strong>
       </div>
-      <div className="cw__bar">
+      <div className="mt-1 h-3 overflow-hidden rounded-[6px] bg-black/10 [&_span]:block [&_span]:h-full [&_span]:bg-terracotta">
         <span style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -255,14 +266,14 @@ function Progress({ program }: { program: RewardProgramView }) {
 
 function RewardDetails({ programs }: { programs: RewardProgramView[] }) {
   return (
-    <div className="cw__details">
+    <div className="mt-2 flex flex-col gap-2">
       {programs.map((p) => (
         <div key={p.name}>
           <strong>{p.name}</strong>
-          <div className="cw__muted">
+          <div className="text-[14px] text-muted [overflow-wrap:anywhere]">
             {p.available > 0 ? `${p.available} ta mavjud` : 'Mavjud emas'} · keyingisigacha {p.remaining} ta
           </div>
-          {p.eligibleProducts.length > 0 && <div className="cw__muted">Mahsulotlar: {p.eligibleProducts.map((x) => x.name).join(', ')}</div>}
+          {p.eligibleProducts.length > 0 && <div className="text-[14px] text-muted [overflow-wrap:anywhere]">Mahsulotlar: {p.eligibleProducts.map((x) => x.name).join(', ')}</div>}
         </div>
       ))}
     </div>
@@ -288,7 +299,7 @@ function RedemptionFlow() {
   const w = useWidget();
   const r = w.redemption;
   return (
-    <div className="cw__stack">
+    <div className="flex flex-col gap-2.5">
       {r.phase === 'selecting' && <RewardProductPicker products={r.products} />}
       {r.phase === 'confirming' && r.selected && <RedeemConfirm product={r.selected} />}
       {r.phase === 'applying' && <RedeemApplying />}
@@ -299,17 +310,17 @@ function RedemptionFlow() {
 
 function RewardProductPicker({ products }: { products: EligibleRewardProduct[] }) {
   return (
-    <div className="cw__stack">
-      <div className="cw__card">
-        <div className="cw__label">Sovg‘a</div>
-        <div className="cw__name">Mahsulotni tanlang</div>
+    <div className="flex flex-col gap-2.5">
+      <div className="rounded-xl border border-line bg-white px-3.5 py-3">
+        <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Sovg‘a</div>
+        <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">Mahsulotni tanlang</div>
       </div>
       {products.map((p) => (
-        <button className="cw__btn cw__btn--ghost" key={p.posterProductId} onClick={() => selectRewardProduct(p)} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep" key={p.posterProductId} onClick={() => selectRewardProduct(p)} type="button">
           {p.name}
         </button>
       ))}
-      <button className="cw__btn cw__btn--ghost" onClick={cancelRedeem} type="button">
+      <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep" onClick={cancelRedeem} type="button">
         Bekor qilish
       </button>
     </div>
@@ -318,15 +329,15 @@ function RewardProductPicker({ products }: { products: EligibleRewardProduct[] }
 
 function RedeemConfirm({ product }: { product: EligibleRewardProduct }) {
   return (
-    <div className="cw__card cw__card--reward">
-      <div className="cw__label">Sovg‘ani ishlatish?</div>
-      <div className="cw__name">{product.name}</div>
-      <div className="cw__big">Mijoz uchun: BEPUL</div>
-      <div className="cw__row">
-        <button className="cw__btn cw__btn--ghost" onClick={cancelRedeem} type="button">
+    <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3">
+      <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Sovg‘ani ishlatish?</div>
+      <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{product.name}</div>
+      <div className="mt-1 mb-2 text-[22px] font-bold">Mijoz uchun: BEPUL</div>
+      <div className="flex flex-wrap gap-2">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep" onClick={cancelRedeem} type="button">
           Bekor qilish
         </button>
-        <button className="cw__btn" onClick={confirmRedeem} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={confirmRedeem} type="button">
           Tasdiqlash
         </button>
       </div>
@@ -336,12 +347,12 @@ function RedeemConfirm({ product }: { product: EligibleRewardProduct }) {
 
 function RedeemApplying() {
   return (
-    <div className="cw__stack" aria-busy="true">
-      <div className="cw__card cw__card--strong">
-        <div className="cw__label">Sovg‘a</div>
-        <div className="cw__name">Sovg‘a qo‘llanmoqda…</div>
+    <div className="flex flex-col gap-2.5" aria-busy="true">
+      <div className="rounded-xl border border-black bg-black px-3.5 py-3 text-white">
+        <div className="text-[11px] font-bold tracking-[0.14em] text-cream uppercase">Sovg‘a</div>
+        <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">Sovg‘a qo‘llanmoqda…</div>
       </div>
-      <div className="cw__skel cw__skel--short" />
+      <div className="h-[52px] animate-cw-pulse rounded-xl bg-[#ece6da]" />
     </div>
   );
 }
@@ -352,9 +363,9 @@ function RedeemDone() {
 
   if (r.transportError) {
     return (
-      <div className="cw__stack">
+      <div className="flex flex-col gap-2.5">
         <Notice tone="warn" title="Sovg‘ani qo‘llab bo‘lmadi." hint="Buyurtma o‘zgartirilmadi." />
-        <button className="cw__btn" onClick={closeRedemption} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={closeRedemption} type="button">
           Yopish
         </button>
       </div>
@@ -364,12 +375,12 @@ function RedeemDone() {
   const status = r.result?.status;
   if (status === 'REDEEMED') {
     return (
-      <div className="cw__stack">
-        <div className="cw__card cw__card--reward" role="status">
-          <div className="cw__label">✓ Sovg‘a qo‘llandi</div>
-          <div className="cw__name">{r.result?.productName ?? ''}</div>
+      <div className="flex flex-col gap-2.5">
+        <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">✓ Sovg‘a qo‘llandi</div>
+          <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{r.result?.productName ?? ''}</div>
         </div>
-        <button className="cw__btn" onClick={closeRedemption} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={closeRedemption} type="button">
           Yopish
         </button>
       </div>
@@ -378,9 +389,9 @@ function RedeemDone() {
 
   if (status === 'UNKNOWN') {
     return (
-      <div className="cw__stack">
+      <div className="flex flex-col gap-2.5">
         <Notice tone="warn" title="Buyurtma holatini aniqlab bo‘lmadi." hint="Sovg‘ani qayta bosmang." />
-        <button className="cw__btn" onClick={closeRedemption} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={closeRedemption} type="button">
           Yopish
         </button>
       </div>
@@ -390,10 +401,10 @@ function RedeemDone() {
   // FAILED, or any other non-success status — same generic message either way, plus a specific line when one is known.
   const reason = r.result?.failureReason ?? null;
   return (
-    <div className="cw__stack">
+    <div className="flex flex-col gap-2.5">
       <Notice tone="warn" title="Sovg‘ani qo‘llab bo‘lmadi." hint="Buyurtma o‘zgartirilmadi." />
-      {reason && FAILURE_TEXT[reason] && <p className="cw__note">{FAILURE_TEXT[reason]}</p>}
-      <button className="cw__btn" onClick={closeRedemption} type="button">
+      {reason && FAILURE_TEXT[reason] && <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">{FAILURE_TEXT[reason]}</p>}
+      <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={closeRedemption} type="button">
         Yopish
       </button>
     </div>
@@ -405,34 +416,34 @@ function LoyaltyCard({ overview }: { overview: Overview }) {
   if (!l) return null;
   const p2 = l.program2;
   return (
-    <div className="cw__card cw__grid2">
+    <div className="grid grid-cols-2 gap-x-3.5 gap-y-2.5 rounded-xl border border-line bg-white px-3.5 py-3">
       {p2.enabled ? (
         <>
           <div>
-            <div className="cw__label">Daraja</div>
-            <div className="cw__value">{p2.level ? `${p2.level.icon} ${p2.level.name}` : '—'}</div>
+            <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Daraja</div>
+            <div className="mt-0.5 text-[19px] font-semibold [overflow-wrap:anywhere]">{p2.level ? `${p2.level.icon} ${p2.level.name}` : '—'}</div>
           </div>
           <div>
-            <div className="cw__label">Cashback</div>
-            <div className="cw__value">{p2.cashbackMinor !== null ? formatSom(p2.cashbackMinor) : '—'}</div>
+            <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Cashback</div>
+            <div className="mt-0.5 text-[19px] font-semibold [overflow-wrap:anywhere]">{p2.cashbackMinor !== null ? formatSom(p2.cashbackMinor) : '—'}</div>
           </div>
           <div>
-            <div className="cw__label">XP</div>
-            <div className="cw__value">{p2.xp.total.toLocaleString('ru-RU')}</div>
+            <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">XP</div>
+            <div className="mt-0.5 text-[19px] font-semibold [overflow-wrap:anywhere]">{p2.xp.total.toLocaleString('ru-RU')}</div>
           </div>
           <div>
-            <div className="cw__label">Ketma-ket kunlar</div>
-            <div className="cw__value">{p2.streak.enabled ? p2.streak.current : '—'}</div>
+            <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Ketma-ket kunlar</div>
+            <div className="mt-0.5 text-[19px] font-semibold [overflow-wrap:anywhere]">{p2.streak.enabled ? p2.streak.current : '—'}</div>
           </div>
         </>
       ) : null}
       {l.legacyProgramEnabled && (
         <div>
-          <div className="cw__label">Ballar</div>
-          <div className="cw__value">{l.points !== null ? l.points.toLocaleString('ru-RU') : 0}</div>
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Ballar</div>
+          <div className="mt-0.5 text-[19px] font-semibold [overflow-wrap:anywhere]">{l.points !== null ? l.points.toLocaleString('ru-RU') : 0}</div>
         </div>
       )}
-      {!p2.enabled && !l.legacyProgramEnabled && <div className="cw__muted">Sodiqlik dasturi yoqilmagan</div>}
+      {!p2.enabled && !l.legacyProgramEnabled && <div className="text-[14px] text-muted [overflow-wrap:anywhere]">Sodiqlik dasturi yoqilmagan</div>}
     </div>
   );
 }
@@ -456,18 +467,18 @@ function Promotions({ promotions, redeemedOrderId, orderId }: { promotions: Over
   const { items, redemption } = promotions;
   const alreadyUsedThisOrder = redemption.enabled && redeemedOrderId === orderId;
   return (
-    <div className="cw__card">
-      <div className="cw__label">Promolar</div>
+    <div className="rounded-xl border border-line bg-white px-3.5 py-3">
+      <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Promolar</div>
       {items.length === 0 ? (
-        <div className="cw__muted">Hozircha aksiya yo‘q</div>
+        <div className="text-[14px] text-muted [overflow-wrap:anywhere]">Hozircha aksiya yo‘q</div>
       ) : (
-        <ul className="cw__list">
+        <ul className="mx-0 mt-1.5 mb-0 flex list-none flex-col gap-1.5 p-0 [&_li]:flex [&_li]:flex-col">
           {items.map((p) => (
             <li key={p.promotionId}>
               <strong>{p.name}</strong>
-              <span className="cw__muted">{benefitText(p)}</span>
+              <span className="text-[14px] text-muted [overflow-wrap:anywhere]">{benefitText(p)}</span>
               {redemption.enabled && !alreadyUsedThisOrder && POSTER_MUTATABLE_BENEFIT_TYPES.has(p.benefit.type) && (
-                <button className="cw__btn cw__btn--ghost" onClick={() => startPromotionRedeem(p.promotionId, p.name)} type="button">
+                <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep" onClick={() => startPromotionRedeem(p.promotionId, p.name)} type="button">
                   Qo‘llash
                 </button>
               )}
@@ -475,8 +486,8 @@ function Promotions({ promotions, redeemedOrderId, orderId }: { promotions: Over
           ))}
         </ul>
       )}
-      {!redemption.enabled && items.length > 0 && <p className="cw__note">Bu yerda aksiya qo‘llanmaydi. Hozircha faqat ko‘rsatiladi.</p>}
-      {alreadyUsedThisOrder && <p className="cw__note">Bu buyurtma uchun aksiya allaqachon qo‘llangan.</p>}
+      {!redemption.enabled && items.length > 0 && <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Bu yerda aksiya qo‘llanmaydi. Hozircha faqat ko‘rsatiladi.</p>}
+      {alreadyUsedThisOrder && <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Bu buyurtma uchun aksiya allaqachon qo‘llangan.</p>}
     </div>
   );
 }
@@ -499,7 +510,7 @@ function PromotionRedemptionFlow() {
   const w = useWidget();
   const r = w.promotionRedemption;
   return (
-    <div className="cw__stack">
+    <div className="flex flex-col gap-2.5">
       {r.phase === 'confirming' && r.promotionName && <PromotionRedeemConfirm name={r.promotionName} />}
       {r.phase === 'applying' && <PromotionRedeemApplying />}
       {r.phase === 'done' && <PromotionRedeemDone />}
@@ -509,14 +520,14 @@ function PromotionRedemptionFlow() {
 
 function PromotionRedeemConfirm({ name }: { name: string }) {
   return (
-    <div className="cw__card cw__card--reward">
-      <div className="cw__label">Bu aksiyani ushbu buyurtmaga qo‘llaysizmi?</div>
-      <div className="cw__name">{name}</div>
-      <div className="cw__row">
-        <button className="cw__btn cw__btn--ghost" onClick={cancelPromotionRedeem} type="button">
+    <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3">
+      <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Bu aksiyani ushbu buyurtmaga qo‘llaysizmi?</div>
+      <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{name}</div>
+      <div className="flex flex-wrap gap-2">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep" onClick={cancelPromotionRedeem} type="button">
           Bekor qilish
         </button>
-        <button className="cw__btn" onClick={confirmPromotionRedeem} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={confirmPromotionRedeem} type="button">
           Tasdiqlash
         </button>
       </div>
@@ -526,12 +537,12 @@ function PromotionRedeemConfirm({ name }: { name: string }) {
 
 function PromotionRedeemApplying() {
   return (
-    <div className="cw__stack" aria-busy="true">
-      <div className="cw__card cw__card--strong">
-        <div className="cw__label">Aksiya</div>
-        <div className="cw__name">Qo‘llanmoqda…</div>
+    <div className="flex flex-col gap-2.5" aria-busy="true">
+      <div className="rounded-xl border border-black bg-black px-3.5 py-3 text-white">
+        <div className="text-[11px] font-bold tracking-[0.14em] text-cream uppercase">Aksiya</div>
+        <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">Qo‘llanmoqda…</div>
       </div>
-      <div className="cw__skel cw__skel--short" />
+      <div className="h-[52px] animate-cw-pulse rounded-xl bg-[#ece6da]" />
     </div>
   );
 }
@@ -542,9 +553,9 @@ function PromotionRedeemDone() {
 
   if (r.transportError) {
     return (
-      <div className="cw__stack">
+      <div className="flex flex-col gap-2.5">
         <Notice tone="warn" title="Aksiyani qo‘llab bo‘lmadi." hint="Buyurtma o‘zgartirilmadi." />
-        <button className="cw__btn" onClick={closePromotionRedemption} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={closePromotionRedemption} type="button">
           Yopish
         </button>
       </div>
@@ -554,12 +565,12 @@ function PromotionRedeemDone() {
   const status = r.result?.status;
   if (status === 'REDEEMED') {
     return (
-      <div className="cw__stack">
-        <div className="cw__card cw__card--reward" role="status">
-          <div className="cw__label">✓ Aksiya qo‘llandi</div>
-          <div className="cw__name">{r.result?.promotionName ?? ''}</div>
+      <div className="flex flex-col gap-2.5">
+        <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-muted uppercase">✓ Aksiya qo‘llandi</div>
+          <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{r.result?.promotionName ?? ''}</div>
         </div>
-        <button className="cw__btn" onClick={closePromotionRedemption} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={closePromotionRedemption} type="button">
           Yopish
         </button>
       </div>
@@ -568,9 +579,9 @@ function PromotionRedeemDone() {
 
   if (status === 'UNKNOWN') {
     return (
-      <div className="cw__stack">
+      <div className="flex flex-col gap-2.5">
         <Notice tone="warn" title="Natija aniqlanmadi." hint="Qayta bosmang." />
-        <button className="cw__btn" onClick={closePromotionRedemption} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={closePromotionRedemption} type="button">
           Yopish
         </button>
       </div>
@@ -579,10 +590,10 @@ function PromotionRedeemDone() {
 
   const reason = r.result?.failureReason ?? null;
   return (
-    <div className="cw__stack">
+    <div className="flex flex-col gap-2.5">
       <Notice tone="warn" title="Aksiyani qo‘llab bo‘lmadi." hint="Buyurtma o‘zgartirilmadi." />
-      {reason && PROMOTION_FAILURE_TEXT[reason] && <p className="cw__note">{PROMOTION_FAILURE_TEXT[reason]}</p>}
-      <button className="cw__btn" onClick={closePromotionRedemption} type="button">
+      {reason && PROMOTION_FAILURE_TEXT[reason] && <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">{PROMOTION_FAILURE_TEXT[reason]}</p>}
+      <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" onClick={closePromotionRedemption} type="button">
         Yopish
       </button>
     </div>
@@ -596,18 +607,18 @@ function Search() {
   const [text, setText] = useState('');
   return (
     <form
-      className="cw__search"
+      className="flex flex-wrap gap-2 [&_input]:min-h-12 [&_input]:min-w-0 [&_input]:flex-[1_1_200px] [&_input]:rounded-[10px] [&_input]:border-[1.5px] [&_input]:border-black [&_input]:bg-white [&_input]:px-3.5 [&_input]:[font:inherit]"
       onSubmit={(e) => {
         e.preventDefault();
         lookup(text);
       }}
     >
       <input aria-label="CUP kodi yoki telefon" autoComplete="off" inputMode="text" maxLength={64} onChange={(e) => setText(e.target.value)} placeholder="CUP-XXXXXXXX yoki +998…" value={text} />
-      <button className="cw__btn" type="submit">
+      <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-0 bg-terracotta text-black active:bg-terracotta-deep" type="submit">
         Qidirish
       </button>
       {w.mobile && (
-        <button className="cw__btn cw__btn--ghost" onClick={scan} type="button">
+        <button className="min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep" onClick={scan} type="button">
           QR skaner
         </button>
       )}
@@ -617,9 +628,9 @@ function Search() {
 
 function Notice({ tone, title, hint }: { tone: 'warn' | 'muted'; title: string; hint: string }) {
   return (
-    <div className={`cw__notice cw__notice--${tone}`} role={tone === 'warn' ? 'alert' : 'status'}>
-      <div className="cw__notice-title">{title}</div>
-      <div className="cw__muted">{hint}</div>
+    <div className={cx('rounded-xl px-3.5 py-3', tone === 'warn' ? 'border border-l-4 border-transparent border-l-terracotta bg-cream' : 'border border-line bg-white')} role={tone === 'warn' ? 'alert' : 'status'}>
+      <div className="mb-0.5 font-bold">{title}</div>
+      <div className="text-[14px] text-muted [overflow-wrap:anywhere]">{hint}</div>
     </div>
   );
 }

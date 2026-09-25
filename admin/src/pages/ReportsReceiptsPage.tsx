@@ -5,7 +5,7 @@ import { ReportsReceiptDetail, ReportsReceiptRow, ReportsReceiptsOverview } from
 import { ReportsSource } from '../lib/types';
 import { apiRequest, ApiError } from '../lib/api';
 import { rangeParams, useReport } from '../lib/useReport';
-import { Column, DataTable, DateRangePicker, DateRangeValue, EmptyState, FilterBar, FilterField, isRangeReady, KeyValue, Modal, PageHeader, SearchInput, SectionCard, StatCard, StatGrid } from '../ui';
+import { Button, Column, DataTable, DateRangePicker, DateRangeValue, EmptyState, FilterBar, FilterField, isRangeReady, KeyValue, Modal, PageHeader, SearchInput, SectionCard, StatCard, StatGrid } from '../ui';
 import { BranchSelect, Notes, num, PeriodHint, ReportBody } from './reportsShared';
 import { SourceSelect } from './reportsProductShared';
 
@@ -14,7 +14,7 @@ const LIMIT = 50;
 
 const columns: Column<ReportsReceiptRow>[] = [
   { key: 'd', header: 'Date', cell: (r) => formatDateTime(r.occurredAt) },
-  { key: 'id', header: 'Receipt', cell: (r) => <span className="table__primary">{r.source === 'POS' ? `#${r.receiptId}` : `…${r.receiptId.slice(-8)}`}</span> },
+  { key: 'id', header: 'Receipt', cell: (r) => <span className="font-semibold text-black">{r.source === 'POS' ? `#${r.receiptId}` : `…${r.receiptId.slice(-8)}`}</span> },
   { key: 's', header: 'Source', cell: (r) => r.source },
   { key: 'c', header: 'Customer', cell: (r) => r.customerName ?? (r.customerId ? '—' : 'Anonymous') },
   { key: 'b', header: 'Branch', low: true, cell: (r) => r.branchName ?? 'Unattributed' },
@@ -57,7 +57,7 @@ export function ReportsReceiptsPage() {
         <BranchSelect branches={data?.filters.branches ?? []} onChange={setBranchId} value={branchId} />
         <SourceSelect onChange={setSource} value={source} />
         <FilterField label="Payment">
-          <select className="select" onChange={(e) => setStatus(e.target.value as Status)} value={status}>
+          <select className="" onChange={(e) => setStatus(e.target.value as Status)} value={status}>
             <option value="all">All receipts</option>
             <option value="paid">Paid (POS)</option>
             <option value="unpaid">Closed without payment (POS)</option>
@@ -81,14 +81,14 @@ export function ReportsReceiptsPage() {
 
             <SectionCard description="Newest first. Click a receipt for its line items (read-only)." flush title="Receipts">
               <DataTable columns={columns} empty={<EmptyState text={search ? 'No receipt matches this search.' : 'No receipts were recorded for these filters.'} title="No receipts" variant="inline" />} onRowClick={setSelected} rowKey={(r) => `${r.source}:${r.receiptId}`} rows={d.rows} />
-              <div className="pager">
-                <span>{num(d.page.total)} total · page {pageNo} of {Math.max(1, Math.ceil(d.page.total / LIMIT))}</span>
-                <button className="button-secondary button--sm" disabled={loading || cursors.length === 0} onClick={() => setCursors((c) => c.slice(0, -1))} type="button">
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-4 py-3 text-[13px] text-muted">
+                <span className="mr-auto">{num(d.page.total)} total · page {pageNo} of {Math.max(1, Math.ceil(d.page.total / LIMIT))}</span>
+                <Button disabled={loading || cursors.length === 0} onClick={() => setCursors((c) => c.slice(0, -1))} size="sm" variant="secondary">
                   Previous
-                </button>
-                <button className="button-secondary button--sm" disabled={loading || !d.page.nextCursor} onClick={() => d.page.nextCursor && setCursors((c) => [...c, d.page.nextCursor as string])} type="button">
+                </Button>
+                <Button disabled={loading || !d.page.nextCursor} onClick={() => d.page.nextCursor && setCursors((c) => [...c, d.page.nextCursor as string])} size="sm" variant="secondary">
                   Next
-                </button>
+                </Button>
               </div>
             </SectionCard>
 
@@ -140,13 +140,13 @@ function ReceiptDetail({ row, onClose }: { row: ReportsReceiptRow; onClose: () =
           { key: 'pd', label: 'Paid', value: row.paidMinor === null ? '—' : formatSom(row.paidMinor) },
         ]}
       />
-      <h3 style={{ margin: '16px 0 8px' }}>Line items</h3>
-      {error && <p className="error-text">{error}</p>}
-      {!detail && !error && <p className="hint-text">Loading…</p>}
+      <h3 className="mt-4 mb-2 mx-0">Line items</h3>
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      {!detail && !error && <p className="text-[13px] leading-snug text-muted">Loading…</p>}
       {detail && (
         <DataTable
           columns={[
-            { key: 'p', header: 'Product', cell: (l) => <span className="table__primary">{l.product}{l.isRewardItem ? ' (free reward)' : ''}</span> },
+            { key: 'p', header: 'Product', cell: (l) => <span className="font-semibold text-black">{l.product}{l.isRewardItem ? ' (free reward)' : ''}</span> },
             { key: 'q', header: 'Quantity', numeric: true, cell: (l) => num(l.quantity) },
             { key: 'u', header: 'Unit price', numeric: true, cell: (l) => formatSom(l.unitPriceMinor) },
             { key: 't', header: 'Total', numeric: true, cell: (l) => formatSom(l.totalMinor) },

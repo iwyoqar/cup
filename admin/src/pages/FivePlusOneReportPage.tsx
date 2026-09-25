@@ -5,7 +5,7 @@ import { formatDate, formatDateTime } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { RewardReport, RewardReportRedemption, RewardReportTopCustomer } from '../lib/types';
 import { CustomerDetailView } from '../components/CustomerDetailView';
-import { Column, DataTable, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, isRangeReady, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
+import { Column, cx, DataTable, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, isRangeReady, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
 
@@ -45,7 +45,7 @@ function useRewardReport(filters: DateRangeValue, ready: boolean) {
 function topCustomerColumns(): Column<RewardReportTopCustomer>[] {
   return [
     { key: 'rank', header: '#', cell: (c) => c.rank },
-    { key: 'name', header: 'Customer', cell: (c) => <span className="table__primary">{c.customerName}</span> },
+    { key: 'name', header: 'Customer', cell: (c) => <span className="font-semibold text-black">{c.customerName}</span> },
     { key: 'phone', header: 'Phone', low: true, cell: (c) => c.phone ?? '—' },
     { key: 'free', header: 'Free coffees', numeric: true, cell: (c) => number(c.freeCoffeesRedeemed) },
     { key: 'qualifying', header: 'Qualifying coffees', numeric: true, low: true, cell: (c) => number(c.qualifyingCoffees) },
@@ -57,7 +57,7 @@ function topCustomerColumns(): Column<RewardReportTopCustomer>[] {
 function recentRedemptionColumns(branchAttributionAvailable: boolean): Column<RewardReportRedemption>[] {
   const columns: Column<RewardReportRedemption>[] = [
     { key: 'date', header: 'Date', low: true, cell: (r) => formatDateTime(r.redeemedAt) },
-    { key: 'customer', header: 'Customer', cell: (r) => <span className="table__primary">{r.customerName}</span> },
+    { key: 'customer', header: 'Customer', cell: (r) => <span className="font-semibold text-black">{r.customerName}</span> },
     { key: 'product', header: 'Reward', cell: (r) => r.rewardProductName },
   ];
   // Only shown when at least one redemption in this program's history actually has a resolvable branch — never a
@@ -87,7 +87,7 @@ export function FivePlusOneReportPage() {
       <FilterBar>
         <DateRangePicker onChange={setRange} value={range} />
         {data && !error && (
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
+          <span className="text-[13px] leading-snug text-muted self-center">
             {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
             {loading && ' · updating…'}
           </span>
@@ -100,8 +100,8 @@ export function FivePlusOneReportPage() {
       {data && !error && !data.program && <EmptyState text="No BUY_X_GET_Y reward program is currently configured." title="No 5+1 program found" />}
 
       {data && !error && data.program && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity var(--motion-base) var(--ease)' }}>
-          <p className="hint-text">
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
+          <p className="text-[13px] leading-snug text-muted">
             {data.program.name} · {data.program.buyQuantity} {data.program.qualifyingCategoryName} → {data.program.rewardQuantity} free
             {!data.program.isActive && ' · currently inactive'}
           </p>
@@ -115,7 +115,7 @@ export function FivePlusOneReportPage() {
           </StatGrid>
 
           {data.notes.map((n) => (
-            <div className="callout" key={n}>
+            <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream" key={n}>
               <p>{n}</p>
             </div>
           ))}

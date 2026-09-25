@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchLoyaltySettings, updateLoyaltySettings } from '../lib/loyaltySettings';
 import { ApiError } from '../lib/api';
 import { LoyaltySettings } from '../lib/types';
-import { LoadingState } from '../ui';
+import { Button, LoadingState, Toggle } from '../ui';
 
 const EXPIRY_PRESETS = [0, 30, 60, 90, 180, 365];
 
@@ -42,7 +42,7 @@ export function LoyaltySettingsPage() {
   if (loadError) {
     return (
       <div>
-        <p className="error-text">{loadError}</p>
+        <p className="text-[13px] font-semibold text-err">{loadError}</p>
       </div>
     );
   }
@@ -84,38 +84,38 @@ export function LoyaltySettingsPage() {
   return (
     <div>
 
-      <div className="settings-card">
-        <div className="settings-row">
-          <span className="settings-row__label">Loyalty program</span>
+      <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Loyalty program</span>
           <Toggle checked={draft.enabled} onChange={(v) => set('enabled', v)} />
         </div>
 
-        <hr className="settings-divider" />
+        <hr className="m-0 h-px border-0 bg-line" />
 
-        <div className="settings-row">
-          <span className="settings-row__label">Points earning</span>
-          <div className="settings-row__control">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Points earning</span>
+          <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
             <NumberInput value={draft.earnUnitAmount} onChange={(v) => set('earnUnitAmount', v)} /> so&apos;m ={' '}
             <NumberInput value={draft.earnRate} onChange={(v) => set('earnRate', v)} /> point(s)
           </div>
         </div>
 
-        <div className="settings-row">
-          <span className="settings-row__label">Minimum order for points</span>
-          <div className="settings-row__control">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Minimum order for points</span>
+          <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
             <NumberInput value={draft.minimumOrderAmount} onChange={(v) => set('minimumOrderAmount', v)} /> so&apos;m
           </div>
         </div>
 
-        <div className="settings-row">
-          <span className="settings-row__label">Welcome bonus</span>
-          <div className="settings-row__control">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Welcome bonus</span>
+          <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
             <NumberInput value={draft.welcomeBonus} onChange={(v) => set('welcomeBonus', v)} /> points
           </div>
         </div>
 
-        <div className="settings-row">
-          <span className="settings-row__label">Point expiration</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Point expiration</span>
           <select
             value={draft.pointsExpireAfterDays}
             onChange={(e) => set('pointsExpireAfterDays', Number(e.target.value))}
@@ -128,47 +128,34 @@ export function LoyaltySettingsPage() {
           </select>
         </div>
 
-        <hr className="settings-divider" />
+        <hr className="m-0 h-px border-0 bg-line" />
 
-        <div className="settings-row">
-          <span className="settings-row__label">Spending</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Spending</span>
           <Toggle checked={draft.spendEnabled} onChange={(v) => set('spendEnabled', v)} />
         </div>
 
-        <div className="settings-row">
-          <span className="settings-row__label">Point value</span>
-          <div className="settings-row__control">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Point value</span>
+          <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
             1 point = <NumberInput value={draft.pointValue} onChange={(v) => set('pointValue', v)} /> so&apos;m
           </div>
         </div>
       </div>
 
-      {saveError && <p className="error-text">{saveError}</p>}
-      {justSaved && !hasUnsavedChanges && <p className="success-text">Saved.</p>}
+      {saveError && <p className="text-[13px] font-semibold text-err">{saveError}</p>}
+      {justSaved && !hasUnsavedChanges && <p className="text-[13px] font-semibold text-ok">Saved.</p>}
 
-      <div className="settings-footer">
-        <button className="button-primary" disabled={isSaving || !hasUnsavedChanges} onClick={handleSave} type="button">
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <Button disabled={isSaving || !hasUnsavedChanges} onClick={handleSave} variant="primary">
           {isSaving ? 'Saving...' : 'Save changes'}
-        </button>
-        {hasUnsavedChanges && <span className="unsaved-badge">Unsaved changes</span>}
+        </Button>
+        {hasUnsavedChanges && <span className="inline-flex items-center rounded-full bg-warn-bg px-2.5 py-0.5 text-xs font-semibold text-warn">Unsaved changes</span>}
       </div>
     </div>
   );
 }
 
-interface ToggleProps {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}
-
-function Toggle({ checked, onChange }: ToggleProps) {
-  return (
-    <label className="toggle">
-      <input checked={checked} onChange={(e) => onChange(e.target.checked)} type="checkbox" />
-      <span className="toggle__track" />
-    </label>
-  );
-}
 
 interface NumberInputProps {
   value: number;

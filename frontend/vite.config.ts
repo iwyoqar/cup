@@ -1,10 +1,11 @@
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 // Mobile-first Telegram Mini App. No SSR, no router — a single-page state machine
 // (see src/app/AppShell.tsx) is enough for this phase's scope.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   build: {
     outDir: 'dist',
   },

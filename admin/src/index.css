@@ -1,24 +1,17 @@
 /* =====================================================================================
-   CUP Admin — Design System 2.0 entry point (Tailwind CSS v4).
+   CUP Admin — Design System 2.0 entry point (Tailwind CSS v4). Pure Tailwind: every style lives in a utility class
+   on the element or in a React primitive in src/ui — there is no component or legacy stylesheet.
 
    Cascade layers, lowest to highest priority:
      theme      — Tailwind's @theme tokens (the ONE place CUP's colours, radii, fonts and motion are defined)
-     base       — element defaults (font, focus ring, reduced motion)
-     legacy     — pre-Tailwind CSS still in use: ui/base.css (token aliases, element base) and styles.css (the scoped
-                  page namespaces .analytics / .c360 / .growth / .bi / .pi that un-migrated pages still render)
-     components — the shared class vocabulary pages still use (buttons, fields, callouts…), rebuilt on the tokens
-     utilities  — Tailwind utilities, so a utility class always wins over legacy CSS without !important
-   Tailwind's preflight is deliberately NOT imported: legacy CSS already has its own reset and relies on it.
+     base       — a minimal element reset + defaults (font, form controls, focus ring, reduced motion)
+     utilities  — Tailwind utilities
+   Tailwind's full preflight is deliberately not imported; the small reset below is all the pages rely on.
    ===================================================================================== */
-@layer theme, base, legacy, components, utilities;
+@layer theme, base, utilities;
 
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities);
-
-@import './ui/base.css' layer(legacy);
-@import './styles.css' layer(legacy);
-
-@import './ui/components.css';
 
 @theme static {
   /* Only CUP colours exist — Tailwind's default palette is removed so no second palette can creep in. */
@@ -117,16 +110,33 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+  *,
+  ::before,
+  ::after {
+    box-sizing: border-box;
+  }
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    margin: 0;
+  }
   body {
     font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.45;
     background: var(--color-canvas);
     color: var(--color-black);
+    overflow-wrap: anywhere;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
-  /* Minimal element reset (Tailwind's full preflight is not used — see the header). Every class in the legacy and
-     components layers still wins over these, so only unclassed / utility-styled elements are affected. */
+  /* Minimal element reset (Tailwind's full preflight is not used — see the header). Base layer = lowest priority, so
+     any utility on the element wins. */
   button {
     background: none;
     border: 0;
@@ -148,6 +158,7 @@
   h2,
   h3,
   h4,
+  p,
   dl,
   dd {
     margin: 0;
@@ -156,9 +167,8 @@
     display: block;
   }
 
-  /* Unclassed form controls (several settings/filter forms write a bare <select>/<input>) get the same field look as
-     `.input` / `.select` in ui/components.css. Base layer = lowest priority, so any class — including the scoped
-     legacy page styles — still overrides this. */
+  /* Unclassed form controls (settings/filter forms write a bare <select>/<input>) get the same field look as the
+     <Input>/<Select> primitives in ui/Inputs.tsx. Any utility on the element still overrides this. */
   select:not([multiple]),
   textarea,
   input:is([type='text'], [type='number'], [type='email'], [type='password'], [type='date'], [type='datetime-local'], [type='time'], [type='search'], [type='tel'], [type='url'], :not([type])) {

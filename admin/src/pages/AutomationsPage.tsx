@@ -5,7 +5,7 @@ import { activateAutomation, AutomationView, CrmSettings, fetchAutomations, fetc
 import { ApiError } from '../lib/api';
 import { formatDate, formatDateTime } from '../lib/format';
 import { findNav } from '../lib/nav';
-import { ErrorState, LoadingState, PageHeader } from '../ui';
+import { Button, cx, ErrorState, LoadingState, PageHeader, tableClass, Toggle } from '../ui';
 
 type View = { kind: 'list' } | { kind: 'create' } | { kind: 'edit'; automation: AutomationView } | { kind: 'detail'; id: string };
 
@@ -14,14 +14,6 @@ const message = (err: unknown) => {
   return typeof m === 'string' ? m : 'Request failed.';
 };
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="toggle">
-      <input checked={checked} onChange={(e) => onChange(e.target.checked)} type="checkbox" />
-      <span className="toggle__track" />
-    </label>
-  );
-}
 
 // Admin → CRM Automation: list (with the CRM business settings) → create / edit → detail (preview + execution history).
 export function AutomationsPage() {
@@ -108,15 +100,15 @@ export function AutomationsPage() {
     <div>
       <PageHeader
         actions={
-          <button className="button-primary" onClick={() => setView({ kind: 'create' })} type="button">
+          <Button onClick={() => setView({ kind: 'create' })} variant="primary">
             + New automation
-          </button>
+          </Button>
         }
         description={findNav('crm-automation').item.description}
         title={findNav('crm-automation').item.label}
       />
       {settings && (
-        <p className={`callout ${settings.enabled && settings.sendGateOpen ? 'callout--ok' : 'callout--warn'}`}>
+        <p className={cx('block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0', settings.enabled && settings.sendGateOpen ? 'border-ok bg-ok-bg text-ok' : 'border-terracotta bg-cream-soft text-warn')}>
           {!settings.enabled
             ? 'CRM automation is OFF — nothing is detected or sent. Previews still work.'
             : !settings.sendGateOpen
@@ -125,104 +117,104 @@ export function AutomationsPage() {
         </p>
       )}
       {error && <ErrorState message={error} />}
-      {notice && <p className="success-text">{notice}</p>}
+      {notice && <p className="text-[13px] font-semibold text-ok">{notice}</p>}
 
       {draft && (
-        <div className="settings-card">
-          <h3 style={{ margin: 0 }}>CRM settings</h3>
-          <div className="settings-row">
-            <span className="settings-row__label">CRM automation enabled</span>
+        <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+          <h3 className="m-0">CRM settings</h3>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+            <span className="text-sm font-semibold">CRM automation enabled</span>
             <Toggle checked={draft.enabled} onChange={(v) => setD('enabled', v)} />
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Max CRM messages per customer per day</span>
-            <input min={1} onChange={(e) => setD('dailyLimit', num(e.target.value))} style={{ width: 90 }} type="number" value={draft.dailyLimit} />
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+            <span className="text-sm font-semibold">Max CRM messages per customer per day</span>
+            <input min={1} onChange={(e) => setD('dailyLimit', num(e.target.value))} className="w-[90px]" type="number" value={draft.dailyLimit} />
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Quiet hours (business time)</span>
-            <div className="settings-row__control">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+            <span className="text-sm font-semibold">Quiet hours (business time)</span>
+            <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
               <input onChange={(e) => setD('quietHoursStart', e.target.value)} type="time" value={draft.quietHoursStart} /> –{' '}
               <input onChange={(e) => setD('quietHoursEnd', e.target.value)} type="time" value={draft.quietHoursEnd} />
             </div>
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Batch size / run interval (seconds)</span>
-            <div className="settings-row__control">
-              <input min={1} onChange={(e) => setD('batchSize', num(e.target.value))} style={{ width: 90 }} type="number" value={draft.batchSize} />
-              <input min={5} onChange={(e) => setD('runIntervalSeconds', num(e.target.value))} style={{ width: 90 }} type="number" value={draft.runIntervalSeconds} />
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+            <span className="text-sm font-semibold">Batch size / run interval (seconds)</span>
+            <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
+              <input min={1} onChange={(e) => setD('batchSize', num(e.target.value))} className="w-[90px]" type="number" value={draft.batchSize} />
+              <input min={5} onChange={(e) => setD('runIntervalSeconds', num(e.target.value))} className="w-[90px]" type="number" value={draft.runIntervalSeconds} />
             </div>
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Default cooldown (h) / default max sends</span>
-            <div className="settings-row__control">
-              <input min={0} onChange={(e) => setD('defaultCooldownHours', num(e.target.value))} style={{ width: 90 }} type="number" value={draft.defaultCooldownHours} />
-              <input min={1} onChange={(e) => setD('defaultMaxSends', num(e.target.value))} style={{ width: 90 }} type="number" value={draft.defaultMaxSends} />
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+            <span className="text-sm font-semibold">Default cooldown (h) / default max sends</span>
+            <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
+              <input min={0} onChange={(e) => setD('defaultCooldownHours', num(e.target.value))} className="w-[90px]" type="number" value={draft.defaultCooldownHours} />
+              <input min={1} onChange={(e) => setD('defaultMaxSends', num(e.target.value))} className="w-[90px]" type="number" value={draft.defaultMaxSends} />
             </div>
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Ignore triggers older than (hours)</span>
-            <input min={1} onChange={(e) => setD('maxEventAgeHours', num(e.target.value))} style={{ width: 90 }} type="number" value={draft.maxEventAgeHours} />
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+            <span className="text-sm font-semibold">Ignore triggers older than (hours)</span>
+            <input min={1} onChange={(e) => setD('maxEventAgeHours', num(e.target.value))} className="w-[90px]" type="number" value={draft.maxEventAgeHours} />
           </div>
-          <p className="hint-text" style={{ margin: 0 }}>
+          <p className="text-[13px] leading-snug text-muted m-0">
             Telegram send gate (operator, read-only): <strong>{draft.sendGateOpen ? 'OPEN' : 'CLOSED'}</strong>
             {draft.enabledAt ? ` · CRM switched on ${formatDateTime(draft.enabledAt)} — nothing earlier can fire.` : ''}
           </p>
           <div>
-            <button className="button-primary" disabled={!changed || savingSettings} onClick={saveSettings} type="button">
+            <Button disabled={!changed || savingSettings} onClick={saveSettings} variant="primary">
               {savingSettings ? 'Saving...' : 'Save settings'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {items === null && !error && <LoadingState variant="card" />}
-      {items !== null && items.length === 0 && <p className="hint-text">Hozircha avtomatlashtirishlar yo&apos;q.</p>}
+      {items !== null && items.length === 0 && <p className="text-[13px] leading-snug text-muted">Hozircha avtomatlashtirishlar yo&apos;q.</p>}
       {items !== null && items.length > 0 && (
         <>
           <div className="overflow-x-auto">
-            <table className="data-table" style={{ minWidth: 860 }}>
+            <table className="w-full border-separate border-spacing-0 text-sm min-w-[860px]">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Trigger</th>
-                  <th>Campaign</th>
-                  <th>Segment</th>
-                  <th>Status</th>
-                  <th>Last run</th>
-                  <th>Created</th>
-                  <th />
+                  <th className={tableClass.th}>Name</th>
+                  <th className={tableClass.th}>Trigger</th>
+                  <th className={tableClass.th}>Campaign</th>
+                  <th className={tableClass.th}>Segment</th>
+                  <th className={tableClass.th}>Status</th>
+                  <th className={tableClass.th}>Last run</th>
+                  <th className={tableClass.th}>Created</th>
+                  <th className={tableClass.th} />
                 </tr>
               </thead>
               <tbody>
                 {items.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.name}</td>
-                    <td>{a.triggerLabel}</td>
-                    <td>{a.campaign.name}</td>
-                    <td>{a.segment?.name ?? '—'}</td>
-                    <td>{a.status}</td>
-                    <td>{a.lastRunAt ? formatDateTime(a.lastRunAt) : '—'}</td>
-                    <td>{formatDate(a.createdAt)}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <tr className={tableClass.tr} key={a.id}>
+                    <td className={tableClass.td}>{a.name}</td>
+                    <td className={tableClass.td}>{a.triggerLabel}</td>
+                    <td className={tableClass.td}>{a.campaign.name}</td>
+                    <td className={tableClass.td}>{a.segment?.name ?? '—'}</td>
+                    <td className={tableClass.td}>{a.status}</td>
+                    <td className={tableClass.td}>{a.lastRunAt ? formatDateTime(a.lastRunAt) : '—'}</td>
+                    <td className={tableClass.td}>{formatDate(a.createdAt)}</td>
+                    <td className={tableClass.td}>
+                      <div className="flex gap-1.5 flex-wrap">
                         {a.status !== 'ACTIVE' && a.status !== 'ARCHIVED' && (
-                          <button className="button-secondary" disabled={busyId === a.id} onClick={() => changeStatus(a, activateAutomation)} type="button">
+                          <Button disabled={busyId === a.id} onClick={() => changeStatus(a, activateAutomation)} variant="secondary">
                             Activate
-                          </button>
+                          </Button>
                         )}
                         {a.status === 'ACTIVE' && (
-                          <button className="button-secondary" disabled={busyId === a.id} onClick={() => changeStatus(a, pauseAutomation)} type="button">
+                          <Button disabled={busyId === a.id} onClick={() => changeStatus(a, pauseAutomation)} variant="secondary">
                             Pause
-                          </button>
+                          </Button>
                         )}
                         {a.status !== 'ARCHIVED' && (
-                          <button className="button-secondary" onClick={() => setView({ kind: 'edit', automation: a })} type="button">
+                          <Button onClick={() => setView({ kind: 'edit', automation: a })} variant="secondary">
                             Edit
-                          </button>
+                          </Button>
                         )}
-                        <button className="button-secondary" onClick={() => setView({ kind: 'detail', id: a.id })} type="button">
+                        <Button onClick={() => setView({ kind: 'detail', id: a.id })} variant="secondary">
                           Preview / history
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -231,10 +223,10 @@ export function AutomationsPage() {
             </table>
           </div>
           {next && (
-            <div style={{ marginTop: 12 }}>
-              <button className="button-secondary" onClick={more} type="button">
+            <div className="mt-3">
+              <Button onClick={more} variant="secondary">
                 Load more
-              </button>
+              </Button>
             </div>
           )}
         </>

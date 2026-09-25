@@ -7,7 +7,7 @@ import { SegmentForm } from '../components/SegmentForm';
 import { SegmentDetailView } from '../components/SegmentDetailView';
 
 import { findNav } from '../lib/nav';
-import { Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '../ui';
+import { Button, Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '../ui';
 type View = { kind: 'list' } | { kind: 'create' } | { kind: 'edit'; segment: Segment } | { kind: 'detail'; segmentId: string };
 
 export function SegmentsPage() {
@@ -82,7 +82,7 @@ export function SegmentsPage() {
   }
 
   const columns: Column<Segment>[] = [
-    { key: 'name', header: 'Segment', cell: (segment) => <span className="table__primary">{segment.name}</span> },
+    { key: 'name', header: 'Segment', cell: (segment) => <span className="font-semibold text-black">{segment.name}</span> },
     { key: 'description', header: 'Description', low: true, cell: (segment) => segment.description ?? '—' },
     { key: 'logic', header: 'Logic', low: true, cell: (segment) => segment.logic },
     { key: 'conditions', header: 'Conditions', numeric: true, cell: (segment) => segment.conditions.length },
@@ -94,9 +94,9 @@ export function SegmentsPage() {
     <>
       <PageHeader
         actions={
-          <button className="button-primary" onClick={() => setView({ kind: 'create' })} type="button">
+          <Button onClick={() => setView({ kind: 'create' })} variant="primary">
             + Create segment
-          </button>
+          </Button>
         }
         description={findNav('segments').item.description}
         title={findNav('segments').item.label}
@@ -109,9 +109,9 @@ export function SegmentsPage() {
         flush
         footer={
           nextCursor ? (
-            <button className="button-secondary" disabled={isLoadingMore} onClick={handleLoadMore} type="button">
+            <Button disabled={isLoadingMore} onClick={handleLoadMore} variant="secondary">
               {isLoadingMore ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           ) : undefined
         }
         title="Segments"
@@ -124,9 +124,9 @@ export function SegmentsPage() {
             empty={
               <EmptyState
                 action={
-                  <button className="button-primary" onClick={() => setView({ kind: 'create' })} type="button">
+                  <Button onClick={() => setView({ kind: 'create' })} variant="primary">
                     + Create segment
-                  </button>
+                  </Button>
                 }
                 text="A segment is a rule-based group of customers. Campaigns, promotions and automations target segments."
                 title="No segments yet"

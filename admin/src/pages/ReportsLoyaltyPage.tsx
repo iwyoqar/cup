@@ -3,14 +3,14 @@ import { formatSom } from '../lib/format';
 import { AdminPage, findNav } from '../lib/nav';
 import { ReportsLoyaltyOverview } from '../lib/reportsTypes';
 import { rangeParams, useReport } from '../lib/useReport';
-import { Column, DataTable, DateRangePicker, DateRangeValue, EmptyState, FilterBar, HBarList, isRangeReady, PageHeader, Pagination, SearchInput, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
+import { Button, Column, DataTable, DateRangePicker, DateRangeValue, EmptyState, FilterBar, HBarList, isRangeReady, PageHeader, Pagination, SearchInput, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
 import { Notes, num, PeriodHint, pctOrDash, ReportBody } from './reportsShared';
 
 type CustomerRow = ReportsLoyaltyOverview['customerRows'][number];
 const pts = (n: number) => `${num(n)} pts`;
 
 const customerColumns: Column<CustomerRow>[] = [
-  { key: 'n', header: 'Customer', cell: (r) => <span className="table__primary">{r.name ?? '—'}</span> },
+  { key: 'n', header: 'Customer', cell: (r) => <span className="font-semibold text-black">{r.name ?? '—'}</span> },
   { key: 'ph', header: 'Phone', low: true, cell: (r) => r.phone ?? '—' },
   { key: 'l', header: 'Level', cell: (r) => r.level ?? '—' },
   { key: 'p', header: 'Points', numeric: true, cell: (r) => pts(r.pointsBalance) },
@@ -79,7 +79,7 @@ export function ReportsLoyaltyPage({ onNavigate }: { onNavigate: (page: AdminPag
               )}
             </SectionCard>
 
-            <div className="grid-2">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <SectionCard actions={<StatusBadge>Current state</StatusBadge>} description="Current loyalty level distribution, derived from lifetime spend exactly as Loyalty 2.0 does." title="Current loyalty levels">
                 {d.levels.length > 0 ? (
                   <HBarList
@@ -95,16 +95,16 @@ export function ReportsLoyaltyPage({ onNavigate }: { onNavigate: (page: AdminPag
 
               <SectionCard
                 actions={
-                  <button className="button-secondary button--sm" onClick={() => onNavigate('rewards-5plus1')} type="button">
+                  <Button onClick={() => onNavigate('rewards-5plus1')} size="sm" variant="secondary">
                     5+1 Coffee report →
-                  </button>
+                  </Button>
                 }
                 description="Successful reward redemptions in the period, by program."
                 title="Rewards"
               >
                 <DataTable
                   columns={[
-                    { key: 'n', header: 'Program', cell: (p) => <span className="table__primary">{p.name}</span> },
+                    { key: 'n', header: 'Program', cell: (p) => <span className="font-semibold text-black">{p.name}</span> },
                     { key: 'r', header: 'Redemptions', numeric: true, cell: (p) => num(p.redemptions) },
                     { key: 'c', header: 'Customers', numeric: true, cell: (p) => num(p.customers) },
                   ]}
@@ -115,11 +115,11 @@ export function ReportsLoyaltyPage({ onNavigate }: { onNavigate: (page: AdminPag
               </SectionCard>
             </div>
 
-            <div className="grid-2">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <SectionCard description={`${num(d.achievements.unlocked)} unlocks by ${num(d.achievements.customers)} customers in the period.`} title="Achievements">
                 <DataTable
                   columns={[
-                    { key: 'n', header: 'Achievement', cell: (a) => <span className="table__primary">{a.name}</span> },
+                    { key: 'n', header: 'Achievement', cell: (a) => <span className="font-semibold text-black">{a.name}</span> },
                     { key: 'u', header: 'Unlocks', numeric: true, cell: (a) => num(a.unlocks) },
                   ]}
                   empty={<EmptyState text="No achievements were unlocked in this period." title="No achievements" variant="inline" />}
@@ -137,7 +137,7 @@ export function ReportsLoyaltyPage({ onNavigate }: { onNavigate: (page: AdminPag
             </div>
 
             <SectionCard actions={<StatusBadge>Current state</StatusBadge>} description="Current loyalty state per customer, ordered by points balance." flush title="Current customer loyalty">
-              <div style={{ padding: '0 16px 8px' }}>
+              <div className="pt-0 pb-2 px-4">
                 <SearchInput label="Search loyalty customers" onChange={setSearchInput} placeholder="Name or phone" value={searchInput} />
               </div>
               <DataTable columns={customerColumns} empty={<EmptyState text={search ? 'No loyalty customer matches this search.' : 'No loyalty accounts yet.'} title="No customers" variant="inline" />} rowKey={(r) => r.customerId} rows={d.customerRows} />

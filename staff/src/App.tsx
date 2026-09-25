@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RecentPage } from './pages/RecentPage';
 import { ScanPage } from './pages/ScanPage';
+import { cx } from './lib/cx';
 
 type Phase = 'booting' | 'login' | 'ready';
 
@@ -46,8 +47,8 @@ export function App() {
 
   if (phase === 'booting') {
     return (
-      <main className="login">
-        <div className="brand">CUP</div>
+      <main className="mx-auto flex min-h-dvh max-w-[420px] flex-col gap-4 px-5 py-12">
+        <div className="font-display text-[32px] font-semibold tracking-[0.32em] whitespace-nowrap">CUP</div>
       </main>
     );
   }
@@ -64,26 +65,26 @@ export function App() {
   }
 
   return (
-    <div className="shell">
-      <header className="topbar">
-        <div className="topbar__left">
-          <span className="brand brand--small">CUP</span>
-          <span className="topbar__meta">
+    <div className="mx-auto min-h-dvh max-w-[1040px]">
+      <header className="sticky top-0 z-5 flex items-center justify-between gap-3 bg-black px-4 pt-[calc(10px+env(safe-area-inset-top))] pb-2.5 text-white">
+        <div className="flex min-w-0 flex-1 items-baseline gap-3">
+          <span className="font-display text-[18px] font-semibold tracking-[0.32em] whitespace-nowrap text-white">CUP</span>
+          <span className="overflow-hidden text-[13px] text-ellipsis whitespace-nowrap text-cream">
             {staff.displayName} · {staff.branch ? staff.branch.name : 'Filial belgilanmagan'}
           </span>
         </div>
-        <button className="topbar__logout" onClick={logout} type="button">
+        <button className="min-h-10 shrink-0 cursor-pointer rounded-sm border border-white/40 bg-transparent px-3.5 text-[13px] font-semibold text-white" onClick={logout} type="button">
           Chiqish
         </button>
       </header>
-      <nav aria-label="Bo‘limlar" className="tabs">
+      <nav aria-label="Bo‘limlar" className="flex gap-1 overflow-x-auto border-b border-line px-3 pt-2">
         {TABS.map((t) => (
-          <button aria-current={route.name === t.name ? 'page' : undefined} className={`tabs__tab${route.name === t.name ? ' tabs__tab--on' : ''}`} key={t.name} onClick={t.go} type="button">
+          <button aria-current={route.name === t.name ? 'page' : undefined} className={cx('font-[inherit] leading-[inherit] min-h-12 flex-1 cursor-pointer border-x-0 border-t-0 border-b-[3px] bg-transparent text-[14px] font-bold tracking-[0.04em] whitespace-nowrap', route.name === t.name ? 'border-terracotta text-black' : 'border-transparent text-muted')} key={t.name} onClick={t.go} type="button">
             {t.label}
           </button>
         ))}
       </nav>
-      <main className="content">
+      <main>
         {route.name === 'scan' && <ScanPage />}
         {route.name === 'customers' && <CustomersPage onSessionExpired={logout} />}
         {route.name === 'recent' && <RecentPage onSessionExpired={logout} />}

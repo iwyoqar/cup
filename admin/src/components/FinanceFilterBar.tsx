@@ -12,7 +12,7 @@ export function FinanceFilterBar({ range, onRangeChange, branchId, onBranchChang
     <FilterBar>
       <FinancePeriodPicker onChange={onRangeChange} value={range} />
       <FilterField label="Branch">
-        <select className="select" onChange={(e) => onBranchChange(e.target.value)} value={branchId}>
+        <select className="" onChange={(e) => onBranchChange(e.target.value)} value={branchId}>
           <option value="">All branches</option>
           <BranchOptions />
         </select>

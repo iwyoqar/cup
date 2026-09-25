@@ -3,6 +3,7 @@ import { createCampaign, CampaignInput, updateCampaign } from '../lib/adminCampa
 import { ApiError } from '../lib/api';
 import { fetchSegments } from '../lib/adminSegments';
 import { Campaign, Segment } from '../lib/types';
+import { Button } from '../ui';
 
 const MAX_MESSAGE_LENGTH = 4096; // Telegram's own hard sendMessage limit — mirrors campaigns.dto.ts.
 
@@ -72,22 +73,22 @@ export function CampaignForm({ existing, onSaved, onCancel }: CampaignFormProps)
     <form onSubmit={handleSubmit}>
       <h1>{existing ? 'Edit campaign' : 'Create campaign'}</h1>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="campaign-name">Name</label>
         <input id="campaign-name" onChange={(e) => setName(e.target.value)} type="text" value={name} />
       </div>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="campaign-description">Description</label>
         <input id="campaign-description" onChange={(e) => setDescription(e.target.value)} type="text" value={description} />
       </div>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="campaign-segment">Segment</label>
         {segments === null ? (
-          <p className="hint-text">Loading segments...</p>
+          <p className="text-[13px] leading-snug text-muted">Loading segments...</p>
         ) : segments.length === 0 ? (
-          <p className="hint-text">No active segments available. Create one under Segments first.</p>
+          <p className="text-[13px] leading-snug text-muted">No active segments available. Create one under Segments first.</p>
         ) : (
           <select id="campaign-segment" onChange={(e) => setSegmentId(e.target.value)} value={segmentId}>
             <option value="">Select a segment</option>
@@ -100,33 +101,32 @@ export function CampaignForm({ existing, onSaved, onCancel }: CampaignFormProps)
         )}
       </div>
 
-      <div className="field" style={{ maxWidth: 520 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[520px]">
         <label htmlFor="campaign-message">Message (Telegram, plain text)</label>
         <textarea
           id="campaign-message"
           onChange={(e) => setMessageText(e.target.value)}
           rows={6}
-          style={{ border: '1px solid var(--cup-border)', borderRadius: 8, padding: '10px 12px', fontSize: 14, fontFamily: 'inherit' }}
           value={messageText}
         />
-        <span className={messageText.length > MAX_MESSAGE_LENGTH ? 'error-text' : 'hint-text'}>
+        <span className={messageText.length > MAX_MESSAGE_LENGTH ? 'text-[13px] font-semibold text-err' : 'text-[13px] leading-snug text-muted'}>
           {messageText.length} / {MAX_MESSAGE_LENGTH}
         </span>
       </div>
 
       {error && (
-        <p className="error-text" style={{ marginTop: 16 }}>
+        <p className="text-[13px] font-semibold text-err mt-4">
           {error}
         </p>
       )}
 
-      <div className="settings-footer">
-        <button className="button-primary" disabled={isSaving} type="submit">
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <Button disabled={isSaving} type="submit" variant="primary">
           {isSaving ? 'Saving...' : 'Save draft'}
-        </button>
-        <button className="button-secondary" disabled={isSaving} onClick={onCancel} type="button">
+        </Button>
+        <Button disabled={isSaving} onClick={onCancel} variant="secondary">
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

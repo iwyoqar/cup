@@ -3,7 +3,7 @@ import { formatSom } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { useReportsProducts } from '../lib/useReportsProducts';
 import { ReportsProductRow, ReportsProductsOverview, ReportsSource } from '../lib/types';
-import { Column, DataTable, DateRangePicker, DateRangeValue, ErrorState, FilterBar, FilterField, isRangeReady, LoadingState, PageHeader, SearchInput, SectionCard, StatCard, StatGrid } from '../ui';
+import { Column, cx, DataTable, DateRangePicker, DateRangeValue, ErrorState, FilterBar, FilterField, isRangeReady, LoadingState, PageHeader, SearchInput, SectionCard, StatCard, StatGrid } from '../ui';
 import { number, PosterTotals, PosterUnavailable, ProductDetailModal, ProductsTable, ReconciliationCard, SortSelect, SortState, sortRows, somOrDash, SourceSelect } from './reportsProductShared';
 
 type SortKey = 'revenue' | 'quantity' | 'averagePrice' | 'theoreticalGrossProfit' | 'theoreticalCOGS';
@@ -26,7 +26,7 @@ const SORT_VALUE: Record<SortKey, (p: ReportsProductRow) => number | null> = {
 
 type Unmapped = { posterProductId: string; name: string | null; quantity: number; revenueMinor: number };
 const unmappedColumns: Column<Unmapped>[] = [
-  { key: 'id', header: 'Poster product ID', cell: (u) => <span className="table__primary">{u.posterProductId}</span> },
+  { key: 'id', header: 'Poster product ID', cell: (u) => <span className="font-semibold text-black">{u.posterProductId}</span> },
   { key: 'name', header: 'Name (from Poster)', cell: (u) => u.name ?? '—' },
   { key: 'q', header: 'Units', numeric: true, cell: (u) => number(u.quantity) },
   { key: 'r', header: 'Revenue', numeric: true, cell: (u) => formatSom(u.revenueMinor) },
@@ -61,7 +61,7 @@ export function ReportsProductsPage() {
       <FilterBar>
         <DateRangePicker onChange={setRange} value={range} />
         <FilterField label="Branch">
-          <select className="select" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
+          <select className="" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
             <option value="">All branches</option>
             {(data?.filters.branches ?? []).map((b) => (
               <option key={b.id} value={b.id}>
@@ -71,7 +71,7 @@ export function ReportsProductsPage() {
           </select>
         </FilterField>
         <FilterField label="Category">
-          <select className="select" onChange={(e) => setCategoryId(e.target.value)} value={categoryId}>
+          <select className="" onChange={(e) => setCategoryId(e.target.value)} value={categoryId}>
             <option value="">All categories</option>
             {(data?.filters.categories ?? []).map((c) => (
               <option key={c.id} value={c.id}>
@@ -85,7 +85,7 @@ export function ReportsProductsPage() {
         <SortSelect onChange={setSort} options={SORT_OPTIONS} value={sort} />
         <SearchInput label="Search products" onChange={setSearch} placeholder="Search product" value={search} />
         {data && !error && (
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
+          <span className="text-[13px] leading-snug text-muted self-center">
             {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
             {loading && ' · updating…'}
           </span>
@@ -96,11 +96,11 @@ export function ReportsProductsPage() {
       {!data && !error && ready && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity var(--motion-base) var(--ease)' }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <Summary data={data} />
 
           {data.warnings.length > 0 && (
-            <div className="callout">
+            <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">
               {data.warnings.map((w) => (
                 <p key={w}>{w}</p>
               ))}
@@ -160,12 +160,12 @@ function PosterReference({ data }: { data: ReportsProductsOverview }) {
           <PosterTotals quantity={ref.totalQuantity} revenue={ref.totalRevenueMinor} />
           {unmapped.length > 0 && (
             <>
-              <h3 style={{ margin: '16px 0 4px' }}>Unmapped Poster products</h3>
-              <p className="hint-text">Sold in Poster but with no CUP product (matched only by Poster product ID). Not created in CUP, not dropped.</p>
+              <h3 className="mt-4 mb-1 mx-0">Unmapped Poster products</h3>
+              <p className="text-[13px] leading-snug text-muted">Sold in Poster but with no CUP product (matched only by Poster product ID). Not created in CUP, not dropped.</p>
               <DataTable
                 columns={[
                   { key: 'id', header: 'Poster product ID', cell: (u) => u.posterProductId },
-                  { key: 'name', header: 'Name', cell: (u) => <span className="table__primary">{u.name}</span> },
+                  { key: 'name', header: 'Name', cell: (u) => <span className="font-semibold text-black">{u.name}</span> },
                   { key: 'q', header: 'Units', numeric: true, cell: (u) => number(u.quantity) },
                   { key: 'r', header: 'Revenue', numeric: true, cell: (u) => formatSom(u.revenueMinor) },
                 ]}

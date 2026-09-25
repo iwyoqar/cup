@@ -3,7 +3,7 @@ import { formatSom } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { useReportsLocations } from '../lib/useReportsLocations';
 import { ReportsLocationsOverview } from '../lib/types';
-import { BarChart, ChartContainer, Column, DataTable, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, FilterField, HBarList, isRangeReady, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
+import { BarChart, Button, ChartContainer, Column, cx, DataTable, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, FilterField, HBarList, isRangeReady, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
 
@@ -29,7 +29,7 @@ export function ReportsLocationsPage() {
       <FilterBar>
         <DateRangePicker onChange={setRange} value={range} />
         <FilterField label="Branch">
-          <select className="select" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
+          <select className="" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
             <option value="">All branches</option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -39,7 +39,7 @@ export function ReportsLocationsPage() {
           </select>
         </FilterField>
         {data && !error && (
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
+          <span className="text-[13px] leading-snug text-muted self-center">
             {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
             {loading && ' · updating…'}
           </span>
@@ -50,7 +50,7 @@ export function ReportsLocationsPage() {
       {!data && !error && ready && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity var(--motion-base) var(--ease)' }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           {data.branch ? <BranchDetail branchName={data.branch.name} data={data} onBack={() => setBranchId('')} /> : <AllBranches data={data} onSelectBranch={setBranchId} />}
           <PosterReferenceCard data={data} />
         </div>
@@ -61,7 +61,7 @@ export function ReportsLocationsPage() {
 
 function AllBranches({ data, onSelectBranch }: { data: ReportsLocationsOverview; onSelectBranch: (id: string) => void }) {
   const columns: Column<BranchRow>[] = [
-    { key: 'name', header: 'Branch', cell: (b) => <span className="table__primary">{b.branchName}</span> },
+    { key: 'name', header: 'Branch', cell: (b) => <span className="font-semibold text-black">{b.branchName}</span> },
     { key: 'revenue', header: 'Revenue', numeric: true, cell: (b) => formatSom(b.revenue) },
     { key: 'orders', header: 'Orders', numeric: true, cell: (b) => number(b.orders) },
     { key: 'customers', header: 'Customers', numeric: true, cell: (b) => number(b.customers) },
@@ -82,7 +82,7 @@ function AllBranches({ data, onSelectBranch }: { data: ReportsLocationsOverview;
       </StatGrid>
 
       {data.notes.length > 0 && (
-        <div className="callout">
+        <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">
           {data.notes.map((n) => (
             <p key={n}>{n}</p>
           ))}
@@ -114,10 +114,10 @@ function AllBranches({ data, onSelectBranch }: { data: ReportsLocationsOverview;
 function BranchDetail({ branchName, data, onBack }: { branchName: string; data: ReportsLocationsOverview; onBack: () => void }) {
   return (
     <>
-      <button className="button-secondary" onClick={onBack} style={{ marginBottom: 8 }} type="button">
+      <Button onClick={onBack} className="mb-2" variant="secondary">
         ← Back to all locations
-      </button>
-      <h2 style={{ margin: '4px 0 0' }}>{branchName}</h2>
+      </Button>
+      <h2 className="mt-1 mb-0 mx-0">{branchName}</h2>
 
       <StatGrid>
         <StatCard hint="CUP + independent POS" label="Revenue" strong value={formatSom(data.summary.revenue)} />
@@ -127,14 +127,14 @@ function BranchDetail({ branchName, data, onBack }: { branchName: string; data: 
       </StatGrid>
 
       {data.notes.length > 0 && (
-        <div className="callout">
+        <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">
           {data.notes.map((n) => (
             <p key={n}>{n}</p>
           ))}
         </div>
       )}
 
-      <div className="grid-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ChartContainer description="Revenue per business day at this branch." title="Revenue trend">
           <BarChart ariaLabel="Daily revenue" data={data.trend.map((d) => ({ label: d.date, value: d.revenue }))} format={formatSom} />
         </ChartContainer>
@@ -143,7 +143,7 @@ function BranchDetail({ branchName, data, onBack }: { branchName: string; data: 
         </ChartContainer>
       </div>
 
-      <div className="grid-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <SourceMix summary={data.summary} />
         {data.detail && (
           <SectionCard description="Who bought at this branch in the period (identified customers only)." title="Customer mix">

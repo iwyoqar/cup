@@ -160,7 +160,7 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
                         { label: 'Cashback', value: data.membership.cashback.enabled ? formatSom(data.membership.cashback.balance) : 'Off' },
                       ]}
                     />
-                    <p className="hint-text mt-3">
+                    <p className="text-[13px] leading-snug text-muted mt-3">
                       {data.membership.nextLevel ? `${formatSom(data.membership.nextLevel.spendToNext)} to ${data.membership.nextLevel.name}` : 'Top level reached'}
                       {data.membership.streak.enabled ? ` · Streak ${data.membership.streak.current} (best ${data.membership.streak.best})` : ''}
                       {data.membership.cashback.enabled ? ` · Cashback earned ${formatSom(data.membership.cashback.lifetimeEarned)}` : ''}
@@ -284,7 +284,7 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
                       { label: 'Referral points earned', value: data.referral.rewardPointsEarned.total.toLocaleString('ru-RU') },
                     ]}
                   />
-                  <p className="hint-text mt-3">
+                  <p className="text-[13px] leading-snug text-muted mt-3">
                     {data.referral.referredBy
                       ? `Referred by ${data.referral.referredBy.referrerName ?? 'a customer'} — ${data.referral.referredBy.status}${data.referral.referredBy.at ? ` (since ${formatDate(data.referral.referredBy.at)})` : ''}.`
                       : 'Not referred by another customer.'}

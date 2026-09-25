@@ -3,7 +3,7 @@ import { createTaxRule, fetchTaxRules, updateTaxRule } from '../lib/adminFinance
 import { ApiError } from '../lib/api';
 import { formatDate } from '../lib/format';
 import { FinanceTaxRule } from '../lib/types';
-import { Column, DataTable, EmptyState, ErrorState, LoadingState, Modal, SectionCard, StatusBadge } from '../ui';
+import { Button, Column, DataTable, EmptyState, ErrorState, LoadingState, Modal, SectionCard, StatusBadge } from '../ui';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const BASE_LABEL: Record<string, string> = { REVENUE: 'Revenue', GROSS_PROFIT: 'Gross Profit', OPERATING_PROFIT: 'Operating Profit' };
@@ -29,7 +29,7 @@ export function FinanceTaxesTab() {
   };
 
   const columns: Column<FinanceTaxRule>[] = [
-    { key: 'name', header: 'Name', cell: (r) => <span className="table__primary">{r.name}</span> },
+    { key: 'name', header: 'Name', cell: (r) => <span className="font-semibold text-black">{r.name}</span> },
     { key: 'rate', header: 'Rate', numeric: true, cell: (r) => `${r.ratePct}%` },
     { key: 'base', header: 'Applied to', low: true, cell: (r) => BASE_LABEL[r.calculationBase] ?? r.calculationBase },
     { key: 'from', header: 'Effective from', low: true, cell: (r) => formatDate(r.effectiveFrom) },
@@ -40,21 +40,21 @@ export function FinanceTaxesTab() {
       header: '',
       actions: true,
       cell: (r) => (
-        <button className="button-secondary button--sm" onClick={() => toggleActive(r)} type="button">
+        <Button onClick={() => toggleActive(r)} size="sm" variant="secondary">
           {r.isActive ? 'Deactivate' : 'Activate'}
-        </button>
+        </Button>
       ),
     },
   ];
 
   return (
-    <div className="stack">
+    <div className="flex min-w-0 flex-col gap-5">
       {error && <ErrorState message={error} onRetry={load} title="Tax rules could not be loaded" />}
       <SectionCard
         actions={
-          <button className="button-primary" onClick={() => setShowAdd(true)} type="button">
+          <Button onClick={() => setShowAdd(true)} variant="primary">
             + Tax rule
-          </button>
+          </Button>
         }
         description="Configurable, transparent tax rules applied to Revenue, Gross Profit, or Operating Profit — never a hardcoded rate."
         flush
@@ -107,27 +107,27 @@ function AddTaxRuleModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
     <Modal
       footer={
         <>
-          <button className="button-secondary" onClick={onClose} type="button">
+          <Button onClick={onClose} variant="secondary">
             Cancel
-          </button>
-          <button className="button-primary" disabled={saving} onClick={submit} type="button">
+          </Button>
+          <Button disabled={saving} onClick={submit} variant="primary">
             {saving ? 'Saving…' : 'Create tax rule'}
-          </button>
+          </Button>
         </>
       }
       onClose={onClose}
       title="New tax rule"
     >
-      {error && <p className="error-text">{error}</p>}
-      <div className="field">
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="tax-name">Name</label>
         <input id="tax-name" onChange={(e) => setName(e.target.value)} value={name} />
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="tax-rate">Rate (%)</label>
         <input id="tax-rate" onChange={(e) => setRate(e.target.value)} type="number" value={rate} />
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="tax-base">Applied to</label>
         <select id="tax-base" onChange={(e) => setBase(e.target.value as typeof base)} value={base}>
           <option value="REVENUE">Revenue</option>
@@ -135,7 +135,7 @@ function AddTaxRuleModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
           <option value="OPERATING_PROFIT">Operating Profit</option>
         </select>
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="tax-from">Effective from</label>
         <input id="tax-from" onChange={(e) => setEffectiveFrom(e.target.value)} type="date" value={effectiveFrom} />
       </div>

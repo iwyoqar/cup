@@ -1,6 +1,7 @@
 import { OrderSummary } from '../../types/api';
 import { formatDateTime, formatSom } from '../../lib/format';
 import { getOrderStatusLabel, getOrderStatusTone } from '../../lib/orderStatusLabels';
+import { cx } from '../../lib/cx';
 
 interface OrderHistoryCardProps {
   order: OrderSummary;
@@ -14,16 +15,16 @@ interface OrderHistoryCardProps {
 export function OrderHistoryCard({ order, onOpen }: OrderHistoryCardProps) {
   const tone = getOrderStatusTone(order.status);
   return (
-    <button className="row" onClick={onOpen} type="button">
-      <span className="row__main">
-        <span className="row__title">{formatDateTime(order.createdAt)}</span>
-        {order.branch && <span className="row__meta">{order.branch.name}</span>}
-        <span className={`status${tone === 'active' ? ' status--active' : tone === 'muted' ? ' status--muted' : ''}`}>
+    <button className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-line py-4 text-left cursor-pointer active:bg-cream-soft" onClick={onOpen} type="button">
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-lead font-semibold">{formatDateTime(order.createdAt)}</span>
+        {order.branch && <span className="text-small text-muted">{order.branch.name}</span>}
+        <span className={cx("inline-flex items-center gap-1.5 text-small font-semibold before:size-[7px] before:shrink-0 before:rounded-full before:content-['']", tone === 'active' ? 'before:bg-terracotta' : tone === 'muted' ? 'text-muted before:bg-muted' : 'before:bg-black')}>
           {getOrderStatusLabel(order.status)}
         </span>
       </span>
-      <span className="row__aside">
-        <span className="row__amount">{formatSom(order.totalMinor)}</span>
+      <span className="flex shrink-0 flex-col items-end gap-0.5 text-right tabular-nums">
+        <span className="text-lead font-semibold">{formatSom(order.totalMinor)}</span>
       </span>
     </button>
   );

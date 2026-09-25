@@ -3,27 +3,7 @@ import { formatSom } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { useAnalyticsOverview } from '../lib/useAnalyticsOverview';
 import { AnalyticsOverview } from '../lib/types';
-import {
-  BarChart,
-  ChartContainer,
-  Column,
-  DataTable,
-  DateRangePicker,
-  DateRangeValue,
-  EmptyState,
-  ErrorState,
-  FilterBar,
-  FilterField,
-  HBarList,
-  isRangeReady,
-  KeyValue,
-  LoadingState,
-  PageHeader,
-  SectionCard,
-  StatCard,
-  StatGrid,
-  StatusBadge,
-} from '../ui';
+import { BarChart, ChartContainer, Column, cx, DataTable, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, FilterField, HBarList, isRangeReady, KeyValue, LoadingState, PageHeader, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
 const percent = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—');
@@ -47,7 +27,7 @@ export function AnalyticsPage({ view }: { view: 'sales' | 'analytics' }) {
       <FilterBar>
         <DateRangePicker onChange={setRange} value={range} />
         <FilterField label="Branch">
-          <select className="select" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
+          <select className="" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
             <option value="">All branches</option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -57,7 +37,7 @@ export function AnalyticsPage({ view }: { view: 'sales' | 'analytics' }) {
           </select>
         </FilterField>
         {data && !error && (
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
+          <span className="text-[13px] leading-snug text-muted self-center">
             {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
             {data.branch ? ` · ${data.branch.name}` : ' · All branches'}
             {loading && ' · updating…'}
@@ -69,7 +49,7 @@ export function AnalyticsPage({ view }: { view: 'sales' | 'analytics' }) {
       {!data && !error && ready && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity var(--motion-base) var(--ease)' }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           {view === 'sales' ? <SalesView data={data} /> : <AnalyticsView data={data} />}
         </div>
       )}
@@ -79,7 +59,7 @@ export function AnalyticsPage({ view }: { view: 'sales' | 'analytics' }) {
 
 function productColumns(revenueTotal: number): Column<Product>[] {
   return [
-    { key: 'name', header: 'Product', cell: (p) => <span className="table__primary">{p.name}</span> },
+    { key: 'name', header: 'Product', cell: (p) => <span className="font-semibold text-black">{p.name}</span> },
     { key: 'qty', header: 'Qty', numeric: true, cell: (p) => number(p.quantity) },
     { key: 'revenue', header: 'Revenue', numeric: true, cell: (p) => formatSom(p.revenue) },
     { key: 'share', header: 'Share of revenue', numeric: true, low: true, cell: (p) => percent(p.revenue, revenueTotal) },
@@ -114,7 +94,7 @@ function SourceCard({ data }: { data: AnalyticsOverview }) {
       ) : (
         <EmptyState text="No revenue was recorded in this period." title="No sales" variant="inline" />
       )}
-      {!pos.importedDataExists && <p className="hint-text">No Poster POS receipts have been imported for this period yet.</p>}
+      {!pos.importedDataExists && <p className="text-[13px] leading-snug text-muted">No Poster POS receipts have been imported for this period yet.</p>}
     </SectionCard>
   );
 }
@@ -131,7 +111,7 @@ function SalesView({ data }: { data: AnalyticsOverview }) {
       <ChartContainer description="Revenue per business day." title="Daily sales">
         <BarChart ariaLabel="Daily revenue" data={data.revenueByDay.map((d) => ({ label: d.date, value: d.revenue }))} format={formatSom} />
       </ChartContainer>
-      <div className="grid-main">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <ProductsCard data={data} />
         <SourceCard data={data} />
       </div>
@@ -149,7 +129,7 @@ function AnalyticsView({ data }: { data: AnalyticsOverview }) {
         <StatCard label="Returning customers" value={number(data.returningCustomers)} />
         <StatCard hint="Returning ÷ (new + returning)" label="Repeat share" value={percent(data.returningCustomers, totalCustomers)} />
       </StatGrid>
-      <div className="grid-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <SectionCard description="Who bought in this period." title="Customers">
           {totalCustomers > 0 ? (
             <HBarList
@@ -176,7 +156,7 @@ function AnalyticsView({ data }: { data: AnalyticsOverview }) {
         <BarChart ariaLabel="Daily revenue" data={data.revenueByDay.map((d) => ({ label: d.date, value: d.revenue }))} format={formatSom} />
       </ChartContainer>
       {!data.sourceBreakdown.pos.importedDataExists && (
-        <div className="callout">
+        <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">
           <StatusBadge>Note</StatusBadge> Poster POS receipts appear here after they are imported (POS Import) or synced automatically (Continuous Sync).
         </div>
       )}

@@ -4,7 +4,7 @@ import { formatSom } from '../lib/format';
 import { AdminPage } from '../lib/nav';
 import { AdminProfile } from '../lib/types';
 import { useAnalyticsOverview } from '../lib/useAnalyticsOverview';
-import { BarChart, ChartContainer, EmptyState, ErrorState, FilterBar, FilterField, HBarList, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
+import { BarChart, Button, ChartContainer, cx, EmptyState, ErrorState, FilterBar, FilterField, HBarList, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
 import { HealthList } from '../ui/HealthList';
 
 type Window = 'today' | 'last7' | 'last30';
@@ -42,9 +42,9 @@ export function DashboardPage({ admin, onNavigate }: DashboardPageProps) {
     <>
       <PageHeader
         actions={
-          <button className="button-secondary" disabled={loading} onClick={reload} type="button">
+          <Button disabled={loading} onClick={reload} variant="secondary">
             Refresh
-          </button>
+          </Button>
         }
         description={`Here is how CUP is doing — ${label}. Signed in as ${admin.email}.`}
         title={greeting(new Date())}
@@ -52,7 +52,7 @@ export function DashboardPage({ admin, onNavigate }: DashboardPageProps) {
 
       <FilterBar>
         <FilterField label="Period">
-          <select className="select" onChange={(e) => setWindowKey(e.target.value as Window)} value={windowKey}>
+          <select className="" onChange={(e) => setWindowKey(e.target.value as Window)} value={windowKey}>
             {WINDOWS.map((w) => (
               <option key={w.key} value={w.key}>
                 {w.label}
@@ -61,7 +61,7 @@ export function DashboardPage({ admin, onNavigate }: DashboardPageProps) {
           </select>
         </FilterField>
         {data && !error && (
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
+          <span className="text-[13px] leading-snug text-muted self-center">
             {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
           </span>
         )}
@@ -71,7 +71,7 @@ export function DashboardPage({ admin, onNavigate }: DashboardPageProps) {
       {!data && !error && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity var(--motion-base) var(--ease)' }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <StatGrid>
             <StatCard hint="CUP + imported POS" label="Revenue" strong value={formatSom(data.revenue)} />
             <StatCard label="Orders" value={number(data.orders)} />
@@ -79,12 +79,12 @@ export function DashboardPage({ admin, onNavigate }: DashboardPageProps) {
             <StatCard hint="Revenue ÷ orders" label="Average order" value={formatSom(data.averageOrder)} />
           </StatGrid>
 
-          <div className="grid-main">
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <ChartContainer
               actions={
-                <button className="button-text" onClick={() => onNavigate('sales')} type="button">
+                <Button onClick={() => onNavigate('sales')} variant="ghost">
                   Open Sales
-                </button>
+                </Button>
               }
               description="Revenue per business day."
               title="Sales trend"
@@ -94,9 +94,9 @@ export function DashboardPage({ admin, onNavigate }: DashboardPageProps) {
 
             <SectionCard
               actions={
-                <button className="button-text" onClick={() => onNavigate('system-health')} type="button">
+                <Button onClick={() => onNavigate('system-health')} variant="ghost">
                   Details
-                </button>
+                </Button>
               }
               description={pulse.checkedAt ? `Checked ${pulse.checkedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Checking…'}
               title="System status"
@@ -105,12 +105,12 @@ export function DashboardPage({ admin, onNavigate }: DashboardPageProps) {
             </SectionCard>
           </div>
 
-          <div className="grid-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <SectionCard
               actions={
-                <button className="button-text" onClick={() => onNavigate('analytics')} type="button">
+                <Button onClick={() => onNavigate('analytics')} variant="ghost">
                   Open Analytics
-                </button>
+                </Button>
               }
               description={`Best sellers — ${label}.`}
               title="Top products"
@@ -126,9 +126,9 @@ export function DashboardPage({ admin, onNavigate }: DashboardPageProps) {
 
             <SectionCard
               actions={
-                <button className="button-text" onClick={() => onNavigate('customers')} type="button">
+                <Button onClick={() => onNavigate('customers')} variant="ghost">
                   Open Customers
-                </button>
+                </Button>
               }
               description={`Who bought — ${label}.`}
               title="Customer activity"

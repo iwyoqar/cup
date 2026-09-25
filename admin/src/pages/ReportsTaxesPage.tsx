@@ -13,7 +13,7 @@ const BASE_LABEL: Record<string, string> = { REVENUE: 'Revenue', GROSS_PROFIT: '
 const REASON_LABEL: Record<string, string> = { INACTIVE: 'Rule inactive', NOT_IN_EFFECT: 'Not in effect in this period', PARTIAL_PERIOD_NOT_PRORATED: 'Only partly in effect — not prorated' };
 
 const posterColumns: Column<PosterTax>[] = [
-  { key: 'n', header: 'Tax', cell: (t) => <span className="table__primary">{t.name}</span> },
+  { key: 'n', header: 'Tax', cell: (t) => <span className="font-semibold text-black">{t.name}</span> },
   { key: 't', header: 'Type', cell: (t) => t.typeLabel ?? '—' },
   { key: 'r', header: 'Rate', numeric: true, cell: (t) => (t.ratePercent === null ? '—' : `${t.ratePercent}%`) },
   { key: 'f', header: 'Fiscal', low: true, cell: (t) => (t.fiscal === null ? '—' : t.fiscal ? 'Yes' : 'No') },
@@ -22,7 +22,7 @@ const posterColumns: Column<PosterTax>[] = [
 ];
 
 const cupColumns: Column<CupRule>[] = [
-  { key: 'n', header: 'Rule', cell: (r) => <span className="table__primary">{r.name}</span> },
+  { key: 'n', header: 'Rule', cell: (r) => <span className="font-semibold text-black">{r.name}</span> },
   { key: 'r', header: 'Rate', numeric: true, cell: (r) => `${r.ratePct}%` },
   { key: 'b', header: 'Tax base', cell: (r) => BASE_LABEL[r.calculationBase] ?? r.calculationBase },
   { key: 'ba', header: 'Base amount', numeric: true, low: true, cell: (r) => (r.baseAmountMinor === null ? '—' : formatSom(r.baseAmountMinor)) },

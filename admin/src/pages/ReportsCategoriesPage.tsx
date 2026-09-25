@@ -4,25 +4,7 @@ import { findNav } from '../lib/nav';
 import { useReportsCategories } from '../lib/useReportsCategories';
 import { useReportsProducts } from '../lib/useReportsProducts';
 import { ReportsCategoriesOverview, ReportsCategoryRow, ReportsProductRow, ReportsSource } from '../lib/types';
-import {
-  Column,
-  DataTable,
-  DateRangePicker,
-  DateRangeValue,
-  EmptyState,
-  ErrorState,
-  FilterBar,
-  FilterField,
-  isRangeReady,
-  KeyValue,
-  LoadingState,
-  Modal,
-  PageHeader,
-  SectionCard,
-  StatCard,
-  StatGrid,
-  StatusBadge,
-} from '../ui';
+import { Button, Column, cx, DataTable, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, FilterField, isRangeReady, KeyValue, LoadingState, Modal, PageHeader, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
 import { number, pct, PosterTotals, PosterUnavailable, ProductDetailModal, ProductsTable, ReconciliationCard, SortSelect, SortState, sortRows, somOrDash, SourceSelect, sourceLine } from './reportsProductShared';
 
 type SortKey = 'revenue' | 'units' | 'productCount' | 'theoreticalCOGS' | 'theoreticalGrossProfit';
@@ -48,7 +30,7 @@ const columns: Column<ReportsCategoryRow>[] = [
     key: 'name',
     header: 'Category',
     cell: (c) => (
-      <span className="table__primary">
+      <span className="font-semibold text-black">
         {c.categoryName}
         {!c.categoryActive && ' (inactive)'}
       </span>
@@ -87,7 +69,7 @@ export function ReportsCategoriesPage() {
       <FilterBar>
         <DateRangePicker onChange={setRange} value={range} />
         <FilterField label="Branch">
-          <select className="select" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
+          <select className="" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
             <option value="">All branches</option>
             {(data?.filters.branches ?? []).map((b) => (
               <option key={b.id} value={b.id}>
@@ -99,7 +81,7 @@ export function ReportsCategoriesPage() {
         <SourceSelect onChange={setSource} value={source} />
         <SortSelect onChange={setSort} options={SORT_OPTIONS} value={sort} />
         {data && !error && (
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
+          <span className="text-[13px] leading-snug text-muted self-center">
             {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
             {loading && ' · updating…'}
           </span>
@@ -110,11 +92,11 @@ export function ReportsCategoriesPage() {
       {!data && !error && ready && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity var(--motion-base) var(--ease)' }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <Summary data={data} />
 
           {data.warnings.length > 0 && (
-            <div className="callout">
+            <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">
               {data.warnings.map((w) => (
                 <p key={w}>{w}</p>
               ))}
@@ -138,9 +120,9 @@ export function ReportsCategoriesPage() {
           {data.uncategorized && (
             <SectionCard
               actions={
-                <button className="button-secondary" onClick={() => setShowUncategorized((v) => !v)} type="button">
+                <Button onClick={() => setShowUncategorized((v) => !v)} variant="secondary">
                   {showUncategorized ? 'Hide products' : 'Show products'}
-                </button>
+                </Button>
               }
               description="Imported POS sales of Poster products with no CUP product, so no CUP category. Counted in totals, never assigned to a category."
               title="Uncategorized"
@@ -154,7 +136,7 @@ export function ReportsCategoriesPage() {
               {showUncategorized && (
                 <DataTable
                   columns={[
-                    { key: 'id', header: 'Poster product ID', cell: (u) => <span className="table__primary">{u.posterProductId}</span> },
+                    { key: 'id', header: 'Poster product ID', cell: (u) => <span className="font-semibold text-black">{u.posterProductId}</span> },
                     { key: 'q', header: 'Units', numeric: true, cell: (u) => number(u.quantity) },
                     { key: 'r', header: 'Revenue', numeric: true, cell: (u) => formatSom(u.revenueMinor) },
                   ]}
@@ -199,7 +181,7 @@ function CategoryDetail({ category, filters, onClose }: { category: ReportsCateg
   return (
     <Modal onClose={onClose} title={category.categoryName} wide>
       {category.isPosterTopScreen && (
-        <p style={{ marginTop: 0 }}>
+        <p className="mt-0">
           <StatusBadge tone="warn">Poster top-screen category</StatusBadge>
         </p>
       )}
@@ -217,7 +199,7 @@ function CategoryDetail({ category, filters, onClose }: { category: ReportsCateg
           { key: 'poster', label: 'Poster reference (comparison only)', value: category.posterReference ? sourceLine(category.posterReference.quantity, category.posterReference.revenueMinor) : 'Not available' },
         ]}
       />
-      <h3 style={{ margin: '16px 0 8px' }}>Products</h3>
+      <h3 className="mt-4 mb-2 mx-0">Products</h3>
       {error && <ErrorState message={error} onRetry={reload} title="Products could not be loaded" />}
       {!data && !error && loading && <LoadingState />}
       {data && !error && <ProductsTable onSelect={setProduct} rows={data.products} showCategory={false} />}
@@ -238,12 +220,12 @@ function PosterReference({ data }: { data: ReportsCategoriesOverview }) {
           <PosterTotals quantity={ref.totalQuantity} revenue={ref.totalRevenueMinor} />
           {ref.unmapped.length > 0 && (
             <>
-              <h3 style={{ margin: '16px 0 4px' }}>Unmapped Poster categories</h3>
-              <p className="hint-text">Poster categories with no CUP category. Not created in CUP.</p>
+              <h3 className="mt-4 mb-1 mx-0">Unmapped Poster categories</h3>
+              <p className="text-[13px] leading-snug text-muted">Poster categories with no CUP category. Not created in CUP.</p>
               <DataTable
                 columns={[
                   { key: 'id', header: 'Poster category ID', cell: (u) => u.posterCategoryId },
-                  { key: 'name', header: 'Name', cell: (u) => <span className="table__primary">{u.name}</span> },
+                  { key: 'name', header: 'Name', cell: (u) => <span className="font-semibold text-black">{u.name}</span> },
                   { key: 'q', header: 'Units', numeric: true, cell: (u) => number(u.quantity) },
                   { key: 'r', header: 'Revenue', numeric: true, cell: (u) => formatSom(u.revenueMinor) },
                 ]}

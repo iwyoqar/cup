@@ -18,21 +18,13 @@ import {
 import { ApiError } from '../lib/api';
 import { formatDateTime } from '../lib/format';
 import { LoyaltySettings } from '../lib/types';
-import { ErrorState, LoadingState } from '../ui';
+import { Button, cx, ErrorState, LoadingState, tableClass, Toggle } from '../ui';
 
 const message = (err: unknown) => (err instanceof ApiError ? err.backendMessage : 'Request failed.');
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="toggle">
-      <input checked={checked} onChange={(e) => onChange(e.target.checked)} type="checkbox" />
-      <span className="toggle__track" />
-    </label>
-  );
-}
 
 function Num({ value, onChange, min = 0, step = 1 }: { value: number; onChange: (v: number) => void; min?: number; step?: number }) {
-  return <input min={min} onChange={(e) => onChange(Number.isFinite(Number(e.target.value)) ? Number(e.target.value) : min)} step={step} style={{ width: 110 }} type="number" value={value} />;
+  return <input min={min} onChange={(e) => onChange(Number.isFinite(Number(e.target.value)) ? Number(e.target.value) : min)} step={step} className="w-[110px]" type="number" value={value} />;
 }
 
 // Phase 12 — Loyalty 2.0 admin: program switches, membership levels, achievements. Nothing here is hardcoded: every value is
@@ -114,131 +106,126 @@ export function Loyalty2Page() {
 
   return (
     <div>
-      <p className="hint-text">Membership levels, XP, cashback, achievements, streak and birthday. Everything is configuration; nothing is earned until the program is switched on.</p>
-      {error && <p className="error-text">{error}</p>}
-      {notice && <p className="success-text">{notice}</p>}
+      <p className="text-[13px] leading-snug text-muted">Membership levels, XP, cashback, achievements, streak and birthday. Everything is configuration; nothing is earned until the program is switched on.</p>
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      {notice && <p className="text-[13px] font-semibold text-ok">{notice}</p>}
 
-      <div className="settings-card">
-        <h3 style={{ margin: 0 }}>Program</h3>
-        <div className="settings-row">
-          <span className="settings-row__label">Loyalty 2.0 enabled</span>
+      <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+        <h3 className="m-0">Program</h3>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Loyalty 2.0 enabled</span>
           <Toggle checked={draft.enabled} onChange={(v) => setD('enabled', v)} />
         </div>
-        <p className="hint-text" style={{ margin: 0 }}>
+        <p className="text-[13px] leading-snug text-muted m-0">
           {settings.accrualStartsAt ? `Cashback and points accrue only for purchases from ${formatDateTime(settings.accrualStartsAt)}. Level and XP use the full purchase history.` : 'The first time the program is enabled, the accrual start is set to that moment (no retroactive cashback).'}
         </p>
-        <hr className="settings-divider" />
-        <div className="settings-row">
-          <span className="settings-row__label">XP</span>
-          <div className="settings-row__control">
+        <hr className="m-0 h-px border-0 bg-line" />
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">XP</span>
+          <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
             <Num min={0} onChange={(v) => setD('xpRate', v)} value={draft.xpRate} /> XP per <Num min={1} onChange={(v) => setD('xpUnitAmount', v)} value={draft.xpUnitAmount} /> so&apos;m
           </div>
         </div>
-        <div className="settings-row">
-          <span className="settings-row__label">Cashback (percent is set per level below)</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Cashback (percent is set per level below)</span>
           <Toggle checked={draft.cashbackEnabled} onChange={(v) => setD('cashbackEnabled', v)} />
         </div>
-        <div className="settings-row">
-          <span className="settings-row__label">Earn loyalty points on purchases</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Earn loyalty points on purchases</span>
           <Toggle checked={draft.purchasePointsEnabled} onChange={(v) => setD('purchasePointsEnabled', v)} />
         </div>
-        <div className="settings-row">
-          <span className="settings-row__label">Points earn rate (existing loyalty rule)</span>
-          <div className="settings-row__control">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Points earn rate (existing loyalty rule)</span>
+          <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
             <Num min={1} onChange={(v) => setRuleDraft({ ...ruleDraft, earnUnitAmount: v })} value={ruleDraft.earnUnitAmount} /> so&apos;m ={' '}
             <Num min={0} onChange={(v) => setRuleDraft({ ...ruleDraft, earnRate: v })} value={ruleDraft.earnRate} /> point(s) × level multiplier
           </div>
         </div>
-        <div className="settings-row">
-          <span className="settings-row__label">Visit streak</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Visit streak</span>
           <Toggle checked={draft.streakEnabled} onChange={(v) => setD('streakEnabled', v)} />
         </div>
-        <div className="settings-row">
-          <span className="settings-row__label">Birthday reward</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Birthday reward</span>
           <Toggle checked={draft.birthdayEnabled} onChange={(v) => setD('birthdayEnabled', v)} />
         </div>
-        <div className="settings-row">
-          <span className="settings-row__label">Birthday reward points / window (days)</span>
-          <div className="settings-row__control">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Birthday reward points / window (days)</span>
+          <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
             <Num min={0} onChange={(v) => setD('birthdayRewardPoints', v)} value={draft.birthdayRewardPoints} /> <Num min={1} onChange={(v) => setD('birthdayWindowDays', v)} value={draft.birthdayWindowDays} />
           </div>
         </div>
-        <div className="settings-row">
-          <span className="settings-row__label">Referral (legacy flag, not used — configure the program under Admin › Referrals)</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+          <span className="text-sm font-semibold">Referral (legacy flag, not used — configure the program under Admin › Referrals)</span>
           <Toggle checked={draft.referralEnabled} onChange={(v) => setD('referralEnabled', v)} />
         </div>
         <div>
-          <button className="button-primary" disabled={busy || !settingsChanged} onClick={saveSettings} type="button">
+          <Button disabled={busy || !settingsChanged} onClick={saveSettings} variant="primary">
             {busy ? 'Saving...' : 'Save settings'}
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div className="settings-card">
-        <h3 style={{ margin: 0 }}>Membership levels</h3>
-        <p className="hint-text" style={{ margin: 0 }}>A customer&apos;s level is derived from lifetime spend (CUP + POS) — it is never assigned by hand. The lowest level must start at 0.</p>
+      <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+        <h3 className="m-0">Membership levels</h3>
+        <p className="text-[13px] leading-snug text-muted m-0">A customer&apos;s level is derived from lifetime spend (CUP + POS) — it is never assigned by hand. The lowest level must start at 0.</p>
         <div className="overflow-x-auto">
-          <table className="data-table" style={{ marginTop: 0, minWidth: 780 }}>
+          <table className="w-full border-separate border-spacing-0 text-sm min-w-[780px]">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Icon</th>
-                <th>Color</th>
-                <th>From (so&apos;m)</th>
-                <th>Cashback %</th>
-                <th>Points ×%</th>
-                <th>Priority</th>
-                <th>Active</th>
+                <th className={tableClass.th}>Code</th>
+                <th className={tableClass.th}>Name</th>
+                <th className={tableClass.th}>Icon</th>
+                <th className={tableClass.th}>Color</th>
+                <th className={tableClass.th}>From (so&apos;m)</th>
+                <th className={tableClass.th}>Cashback %</th>
+                <th className={tableClass.th}>Points ×%</th>
+                <th className={tableClass.th}>Priority</th>
+                <th className={tableClass.th}>Active</th>
               </tr>
             </thead>
             <tbody>
               {levels.map((l) => (
-                <tr key={l.code}>
-                  <td>{l.code}</td>
-                  <td><input onChange={(e) => setLevel(l.code, { name: e.target.value })} style={{ width: 100 }} value={l.name} /></td>
-                  <td><input onChange={(e) => setLevel(l.code, { icon: e.target.value })} style={{ width: 50 }} value={l.icon} /></td>
-                  <td><input onChange={(e) => setLevel(l.code, { color: e.target.value })} style={{ width: 90 }} value={l.color} /></td>
-                  <td><Num min={0} onChange={(v) => setLevel(l.code, { minLifetimeSpend: v })} value={l.minLifetimeSpend} /></td>
-                  <td><Num min={0} onChange={(v) => setLevel(l.code, { cashbackRateBps: Math.round(v * 100) })} step={0.1} value={l.cashbackRateBps / 100} /></td>
-                  <td><Num min={0} onChange={(v) => setLevel(l.code, { pointMultiplierPercent: v })} value={l.pointMultiplierPercent} /></td>
-                  <td><Toggle checked={l.prioritySupport} onChange={(v) => setLevel(l.code, { prioritySupport: v })} /></td>
-                  <td><Toggle checked={l.isActive} onChange={(v) => setLevel(l.code, { isActive: v })} /></td>
+                <tr className={tableClass.tr} key={l.code}>
+                  <td className={tableClass.td}>{l.code}</td>
+                  <td className={tableClass.td}><input onChange={(e) => setLevel(l.code, { name: e.target.value })} className="w-[100px]" value={l.name} /></td>
+                  <td className={tableClass.td}><input onChange={(e) => setLevel(l.code, { icon: e.target.value })} className="w-[50px]" value={l.icon} /></td>
+                  <td className={tableClass.td}><input onChange={(e) => setLevel(l.code, { color: e.target.value })} className="w-[90px]" value={l.color} /></td>
+                  <td className={tableClass.td}><Num min={0} onChange={(v) => setLevel(l.code, { minLifetimeSpend: v })} value={l.minLifetimeSpend} /></td>
+                  <td className={tableClass.td}><Num min={0} onChange={(v) => setLevel(l.code, { cashbackRateBps: Math.round(v * 100) })} step={0.1} value={l.cashbackRateBps / 100} /></td>
+                  <td className={tableClass.td}><Num min={0} onChange={(v) => setLevel(l.code, { pointMultiplierPercent: v })} value={l.pointMultiplierPercent} /></td>
+                  <td className={tableClass.td}><Toggle checked={l.prioritySupport} onChange={(v) => setLevel(l.code, { prioritySupport: v })} /></td>
+                  <td className={tableClass.td}><Toggle checked={l.isActive} onChange={(v) => setLevel(l.code, { isActive: v })} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <div>
-          <button
-            className="button-primary"
-            disabled={busy}
-            onClick={() =>
+          <Button disabled={busy} onClick={() =>
               run(async () => {
                 setLevels(await saveLoyalty2Levels(levels.map(({ code, name, color, icon, minLifetimeSpend, cashbackRateBps, pointMultiplierPercent, prioritySupport, isActive }) => ({ code, name, color, icon, minLifetimeSpend, cashbackRateBps, pointMultiplierPercent, prioritySupport, isActive }))));
               }, 'Levels saved.')
-            }
-            type="button"
-          >
+            } variant="primary">
             Save levels
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div className="settings-card">
-        <h3 style={{ margin: 0 }}>Achievements</h3>
-        <p className="hint-text" style={{ margin: 0 }}>Unlock automatically, once per customer. Coffee achievements need a category before they can be activated.</p>
+      <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+        <h3 className="m-0">Achievements</h3>
+        <p className="text-[13px] leading-snug text-muted m-0">Unlock automatically, once per customer. Coffee achievements need a category before they can be activated.</p>
         <div className="overflow-x-auto">
-          <table className="data-table" style={{ marginTop: 0, minWidth: 860 }}>
+          <table className="w-full border-separate border-spacing-0 text-sm min-w-[860px]">
             <thead>
               <tr>
-                <th>Achievement</th>
-                <th>Condition</th>
-                <th>Target</th>
-                <th>Extra</th>
-                <th>Reward pts</th>
-                <th>Active</th>
-                <th />
+                <th className={tableClass.th}>Achievement</th>
+                <th className={tableClass.th}>Condition</th>
+                <th className={tableClass.th}>Target</th>
+                <th className={tableClass.th}>Extra</th>
+                <th className={tableClass.th}>Reward pts</th>
+                <th className={tableClass.th}>Active</th>
+                <th className={tableClass.th} />
               </tr>
             </thead>
             <tbody>
@@ -266,9 +253,9 @@ function AchievementRowEditor({ row, categories, onSaved, run }: { row: Achievem
   return (
     <tr>
       <td>
-        <input onChange={(e) => setD({ ...d, icon: e.target.value })} style={{ width: 44 }} value={d.icon} />{' '}
-        <input onChange={(e) => setD({ ...d, name: e.target.value })} style={{ width: 130 }} value={d.name} />
-        <div className="hint-text">{d.code}</div>
+        <input onChange={(e) => setD({ ...d, icon: e.target.value })} className="w-[44px]" value={d.icon} />{' '}
+        <input onChange={(e) => setD({ ...d, name: e.target.value })} className="w-[130px]" value={d.name} />
+        <div className="text-[13px] leading-snug text-muted">{d.code}</div>
       </td>
       <td>{CONDITION_LABELS[d.conditionType] ?? d.conditionType}</td>
       <td><Num min={1} onChange={(v) => setD({ ...d, conditionValue: v })} value={d.conditionValue} /></td>
@@ -290,20 +277,15 @@ function AchievementRowEditor({ row, categories, onSaved, run }: { row: Achievem
       <td><Num min={0} onChange={(v) => setD({ ...d, rewardPoints: v })} value={d.rewardPoints} /></td>
       <td><Toggle checked={d.isActive} onChange={(v) => setD({ ...d, isActive: v })} /></td>
       <td>
-        <button
-          className="button-secondary"
-          disabled={!changed}
-          onClick={() =>
+        <Button disabled={!changed} onClick={() =>
             run(async () => {
               const saved = await updateLoyalty2Achievement(row.id, { name: d.name, description: d.description, icon: d.icon, conditionType: d.conditionType, conditionValue: d.conditionValue, conditionParam: d.conditionParam, categoryId: d.categoryId, rewardPoints: d.rewardPoints, isActive: d.isActive, sortOrder: d.sortOrder });
               setD(saved);
               onSaved(saved);
             }, `${d.name} saved.`)
-          }
-          type="button"
-        >
+          } variant="secondary">
           Save
-        </button>
+        </Button>
       </td>
     </tr>
   );
@@ -315,29 +297,29 @@ function NewAchievement({ categories, onCreated, run }: { categories: CatalogCat
   if (!open) {
     return (
       <div>
-        <button className="button-secondary" onClick={() => setOpen(true)} type="button">
+        <Button onClick={() => setOpen(true)} variant="secondary">
           Add achievement
-        </button>
+        </Button>
       </div>
     );
   }
   return (
-    <div className="settings-card" style={{ margin: 0 }}>
-      <div className="settings-row">
-        <span className="settings-row__label">Code / name / icon</span>
-        <div className="settings-row__control">
-          <input onChange={(e) => setD({ ...d, code: e.target.value.toUpperCase() })} placeholder="CODE" style={{ width: 130 }} value={d.code} />
-          <input onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="Name" style={{ width: 150 }} value={d.name} />
-          <input onChange={(e) => setD({ ...d, icon: e.target.value })} style={{ width: 50 }} value={d.icon} />
+    <div className="flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium m-0">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+        <span className="text-sm font-semibold">Code / name / icon</span>
+        <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
+          <input onChange={(e) => setD({ ...d, code: e.target.value.toUpperCase() })} placeholder="CODE" className="w-[130px]" value={d.code} />
+          <input onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="Name" className="w-[150px]" value={d.name} />
+          <input onChange={(e) => setD({ ...d, icon: e.target.value })} className="w-[50px]" value={d.icon} />
         </div>
       </div>
-      <div className="settings-row">
-        <span className="settings-row__label">Description</span>
-        <input onChange={(e) => setD({ ...d, description: e.target.value })} style={{ width: 320 }} value={d.description} />
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+        <span className="text-sm font-semibold">Description</span>
+        <input onChange={(e) => setD({ ...d, description: e.target.value })} className="w-[320px]" value={d.description} />
       </div>
-      <div className="settings-row">
-        <span className="settings-row__label">Condition</span>
-        <div className="settings-row__control">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+        <span className="text-sm font-semibold">Condition</span>
+        <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
           <select onChange={(e) => setD({ ...d, conditionType: e.target.value })} value={d.conditionType}>
             {Object.entries(CONDITION_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
@@ -355,29 +337,25 @@ function NewAchievement({ categories, onCreated, run }: { categories: CatalogCat
           {d.conditionType === 'MORNING_PURCHASES' && <Num min={1} onChange={(v) => setD({ ...d, conditionParam: v })} value={d.conditionParam ?? 11} />}
         </div>
       </div>
-      <div className="settings-row">
-        <span className="settings-row__label">Reward points / active</span>
-        <div className="settings-row__control">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+        <span className="text-sm font-semibold">Reward points / active</span>
+        <div className="flex items-center gap-2 text-sm [&_input[type=number]]:h-9 [&_input[type=number]]:w-24 [&_input[type=text]]:h-9 [&_select]:h-9">
           <Num min={0} onChange={(v) => setD({ ...d, rewardPoints: v })} value={d.rewardPoints} /> <Toggle checked={d.isActive} onChange={(v) => setD({ ...d, isActive: v })} />
         </div>
       </div>
       <div>
-        <button
-          className="button-primary"
-          onClick={() =>
+        <Button onClick={() =>
             run(async () => {
               const created = await createLoyalty2Achievement({ ...d, sortOrder: 100 });
               onCreated(created);
               setOpen(false);
             }, 'Achievement created.')
-          }
-          type="button"
-        >
+          } variant="primary">
           Create
-        </button>{' '}
-        <button className="button-secondary" onClick={() => setOpen(false)} type="button">
+        </Button>{' '}
+        <Button onClick={() => setOpen(false)} variant="secondary">
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import { CampaignForm } from '../components/CampaignForm';
 import { CampaignDetailView } from '../components/CampaignDetailView';
 
 import { findNav } from '../lib/nav';
-import { Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '../ui';
+import { Button, Column, DataTable, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '../ui';
 import type { BadgeTone } from '../ui';
 
 // Restrained status tones: a draft is quiet, a finished send is calm green, a failure stands out.
@@ -92,7 +92,7 @@ export function CampaignsPage() {
   }
 
   const columns: Column<CampaignListItem>[] = [
-    { key: 'name', header: 'Campaign', cell: (campaign) => <span className="table__primary">{campaign.name}</span> },
+    { key: 'name', header: 'Campaign', cell: (campaign) => <span className="font-semibold text-black">{campaign.name}</span> },
     { key: 'segment', header: 'Audience', cell: (campaign) => campaign.segment.name },
     { key: 'channel', header: 'Channel', low: true, cell: () => 'Telegram' },
     { key: 'status', header: 'Status', cell: (campaign) => <StatusBadge dot tone={CAMPAIGN_TONE[campaign.status] ?? 'neutral'}>{STATUS_LABELS[campaign.status] ?? campaign.status}</StatusBadge> },
@@ -104,9 +104,9 @@ export function CampaignsPage() {
     <>
       <PageHeader
         actions={
-          <button className="button-primary" onClick={() => setView({ kind: 'create' })} type="button">
+          <Button onClick={() => setView({ kind: 'create' })} variant="primary">
             + Create campaign
-          </button>
+          </Button>
         }
         description={findNav('campaigns').item.description}
         title={findNav('campaigns').item.label}
@@ -119,9 +119,9 @@ export function CampaignsPage() {
         flush
         footer={
           nextCursor ? (
-            <button className="button-secondary" disabled={isLoadingMore} onClick={handleLoadMore} type="button">
+            <Button disabled={isLoadingMore} onClick={handleLoadMore} variant="secondary">
               {isLoadingMore ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           ) : undefined
         }
         title="Campaigns"
@@ -134,9 +134,9 @@ export function CampaignsPage() {
             empty={
               <EmptyState
                 action={
-                  <button className="button-primary" onClick={() => setView({ kind: 'create' })} type="button">
+                  <Button onClick={() => setView({ kind: 'create' })} variant="primary">
                     + Create campaign
-                  </button>
+                  </Button>
                 }
                 text="A campaign sends one message to a segment of customers. Create a segment first if you have none, then compose the campaign."
                 title="No campaigns yet"

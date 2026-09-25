@@ -7,7 +7,16 @@ import { AdminCustomerListItem } from '../lib/types';
 import { CustomerDetailView } from '../components/CustomerDetailView';
 import { LIFECYCLE_LABELS, LifecycleState } from '../lib/adminGrowth';
 import { findNav } from '../lib/nav';
-import { Column, ConfirmDialog, DataTable, EmptyState, ErrorState, FilterBar, LoadingState, PageHeader, SearchInput, SectionCard } from '../ui';
+
+const LIFECYCLE_BADGE: Record<LifecycleState, string> = {
+  NEW: 'border-transparent bg-cream',
+  ACTIVE: 'border-black/12 bg-[#efe9df]',
+  LOYAL: 'border-transparent bg-cream',
+  AT_RISK: 'border-transparent bg-[#f3c9b8]',
+  DORMANT: 'border-black bg-black text-white',
+  CHURNED: 'border-black bg-black text-white',
+};
+import { Button, Column, ConfirmDialog, cx, DataTable, EmptyState, ErrorState, FilterBar, LoadingState, PageHeader, SearchInput, SectionCard } from '../ui';
 
 // Phase 4 Part 9: Customers page — search + table, click a row to open Customer 360. Detail
 // navigation is local to this page (no router library, same pattern as Dashboard/Loyalty
@@ -92,7 +101,7 @@ export function CustomersPage() {
   }
 
   const columns: Column<AdminCustomerListItem>[] = [
-    { key: 'name', header: 'Name', cell: (c) => <span className="table__primary">{c.displayName ?? '—'}</span> },
+    { key: 'name', header: 'Name', cell: (c) => <span className="font-semibold text-black">{c.displayName ?? '—'}</span> },
     { key: 'phone', header: 'Phone', low: true, cell: (c) => c.phone ?? '—' },
     { key: 'orders', header: 'Orders', numeric: true, cell: (c) => c.orderCount },
     { key: 'spent', header: 'Total spent', numeric: true, cell: (c) => formatSom(c.totalSpentMinor) },
@@ -104,7 +113,7 @@ export function CustomersPage() {
       cell: (customer) => (
         <span title={customer.growth.lifetimePurchases > 0 ? `Last purchase ${customer.growth.daysSinceLastPurchase} days ago · ${customer.growth.lifetimePurchases} purchases · ${formatSom(customer.growth.lifetimeRevenue)} (CUP + POS)` : 'No qualifying purchase yet'}>
           {customer.growth.lifecycleState ? (
-            <span className={`growth__badge growth__badge--${customer.growth.lifecycleState.toLowerCase()}`}>{LIFECYCLE_LABELS[customer.growth.lifecycleState as LifecycleState] ?? customer.growth.lifecycleState}</span>
+            <span className={cx('inline-block rounded-full border px-2.5 py-px text-xs font-semibold', LIFECYCLE_BADGE[customer.growth.lifecycleState as LifecycleState] ?? LIFECYCLE_BADGE.ACTIVE)}>{LIFECYCLE_LABELS[customer.growth.lifecycleState as LifecycleState] ?? customer.growth.lifecycleState}</span>
           ) : (
             '—'
           )}
@@ -117,16 +126,12 @@ export function CustomersPage() {
       header: '',
       actions: true,
       cell: (c) => (
-        <button
-          className="button-secondary button--sm"
-          onClick={(e) => {
+        <Button onClick={(e) => {
             e.stopPropagation();
             setDeactivateFor(c);
-          }}
-          type="button"
-        >
+          }} size="sm" variant="secondary">
           Deactivate
-        </button>
+        </Button>
       ),
     },
   ];
@@ -139,7 +144,7 @@ export function CustomersPage() {
         <SearchInput label="Search customers" onChange={setSearchInput} placeholder="Search name or phone" value={searchInput} />
       </FilterBar>
 
-      {notice && <div className="callout callout--ok">{notice}</div>}
+      {notice && <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-ok bg-ok-bg text-ok">{notice}</div>}
       {error && <ErrorState message={error} title="Customers could not be loaded" />}
 
       <SectionCard
@@ -147,9 +152,9 @@ export function CustomersPage() {
         flush
         footer={
           nextCursor ? (
-            <button className="button-secondary" disabled={isLoadingMore} onClick={handleLoadMore} type="button">
+            <Button disabled={isLoadingMore} onClick={handleLoadMore} variant="secondary">
               {isLoadingMore ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           ) : undefined
         }
         title="All customers"

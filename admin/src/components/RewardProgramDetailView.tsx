@@ -9,6 +9,7 @@ import {
 import { ApiError } from '../lib/api';
 import { formatDateTime } from '../lib/format';
 import { RewardProgram, RewardRedemptionItem } from '../lib/types';
+import { Button, tableClass } from '../ui';
 
 interface RewardProgramDetailViewProps {
   programId: string;
@@ -94,101 +95,101 @@ export function RewardProgramDetailView({ programId, onBack, onEdit, onDeleted }
 
   return (
     <div>
-      <button className="button-secondary" onClick={onBack} style={{ marginBottom: 16 }} type="button">
+      <Button onClick={onBack} className="mb-4" variant="secondary">
         ← Back to reward programs
-      </button>
+      </Button>
 
-      {error && <p className="error-text">{error}</p>}
-      {!program && !error && <p className="hint-text">Loading...</p>}
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      {!program && !error && <p className="text-[13px] leading-snug text-muted">Loading...</p>}
 
       {program && (
         <>
           <h1>{program.name}</h1>
-          {program.description && <p className="hint-text">{program.description}</p>}
+          {program.description && <p className="text-[13px] leading-snug text-muted">{program.description}</p>}
 
-          <div className="settings-card">
-            <div className="settings-row">
-              <span className="settings-row__label">Status</span>
+          <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Status</span>
               <span>{program.isActive ? 'Active' : 'Inactive'}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Rule</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Rule</span>
               <span>
                 Buy {program.buyQuantity}, get {program.rewardQuantity} free — {program.qualifyingCategory.name}
               </span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Starts</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Starts</span>
               <span>{formatDateTime(program.startsAt)}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Ends</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Ends</span>
               <span>{program.endsAt ? formatDateTime(program.endsAt) : 'No end date'}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Total redemptions</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Total redemptions</span>
               <span>{program.redemptionCount}</span>
             </div>
           </div>
 
-          <div className="settings-footer">
-            <button className="button-secondary" onClick={() => onEdit(program)} type="button">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Button onClick={() => onEdit(program)} variant="secondary">
               Edit
-            </button>
+            </Button>
             {program.isActive ? (
-              <button className="button-secondary" disabled={isBusy} onClick={handleDeactivate} type="button">
+              <Button disabled={isBusy} onClick={handleDeactivate} variant="secondary">
                 Deactivate
-              </button>
+              </Button>
             ) : (
-              <button className="button-primary" disabled={isBusy} onClick={handleActivate} type="button">
+              <Button disabled={isBusy} onClick={handleActivate} variant="primary">
                 Activate
-              </button>
+              </Button>
             )}
-            <button className="button-secondary" onClick={handleLoadRedemptions} type="button">
+            <Button onClick={handleLoadRedemptions} variant="secondary">
               View redemptions
-            </button>
-            <button className="button-secondary" disabled={isBusy} onClick={handleDelete} type="button">
+            </Button>
+            <Button disabled={isBusy} onClick={handleDelete} variant="secondary">
               {isBusy ? 'Working...' : 'Delete'}
-            </button>
+            </Button>
           </div>
 
           {showRedemptions && (
-            <div className="settings-card">
-              <h3 style={{ margin: 0 }}>Redemptions</h3>
+            <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+              <h3 className="m-0">Redemptions</h3>
               {redemptions === null ? (
-                <p className="hint-text">Loading...</p>
+                <p className="text-[13px] leading-snug text-muted">Loading...</p>
               ) : redemptions.length === 0 ? (
-                <p className="hint-text">No redemptions yet.</p>
+                <p className="text-[13px] leading-snug text-muted">No redemptions yet.</p>
               ) : (
                 <>
-                  <table className="data-table">
+                  <table className={tableClass.table}>
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>#</th>
-                        <th>Reward product</th>
-                        <th>Redeemed</th>
+                        <th className={tableClass.th}>Name</th>
+                        <th className={tableClass.th}>Phone</th>
+                        <th className={tableClass.th}>#</th>
+                        <th className={tableClass.th}>Reward product</th>
+                        <th className={tableClass.th}>Redeemed</th>
                       </tr>
                     </thead>
                     <tbody>
                       {redemptions.map((redemption, index) => (
-                        <tr key={`${redemption.customerId}-${redemption.redemptionIndex}-${index}`}>
-                          <td>{redemption.displayName ?? '—'}</td>
-                          <td>{redemption.phone ?? '—'}</td>
-                          <td>{redemption.redemptionIndex}</td>
-                          <td>
+                        <tr className={tableClass.tr} key={`${redemption.customerId}-${redemption.redemptionIndex}-${index}`}>
+                          <td className={tableClass.td}>{redemption.displayName ?? '—'}</td>
+                          <td className={tableClass.td}>{redemption.phone ?? '—'}</td>
+                          <td className={tableClass.td}>{redemption.redemptionIndex}</td>
+                          <td className={tableClass.td}>
                             {redemption.rewardProduct?.name ?? '—'} × {redemption.rewardQuantity}
                           </td>
-                          <td>{formatDateTime(redemption.redeemedAt)}</td>
+                          <td className={tableClass.td}>{formatDateTime(redemption.redeemedAt)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   {redemptionsCursor && (
-                    <button className="button-secondary" onClick={handleLoadMoreRedemptions} style={{ marginTop: 12 }} type="button">
+                    <Button onClick={handleLoadMoreRedemptions} className="mt-3" variant="secondary">
                       Load more
-                    </button>
+                    </Button>
                   )}
                 </>
               )}

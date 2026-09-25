@@ -19,7 +19,7 @@ export const SOURCE_OPTIONS: { key: ReportsSource; label: string }[] = [
 export function SourceSelect({ value, onChange }: { value: ReportsSource; onChange: (v: ReportsSource) => void }) {
   return (
     <FilterField label="Source">
-      <select className="select" onChange={(e) => onChange(e.target.value as ReportsSource)} value={value}>
+      <select className="" onChange={(e) => onChange(e.target.value as ReportsSource)} value={value}>
         {SOURCE_OPTIONS.map((o) => (
           <option key={o.key} value={o.key}>
             {o.label}
@@ -38,15 +38,15 @@ export interface SortState<K extends string> {
 export function SortSelect<K extends string>({ options, value, onChange }: { options: { key: K; label: string }[]; value: SortState<K>; onChange: (v: SortState<K>) => void }) {
   return (
     <FilterField label="Sort by">
-      <div style={{ display: 'flex', gap: 6 }}>
-        <select className="select" onChange={(e) => onChange({ ...value, by: e.target.value as K })} value={value.by}>
+      <div className="flex gap-1.5">
+        <select className="" onChange={(e) => onChange({ ...value, by: e.target.value as K })} value={value.by}>
           {options.map((o) => (
             <option key={o.key} value={o.key}>
               {o.label}
             </option>
           ))}
         </select>
-        <select aria-label="Sort direction" className="select" onChange={(e) => onChange({ ...value, direction: e.target.value as 'asc' | 'desc' })} value={value.direction}>
+        <select aria-label="Sort direction" className="" onChange={(e) => onChange({ ...value, direction: e.target.value as 'asc' | 'desc' })} value={value.direction}>
           <option value="desc">High → low</option>
           <option value="asc">Low → high</option>
         </select>
@@ -72,7 +72,7 @@ export function sourceLine(q: number, revenue: number) {
 
 export function productColumns(showCategory: boolean): Column<ReportsProductRow>[] {
   return [
-    { key: 'name', header: 'Product', cell: (p) => <span className="table__primary">{p.productName}</span> },
+    { key: 'name', header: 'Product', cell: (p) => <span className="font-semibold text-black">{p.productName}</span> },
     ...(showCategory ? [{ key: 'category', header: 'Category', low: true, cell: (p: ReportsProductRow) => p.categoryName }] : []),
     { key: 'units', header: 'Units', numeric: true, cell: (p) => number(p.quantity) },
     { key: 'revenue', header: 'Revenue', numeric: true, cell: (p) => formatSom(p.revenueMinor) },
@@ -108,7 +108,7 @@ export function ProductDetailModal({ product, onClose }: { product: ReportsProdu
           },
         ]}
       />
-      <p className="hint-text" style={{ marginTop: 12 }}>
+      <p className="text-[13px] leading-snug text-muted mt-3">
         Theoretical figures use the recipe cost Poster reports for this product — not actual inventory COGS. The Poster reference covers every sale Poster saw
         (CUP-originated included) and is never added to CUP figures.
       </p>

@@ -5,6 +5,7 @@ import { CatalogCategory, fetchActiveCategories } from '../lib/adminCatalog';
 import { fetchRewardPrograms } from '../lib/adminRewardPrograms';
 import { fetchSegments } from '../lib/adminSegments';
 import { AutomationInput, AutomationMeta, AutomationView, createAutomation, fetchAutomationMeta, TriggerConfig, TriggerType, updateAutomation } from '../lib/adminAutomations';
+import { Button } from '../ui';
 
 interface Props {
   existing: AutomationView | null;
@@ -119,31 +120,31 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
     }
   };
 
-  if (loadError) return <p className="error-text">{loadError}</p>;
-  if (!meta) return <p className="hint-text">Loading...</p>;
+  if (loadError) return <p className="text-[13px] font-semibold text-err">{loadError}</p>;
+  if (!meta) return <p className="text-[13px] leading-snug text-muted">Loading...</p>;
 
   const cfgNum = (key: string) => String(config[key] ?? '');
   const campaign = campaigns.find((c) => c.id === campaignId);
 
   return (
     <div>
-      <button className="button-secondary" onClick={onCancel} type="button" style={{ marginBottom: 16 }}>
+      <Button onClick={onCancel} className="mb-4" variant="secondary">
         ← Back
-      </button>
+      </Button>
       <h1>{existing ? 'Edit automation' : 'New automation'}</h1>
-      {locked && <p className="hint-text">This automation is ACTIVE: pause it to change the trigger, campaign or segment.</p>}
+      {locked && <p className="text-[13px] leading-snug text-muted">This automation is ACTIVE: pause it to change the trigger, campaign or segment.</p>}
 
-      <div className="settings-card">
-        <div className="field">
+      <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label htmlFor="a-name">Name</label>
           <input id="a-name" maxLength={100} onChange={(e) => setName(e.target.value)} type="text" value={name} />
         </div>
-        <div className="field">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label htmlFor="a-desc">Description</label>
           <input id="a-desc" maxLength={500} onChange={(e) => setDescription(e.target.value)} type="text" value={description} />
         </div>
 
-        <div className="field">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label htmlFor="a-trigger">Trigger</label>
           <select disabled={locked} id="a-trigger" onChange={(e) => changeTrigger(e.target.value as TriggerType)} value={triggerType}>
             {meta.triggers.map((t) => (
@@ -152,17 +153,17 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
               </option>
             ))}
           </select>
-          <span className="hint-text">{meta.triggers.find((t) => t.type === triggerType)?.description}</span>
+          <span className="text-[13px] leading-snug text-muted">{meta.triggers.find((t) => t.type === triggerType)?.description}</span>
         </div>
 
         {triggerType === 'FIRST_PURCHASE' && (
-          <div className="field">
+          <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
             <label>Delay after the purchase (minutes)</label>
             <input disabled={locked} min={0} onChange={(e) => setCfg({ delayMinutes: num(e.target.value) })} type="number" value={cfgNum('delayMinutes')} />
           </div>
         )}
         {triggerType === 'REWARD_UNLOCKED' && (
-          <div className="field">
+          <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
             <label>Reward program</label>
             <select disabled={locked} onChange={(e) => setCfg({ rewardProgramId: e.target.value })} value={String(config.rewardProgramId ?? '')}>
               <option value="">Choose…</option>
@@ -175,31 +176,31 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
           </div>
         )}
         {triggerType === 'BIRTHDAY' && (
-          <div className="field">
+          <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
             <label>Days before the birthday (0 = on the day)</label>
             <input disabled={locked} max={30} min={0} onChange={(e) => setCfg({ daysBefore: num(e.target.value) })} type="number" value={cfgNum('daysBefore')} />
           </div>
         )}
         {triggerType === 'INACTIVE_CUSTOMER' && (
           <>
-            <div className="field">
+            <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
               <label>Days inactive</label>
               <input disabled={locked} min={1} onChange={(e) => setCfg({ inactiveDays: num(e.target.value) })} type="number" value={cfgNum('inactiveDays')} />
             </div>
-            <label className="hint-text">
+            <label className="text-[13px] leading-snug text-muted">
               <input checked={config.includeExisting === true} disabled={locked} onChange={(e) => setCfg({ includeExisting: e.target.checked })} type="checkbox" /> Also include customers who were already inactive before activation
             </label>
           </>
         )}
         {triggerType === 'ABANDONED_CART' && (
-          <div className="field">
+          <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
             <label>Delay (minutes) — must be shorter than the cart expiry ({meta.cartExpiryMinutes} min)</label>
             <input disabled={locked} min={1} onChange={(e) => setCfg({ delayMinutes: num(e.target.value) })} type="number" value={cfgNum('delayMinutes')} />
           </div>
         )}
         {triggerType === 'LOYALTY_MILESTONE' && (
           <>
-            <div className="field">
+            <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
               <label>Metric</label>
               <select disabled={locked} onChange={(e) => setCfg({ metric: e.target.value })} value={String(config.metric ?? 'lifetimeSpend')}>
                 {METRICS.map((m) => (
@@ -210,7 +211,7 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
               </select>
             </div>
             {config.metric === 'lifetimeCoffeeQuantity' && (
-              <div className="field">
+              <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
                 <label>Category</label>
                 <select disabled={locked} onChange={(e) => setCfg({ categoryId: e.target.value })} value={String(config.categoryId ?? '')}>
                   <option value="">Choose…</option>
@@ -222,7 +223,7 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
                 </select>
               </div>
             )}
-            <div className="field">
+            <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
               <label>Threshold</label>
               <input disabled={locked} min={1} onChange={(e) => setCfg({ threshold: num(e.target.value) })} type="number" value={cfgNum('threshold')} />
             </div>
@@ -230,7 +231,7 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
         )}
         {triggerType === 'SCHEDULED_SEGMENT' && (
           <>
-            <div className="field">
+            <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
               <label>Frequency</label>
               <select disabled={locked} onChange={(e) => setCfg({ frequency: e.target.value, ...(e.target.value === 'WEEKLY' ? { weekday: 1 } : { weekday: undefined }) })} value={String(config.frequency ?? 'WEEKLY')}>
                 <option value="DAILY">Every day</option>
@@ -238,7 +239,7 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
               </select>
             </div>
             {config.frequency === 'WEEKLY' && (
-              <div className="field">
+              <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
                 <label>Weekday</label>
                 <select disabled={locked} onChange={(e) => setCfg({ weekday: Number(e.target.value) })} value={String(config.weekday ?? 1)}>
                   {WEEKDAYS.map((d, i) => (
@@ -249,14 +250,14 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
                 </select>
               </div>
             )}
-            <div className="field">
+            <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
               <label>Time (business time)</label>
               <input disabled={locked} onChange={(e) => setCfg({ time: e.target.value })} type="time" value={String(config.time ?? '10:00')} />
             </div>
           </>
         )}
 
-        <div className="field">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label>Segment {triggerType === 'SCHEDULED_SEGMENT' ? '(the audience — required)' : '(optional filter)'}</label>
           <select disabled={locked} onChange={(e) => setSegmentId(e.target.value)} value={segmentId}>
             <option value="">{triggerType === 'SCHEDULED_SEGMENT' ? 'Choose…' : 'Everyone the trigger matches'}</option>
@@ -268,7 +269,7 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
           </select>
         </div>
 
-        <div className="field">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label>Campaign (the message and channel)</label>
           <select disabled={locked} onChange={(e) => setCampaignId(e.target.value)} value={campaignId}>
             <option value="">Choose…</option>
@@ -278,30 +279,30 @@ export function AutomationForm({ existing, onCancel, onSaved }: Props) {
               </option>
             ))}
           </select>
-          <span className="hint-text">
+          <span className="text-[13px] leading-snug text-muted">
             The message text comes from the campaign. Allowed variables: {meta.variables.map((v) => `{{${v}}}`).join(' ')}.
             {campaign && campaign.status !== 'draft' && campaign.status !== 'completed' ? ' This campaign is not ready (being sent or failed).' : ''}
           </span>
         </div>
 
-        <div className="field">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label>Cooldown (hours between sends to the same customer)</label>
           <input min={0} onChange={(e) => setCooldownHours(e.target.value)} type="number" value={cooldownHours} />
         </div>
-        <div className="field">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label>Max sends per customer (empty = unlimited)</label>
           <input min={1} onChange={(e) => setMaxSends(e.target.value)} type="number" value={maxSends} />
         </div>
       </div>
 
-      {error && <p className="error-text">{error}</p>}
-      <div className="settings-footer">
-        <button className="button-primary" disabled={saving || name.trim() === '' || campaignId === ''} onClick={submit} type="button">
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <Button disabled={saving || name.trim() === '' || campaignId === ''} onClick={submit} variant="primary">
           {saving ? 'Saving...' : existing ? 'Save changes' : 'Create automation'}
-        </button>
-        <button className="button-secondary" disabled={saving} onClick={onCancel} type="button">
+        </Button>
+        <Button disabled={saving} onClick={onCancel} variant="secondary">
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

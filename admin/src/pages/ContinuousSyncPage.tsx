@@ -4,7 +4,7 @@ import { errorMessage } from '../lib/errors';
 import { formatAgo, formatDateTime, formatDuration } from '../lib/format';
 import { deriveHealth } from '../lib/health';
 import { findNav } from '../lib/nav';
-import { Column, DataTable, EmptyState, ErrorState, FilterBar, FilterField, KeyValue, LoadingState, PageHeader, Pagination, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
+import { Button, Column, DataTable, EmptyState, ErrorState, FilterBar, FilterField, KeyValue, LoadingState, PageHeader, Pagination, SectionCard, StatCard, StatGrid, StatusBadge, cx } from '../ui';
 import { HealthList } from '../ui/HealthList';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
@@ -70,7 +70,7 @@ export function ContinuousSyncPage() {
   const base = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '').replace(/\/+$/, '');
 
   const columns: Column<EventRow>[] = [
-    { key: 'tx', header: 'Poster #', cell: (e) => <span className="table__primary">#{e.transactionId}</span> },
+    { key: 'tx', header: 'Poster #', cell: (e) => <span className="font-semibold text-black">#{e.transactionId}</span> },
     { key: 'action', header: 'Action', low: true, cell: (e) => e.action },
     { key: 'received', header: 'Received', cell: (e) => formatDateTime(e.receivedAt) },
     {
@@ -79,7 +79,7 @@ export function ContinuousSyncPage() {
       cell: (e) => (
         <>
           {statusBadge(e.status)}
-          {e.status === 'QUEUED' && e.attempts > 0 && <span className="table__sub">retry {formatDateTime(e.nextAttemptAt)}</span>}
+          {e.status === 'QUEUED' && e.attempts > 0 && <span className="mt-0.5 block text-xs font-normal text-muted">retry {formatDateTime(e.nextAttemptAt)}</span>}
         </>
       ),
     },
@@ -90,7 +90,7 @@ export function ContinuousSyncPage() {
       cell: (e) => (
         <>
           {outcomeLabel(e.outcome)}
-          {e.lastError && <span className="table__sub">{e.lastError}</span>}
+          {e.lastError && <span className="mt-0.5 block text-xs font-normal text-muted">{e.lastError}</span>}
         </>
       ),
     },
@@ -102,9 +102,9 @@ export function ContinuousSyncPage() {
       actions: true,
       cell: (e) =>
         e.status === 'DEAD' ? (
-          <button className="button-secondary button--sm" onClick={() => retry(e.id)} type="button">
+          <Button onClick={() => retry(e.id)} size="sm" variant="secondary">
             Retry
-          </button>
+          </Button>
         ) : null,
     },
   ];
@@ -115,9 +115,9 @@ export function ContinuousSyncPage() {
         actions={
           <>
             {status && <StatusBadge dot tone={status.config.syncEnabled ? 'ok' : 'warn'}>{status.config.syncEnabled ? 'Automatic import ON' : 'Automatic import OFF'}</StatusBadge>}
-            <button className="button-secondary" disabled={busy} onClick={() => setTick((t) => t + 1)} type="button">
+            <Button disabled={busy} onClick={() => setTick((t) => t + 1)} variant="secondary">
               {busy ? 'Loading…' : 'Refresh'}
-            </button>
+            </Button>
           </>
         }
         description={item.description}
@@ -130,16 +130,16 @@ export function ContinuousSyncPage() {
       {status && (
         <>
           {status.alerts.length > 0 ? (
-            <div className="callout callout--warn" role="status">
+            <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-terracotta bg-cream-soft text-warn" role="status">
               <strong>Needs attention</strong>
-              <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              <ul className="mt-1.5 mb-0 mx-0 pl-4.5">
                 {status.alerts.map((a) => (
                   <li key={a}>{a}</li>
                 ))}
               </ul>
             </div>
           ) : (
-            <div className="callout callout--ok">Everything is healthy: no alerts.</div>
+            <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-ok bg-ok-bg text-ok">Everything is healthy: no alerts.</div>
           )}
 
           <StatGrid>
@@ -149,7 +149,7 @@ export function ContinuousSyncPage() {
             <StatCard hint={status.queue.dead > 0 ? 'need a manual retry' : 'none'} label="Dead" strong={status.queue.dead > 0} value={number(status.queue.dead)} />
           </StatGrid>
 
-          <div className="grid-main">
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <SectionCard description="A calm row means it is working; a tinted row needs a look." title="Health">
               <HealthList items={health} />
             </SectionCard>
@@ -163,15 +163,15 @@ export function ContinuousSyncPage() {
                   { key: 'overlap', label: 'Safety overlap', value: `${status.config.reconcileOverlapMinutes} min` },
                 ]}
               />
-              <div className="hint-text">
+              <div className="text-[13px] leading-snug text-muted">
                 Webhook URL for Poster
                 <br />
-                <code style={{ overflowWrap: 'anywhere' }}>{base + status.config.webhookPath}</code>
+                <code className="[overflow-wrap:anywhere]">{base + status.config.webhookPath}</code>
               </div>
             </SectionCard>
           </div>
 
-          <div className="grid-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <SectionCard description="Webhooks and the background processor." title="Activity">
               <KeyValue
                 rows={[
@@ -194,12 +194,12 @@ export function ContinuousSyncPage() {
                 ]}
               />
               {status.reconciliation.lastError && (
-                <div className={`callout${status.reconciliation.lastError.resolved ? '' : ' callout--err'}`}>
+                <div className={cx('block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0', status.reconciliation.lastError.resolved ? 'border-muted-cream bg-neutral-bg text-muted-cream' : 'border-err bg-err-bg text-err')}>
                   Last error ({formatDateTime(status.reconciliation.lastError.at)}
                   {status.reconciliation.lastError.resolved ? ', since resolved' : ', checkpoint NOT advanced'}): {status.reconciliation.lastError.message}
                 </div>
               )}
-              {status.reconciliation.last?.blockedBy && <div className="callout">Checkpoint held: {status.reconciliation.last.blockedBy}.</div>}
+              {status.reconciliation.last?.blockedBy && <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">Checkpoint held: {status.reconciliation.last.blockedBy}.</div>}
             </SectionCard>
           </div>
         </>
@@ -211,7 +211,7 @@ export function ContinuousSyncPage() {
             <FilterField label="Show">
               <select
                 aria-label="Filter events"
-                className="select"
+                className=""
                 onChange={(e) => {
                   setFilter(e.target.value);
                   setPage(1);

@@ -1,4 +1,5 @@
 import { SEGMENT_FIELD_META, SEGMENT_FIELDS, SEGMENT_OPERATOR_LABELS, SegmentCondition, SegmentField } from '../lib/types';
+import { Button } from '../ui';
 
 interface SegmentConditionBuilderProps {
   conditions: SegmentCondition[];
@@ -40,11 +41,11 @@ export function SegmentConditionBuilder({ conditions, onChange }: SegmentConditi
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="flex flex-col gap-2.5">
       {conditions.map((condition, index) => {
         const meta = SEGMENT_FIELD_META[condition.field];
         return (
-          <div key={index} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div key={index} className="flex gap-2 items-center">
             <select value={condition.field} onChange={(e) => handleFieldChange(index, e.target.value as SegmentField)}>
               {SEGMENT_FIELDS.map((field) => (
                 <option key={field} value={field}>
@@ -88,15 +89,15 @@ export function SegmentConditionBuilder({ conditions, onChange }: SegmentConditi
                 value={condition.value}
               />
             )}
-            <button className="button-secondary" onClick={() => handleRemove(index)} type="button">
+            <Button onClick={() => handleRemove(index)} variant="secondary">
               Remove
-            </button>
+            </Button>
           </div>
         );
       })}
-      <button className="button-secondary" onClick={handleAdd} type="button" style={{ alignSelf: 'flex-start' }}>
+      <Button onClick={handleAdd} className="self-start" variant="secondary">
         + Add condition
-      </button>
+      </Button>
     </div>
   );
 }

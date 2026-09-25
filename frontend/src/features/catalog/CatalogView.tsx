@@ -71,42 +71,42 @@ export function CatalogView({ branchName, cart, sync, syncError, onOpenCart, onC
 
   if (!catalog) {
     return (
-      <div className="app-shell">
+      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <CatalogSkeleton branchName={branchName} />
       </div>
     );
   }
 
   return (
-    <div className="app-shell">
-      <header className="masthead">
-        <div className="masthead__bar">
-          <span className="brand-mark">CUP</span>
-          <button className="icon-button" aria-label="Hisobim" onClick={onOpenAccount} type="button">
+    <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <header className="px-4 pt-2">
+        <div className="flex min-h-11 items-center justify-between">
+          <span className="font-display text-[20px] font-semibold tracking-[0.32em] after:ml-1 after:inline-block after:size-1.5 after:rounded-full after:bg-terracotta after:content-['']">CUP</span>
+          <button className="-mr-2.5 inline-flex size-11 cursor-pointer items-center justify-center rounded-full [&_svg]:size-6 [&_svg]:fill-none [&_svg]:stroke-black [&_svg]:stroke-[1.6] [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]" aria-label="Hisobim" onClick={onOpenAccount} type="button">
             <IconUser />
           </button>
         </div>
-        <button className="branch-line" onClick={onChangeBranch} type="button">
-          <span className="branch-line__name">{branchName}</span>
-          <span className="branch-line__change">O'zgartirish</span>
+        <button className="flex min-h-11 max-w-full cursor-pointer items-baseline gap-2 text-left" onClick={onChangeBranch} type="button">
+          <span className="min-w-0 overflow-hidden text-small font-semibold text-ellipsis whitespace-nowrap text-muted">{branchName}</span>
+          <span className="shrink-0 text-small font-semibold text-terracotta-deep underline underline-offset-3">O'zgartirish</span>
         </button>
-        <h1 className="display masthead__title">Bugun qanday coffee?</h1>
+        <h1 className="font-display text-display leading-[1.08] font-medium tracking-[-0.01em] mt-3">Bugun qanday coffee?</h1>
       </header>
 
       <CategoryTabs categories={catalog.categories} selectedCategoryId={selectedCategoryId} onSelect={setSelectedCategoryId} />
 
       {syncError && (
-        <div style={{ padding: 'var(--space-4) var(--gutter) 0' }}>
+        <div className="px-4 pt-4">
           <ErrorBanner message={syncError} onDismiss={sync.dismissError} />
         </div>
       )}
 
       {visibleProducts.length === 0 ? (
-        <div className="screen">
+        <div className="flex flex-1 flex-col gap-6 px-4 pt-3 pb-8">
           <EmptyState title="Menyu hozircha mavjud emas" message="Birozdan so'ng qayta urinib ko'ring." />
         </div>
       ) : (
-        <div className="product-list">
+        <div className="grid flex-1 grid-cols-2 content-start gap-x-3 gap-y-4 px-4 py-6">
           {visibleProducts.map((product) => (
             <ProductCard
               key={product.id}

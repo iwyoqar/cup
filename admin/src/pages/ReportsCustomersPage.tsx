@@ -20,7 +20,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 ];
 
 const columns: Column<Row>[] = [
-  { key: 'name', header: 'Customer', cell: (r) => <span className="table__primary">{r.name ?? '—'}{!r.isActive && ' (deactivated)'}</span> },
+  { key: 'name', header: 'Customer', cell: (r) => <span className="font-semibold text-black">{r.name ?? '—'}{!r.isActive && ' (deactivated)'}</span> },
   { key: 'phone', header: 'Phone', low: true, cell: (r) => r.phone ?? '—' },
   { key: 'p', header: 'Purchases', numeric: true, cell: (r) => num(r.purchases) },
   { key: 'u', header: 'Units', numeric: true, low: true, cell: (r) => num(r.units) },

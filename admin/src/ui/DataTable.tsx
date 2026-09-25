@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { cx } from './cx';
+import { tableClass } from './table';
 import { EmptyState } from './States';
 import { TableSkeleton } from './Skeleton';
 
@@ -34,15 +35,11 @@ interface DataTableProps<T> {
   rowClassName?: (row: T) => string | undefined;
 }
 
-// One table for the whole Admin — pure Tailwind (no `.table*` classes from ui/components.css). Quiet uppercase
+// One table for the whole Admin — pure Tailwind. Quiet uppercase
 // header, 48px rows, subtle hover, right-aligned tabular figures, horizontal scroll inside its own wrapper. The
 // 760px breakpoint is an arbitrary value (`max-[760px]:*`) rather than Tailwind's default `md` (768px) to match the
 // exact breakpoint the legacy CSS used — this project's mobile/icon-rail breakpoints are deliberately exact values.
-const TH_BASE = 'border-b border-line bg-white px-4 py-3 text-left text-[11px] font-semibold tracking-[0.08em] whitespace-nowrap text-muted uppercase max-[760px]:px-3';
-const TD_BASE = 'h-12 border-b border-line px-4 py-3 align-middle max-[760px]:px-3 max-[760px]:whitespace-nowrap';
-const NUM = 'text-right whitespace-nowrap tabular-nums';
-const ACTIONS = 'text-right whitespace-nowrap';
-const LOW = 'max-[760px]:hidden';
+const { th: TH_BASE, td: TD_BASE, num: NUM, actions: ACTIONS, low: LOW } = tableClass;
 
 export function DataTable<T>({ columns, rows, rowKey, onRowClick, empty, boxed, caption, loading, stickyHeader, rowClassName }: DataTableProps<T>) {
   if (loading && rows.length === 0) return <TableSkeleton />;
@@ -52,8 +49,8 @@ export function DataTable<T>({ columns, rows, rowKey, onRowClick, empty, boxed, 
   const thCls = (c: Column<T>) => cx(TH_BASE, c.numeric && NUM, c.actions && ACTIONS, c.low && LOW);
   const tdCls = (c: Column<T>) => cx(TD_BASE, c.numeric && NUM, c.actions && ACTIONS, c.low && LOW);
   return (
-    <div className={cx('max-w-full overflow-x-auto', boxed && 'rounded-md border border-line bg-white', stickyHeader && 'max-h-[70vh] overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10')}>
-      <table className="w-full min-w-[560px] border-separate border-spacing-0 text-sm max-[760px]:min-w-full">
+    <div className={cx(tableClass.wrap, boxed && 'rounded-md border border-line bg-white', stickyHeader && 'max-h-[70vh] overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10')}>
+      <table className={tableClass.table}>
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr>
@@ -67,7 +64,7 @@ export function DataTable<T>({ columns, rows, rowKey, onRowClick, empty, boxed, 
         <tbody>
           {rows.map((row, index) => (
             <tr
-              className={cx('transition-colors duration-150 ease-out hover:bg-hover [&:last-child_td]:border-b-0', onRowClick && 'cursor-pointer focus-visible:[outline-offset:-2px]', rowClassName?.(row))}
+              className={cx(tableClass.tr, onRowClick && 'cursor-pointer focus-visible:[outline-offset:-2px]', rowClassName?.(row))}
               key={rowKey(row, index)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               onKeyDown={

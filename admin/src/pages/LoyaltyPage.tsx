@@ -24,7 +24,7 @@ export function LoyaltyPage() {
           { id: 'levels', label: 'Levels, XP & achievements' },
         ]}
       />
-      <div className="narrow">{tab === 'points' ? <LoyaltySettingsPage /> : <Loyalty2Page />}</div>
+      <div className="max-w-2xl">{tab === 'points' ? <LoyaltySettingsPage /> : <Loyalty2Page />}</div>
     </>
   );
 }

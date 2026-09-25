@@ -4,6 +4,8 @@ import { fetchOrder } from '../../lib/api/orders';
 import { formatDateTime, formatSom } from '../../lib/format';
 import { getOrderStatusLabel, getOrderStatusTone, isTerminalOrderStatus } from '../../lib/orderStatusLabels';
 import { StatusScreen } from '../../app/StatusScreen';
+import { buttonSecondary } from '../../app/buttonStyles';
+import { cx } from '../../lib/cx';
 
 interface OrderStatusViewProps {
   orderId: string;
@@ -67,7 +69,7 @@ export function OrderStatusView({ orderId, onBackToMenu }: OrderStatusViewProps)
   if (!order) {
     if (initialLoadFailed) {
       return (
-        <div className="app-shell">
+        <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           <StatusScreen
             title="Xatolik"
             message="Buyurtma ma'lumotlarini yuklab bo'lmadi."
@@ -78,52 +80,52 @@ export function OrderStatusView({ orderId, onBackToMenu }: OrderStatusViewProps)
       );
     }
     return (
-      <div className="app-shell">
+      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <StatusScreen title="Buyurtma" message="Yuklanmoqda..." isLoading />
       </div>
     );
   }
 
   return (
-    <div className="app-shell">
-      <div className="screen">
-        <div className="top-bar">
-          <button className="top-bar__back" onClick={onBackToMenu} type="button">
+    <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <div className="flex flex-1 flex-col gap-6 px-4 pt-3 pb-8">
+        <div className="-mx-4 flex min-h-11 items-center gap-2 px-4">
+          <button className="min-h-11 cursor-pointer py-2.5 text-small font-semibold tracking-[0.02em] text-black" onClick={onBackToMenu} type="button">
             ← Menyu
           </button>
         </div>
 
         {/* Calm, prominent status: a serif headline, not an alert. A pulsing terracotta dot marks
             an order that is still moving; settled/dead-end statuses simply read as text. */}
-        <div className="order-hero">
-          <div className="eyebrow">Buyurtma · {formatDateTime(order.createdAt)}</div>
-          <h1 className="order-hero__status">
-            {getOrderStatusTone(order.status) === 'active' && <span className="order-hero__dot" aria-hidden="true" />}
+        <div className="flex flex-col gap-2">
+          <div className="text-micro font-bold tracking-[0.14em] text-muted uppercase">Buyurtma · {formatDateTime(order.createdAt)}</div>
+          <h1 className="font-display text-title leading-[1.15] font-medium">
+            {getOrderStatusTone(order.status) === 'active' && <span className="mr-2 inline-block size-2.5 animate-dot-pulse rounded-full bg-terracotta align-middle" aria-hidden="true" />}
             {getOrderStatusLabel(order.status)}
           </h1>
-          {order.branch && <p className="hint-text">CUP Coffee — {order.branch.name}</p>}
-          {pollError && <p className="hint-text">{pollError}</p>}
+          {order.branch && <p className="text-small leading-[1.45] text-muted">CUP Coffee — {order.branch.name}</p>}
+          {pollError && <p className="text-small leading-[1.45] text-muted">{pollError}</p>}
         </div>
 
         <div>
-          <h2 className="section-title">Buyurtma tarkibi</h2>
-          <ul className="receipt">
+          <h2 className="font-display text-section leading-[1.2] font-medium">Buyurtma tarkibi</h2>
+          <ul className="m-0 list-none p-0">
             {order.items.map((item, index) => (
-              <li className="receipt__line" key={`${item.productName}-${index}`}>
-                <span className="receipt__name">
-                  {item.productName} <span className="receipt__qty">× {item.quantity}</span>
+              <li className="flex items-baseline justify-between gap-3 border-b border-line py-3" key={`${item.productName}-${index}`}>
+                <span className="min-w-0 font-medium">
+                  {item.productName} <span className="font-medium text-muted">× {item.quantity}</span>
                 </span>
-                <span className="receipt__amount">{formatSom(item.totalPriceMinor)}</span>
+                <span className="shrink-0 font-semibold tabular-nums">{formatSom(item.totalPriceMinor)}</span>
               </li>
             ))}
           </ul>
-          <div className="summary__row" style={{ paddingTop: 'var(--space-4)' }}>
-            <span className="summary__label">Jami</span>
-            <span className="summary__total">{formatSom(order.totalMinor)}</span>
+          <div className="flex items-baseline justify-between gap-3 pt-4">
+            <span className="text-small font-bold tracking-[0.14em] text-muted uppercase">Jami</span>
+            <span className="font-display text-title font-medium whitespace-nowrap tabular-nums">{formatSom(order.totalMinor)}</span>
           </div>
         </div>
 
-        <button className="button-secondary" style={{ alignSelf: 'flex-start' }} onClick={onBackToMenu} type="button">
+        <button className={cx(buttonSecondary, 'self-start')} onClick={onBackToMenu} type="button">
           Menyu'ga qaytish
         </button>
       </div>

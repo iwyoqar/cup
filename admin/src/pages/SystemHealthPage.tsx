@@ -1,7 +1,7 @@
 import { deriveHealth, overallState, usePulse } from '../lib/health';
 import { formatAgo } from '../lib/format';
 import { findNav } from '../lib/nav';
-import { EmptyState, HEALTH_LABEL, HealthBadge, KeyValue, LoadingState, PageHeader, SectionCard, StatusBadge } from '../ui';
+import { Button, EmptyState, HEALTH_LABEL, HealthBadge, KeyValue, LoadingState, PageHeader, SectionCard, StatusBadge, cx } from '../ui';
 import { HealthList } from '../ui/HealthList';
 
 const yesNo = (v: boolean) => (v ? <StatusBadge tone="ok">Yes</StatusBadge> : <StatusBadge tone="warn">No</StatusBadge>);
@@ -21,9 +21,9 @@ export function SystemHealthPage() {
         actions={
           <>
             {!pulse.loading && <HealthBadge state={overall} />}
-            <button className="button-secondary" disabled={pulse.loading} onClick={pulse.reload} type="button">
+            <Button disabled={pulse.loading} onClick={pulse.reload} variant="secondary">
               Check again
-            </button>
+            </Button>
           </>
         }
         description={item.description}
@@ -34,12 +34,12 @@ export function SystemHealthPage() {
         <LoadingState variant="page" />
       ) : (
         <>
-          <div className={`callout ${overall === 'healthy' ? 'callout--ok' : overall === 'unknown' ? '' : overall === 'warning' ? 'callout--warn' : 'callout--err'}`}>
+          <div className={cx('block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0', overall === 'healthy' ? 'border-ok bg-ok-bg text-ok' : overall === 'unknown' ? 'border-muted-cream bg-neutral-bg text-muted-cream' : overall === 'warning' ? 'border-terracotta bg-cream-soft text-warn' : 'border-err bg-err-bg text-err')}>
             <strong>{overall === 'healthy' ? 'All monitored systems are healthy.' : overall === 'unknown' ? 'CUP could not confirm its status.' : overall === 'warning' ? 'Something needs a look.' : 'Something is broken.'}</strong>
-            {pulse.checkedAt && <span className="hint-text"> Checked {formatAgo(pulse.checkedAt.toISOString())}.</span>}
+            {pulse.checkedAt && <span className="text-[13px] leading-snug text-muted"> Checked {formatAgo(pulse.checkedAt.toISOString())}.</span>}
           </div>
 
-          <div className="grid-main">
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <SectionCard description={`${HEALTH_LABEL.healthy}, ${HEALTH_LABEL.warning}, ${HEALTH_LABEL.error} or ${HEALTH_LABEL.unknown} — with the reason.`} title="Components">
               <HealthList items={items} />
             </SectionCard>

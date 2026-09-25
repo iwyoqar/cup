@@ -7,7 +7,7 @@ import { FinanceCogsBanner } from '../components/FinanceCogsBanner';
 import { FinanceFilterBar } from '../components/FinanceFilterBar';
 import { FinanceRangeValue, isFinanceRangeReady } from '../components/FinancePeriodPicker';
 import { useFinanceData } from '../components/useFinanceData';
-import { EmptyState, ErrorState, KeyValue, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
+import { cx, EmptyState, ErrorState, KeyValue, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
 
@@ -33,7 +33,7 @@ export function FinanceOverviewPage() {
       {!data && !error && <LoadingState variant="page" />}
 
       {data && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1 }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <FinanceCogsBanner data={data} />
           <StatGrid>
             <StatCard hint="CUP + imported POS" label="Revenue" strong value={formatSom(data.revenue)} />
@@ -45,7 +45,7 @@ export function FinanceOverviewPage() {
             <StatCard hint={`${data.netMarginPct ?? '—'}% margin`} label="Net Profit" strong value={formatSom(data.netProfit)} />
             {payback && payback.status === 'OK' && <StatCard hint={`due ~${payback.estimatedPaybackDate}`} label="Payback progress" value={`${payback.paybackProgressPct}%`} />}
           </StatGrid>
-          <div className="grid-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <SectionCard description="Ranked by gross profit (revenue minus its known theoretical cost)." title="Most profitable products">
               {data.topGrossProfitProducts.length > 0 ? (
                 <KeyValue rows={data.topGrossProfitProducts.map((p) => ({ key: p.name, label: `${p.name} (×${number(p.quantity)})`, value: formatSom(p.grossProfitMinor) }))} />

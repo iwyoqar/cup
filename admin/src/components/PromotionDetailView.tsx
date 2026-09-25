@@ -9,6 +9,7 @@ import {
 } from '../lib/adminPromotions';
 import { ApiError } from '../lib/api';
 import { formatDateTime, formatSom } from '../lib/format';
+import { Button, tableClass } from '../ui';
 import {
   Promotion,
   PromotionAudienceCandidate,
@@ -143,120 +144,120 @@ export function PromotionDetailView({ promotionId, onBack, onEdit, onDeleted }: 
 
   return (
     <div>
-      <button className="button-secondary" onClick={onBack} style={{ marginBottom: 16 }} type="button">
+      <Button onClick={onBack} className="mb-4" variant="secondary">
         ← Back to promotions
-      </button>
+      </Button>
 
-      {error && <p className="error-text">{error}</p>}
-      {!promotion && !error && <p className="hint-text">Loading...</p>}
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      {!promotion && !error && <p className="text-[13px] leading-snug text-muted">Loading...</p>}
 
       {promotion && (
         <>
           <h1>{promotion.name}</h1>
-          {promotion.description && <p className="hint-text">{promotion.description}</p>}
+          {promotion.description && <p className="text-[13px] leading-snug text-muted">{promotion.description}</p>}
 
-          <div className="settings-card">
-            <div className="settings-row">
-              <span className="settings-row__label">Status</span>
+          <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Status</span>
               <span>{promotion.isActive ? 'Active' : 'Inactive'}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Audience</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Audience</span>
               <span>{promotion.segment ? promotion.segment.name : 'Everyone'}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Benefit</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Benefit</span>
               <span>{describeBenefit(promotion)}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Starts</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Starts</span>
               <span>{formatDateTime(promotion.startsAt)}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Ends</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Ends</span>
               <span>{promotion.endsAt ? formatDateTime(promotion.endsAt) : 'No end date'}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Usage limit per customer</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Usage limit per customer</span>
               <span>{promotion.usageLimitPerCustomer ?? 'Unlimited'}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-row__label">Total redemptions</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+              <span className="text-sm font-semibold">Total redemptions</span>
               <span>{promotion.redemptionCount}</span>
             </div>
           </div>
 
-          <div className="settings-footer">
-            <button className="button-secondary" onClick={() => onEdit(promotion)} type="button">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Button onClick={() => onEdit(promotion)} variant="secondary">
               Edit
-            </button>
+            </Button>
             {promotion.isActive ? (
-              <button className="button-secondary" disabled={isBusy} onClick={handleDeactivate} type="button">
+              <Button disabled={isBusy} onClick={handleDeactivate} variant="secondary">
                 Deactivate
-              </button>
+              </Button>
             ) : (
-              <button className="button-primary" disabled={isBusy} onClick={handleActivate} type="button">
+              <Button disabled={isBusy} onClick={handleActivate} variant="primary">
                 Activate
-              </button>
+              </Button>
             )}
-            <button className="button-secondary" onClick={handleLoadAudience} type="button">
+            <Button onClick={handleLoadAudience} variant="secondary">
               View audience
-            </button>
-            <button className="button-secondary" onClick={handleLoadRedemptions} type="button">
+            </Button>
+            <Button onClick={handleLoadRedemptions} variant="secondary">
               View redemptions
-            </button>
-            <button className="button-secondary" disabled={isBusy} onClick={handleDelete} type="button">
+            </Button>
+            <Button disabled={isBusy} onClick={handleDelete} variant="secondary">
               {isBusy ? 'Working...' : 'Delete'}
-            </button>
+            </Button>
           </div>
 
           {showAudience && (
-            <div className="settings-card">
-              <h3 style={{ margin: 0 }}>Audience</h3>
+            <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+              <h3 className="m-0">Audience</h3>
               {audienceCounts && (
                 <>
-                  <div className="settings-row">
-                    <span className="settings-row__label">Matched by segment</span>
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                    <span className="text-sm font-semibold">Matched by segment</span>
                     <span>{audienceCounts.segmentMatchCount}</span>
                   </div>
-                  <div className="settings-row">
-                    <span className="settings-row__label">Currently eligible</span>
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                    <span className="text-sm font-semibold">Currently eligible</span>
                     <span>{audienceCounts.eligibleCount}</span>
                   </div>
-                  <div className="settings-row">
-                    <span className="settings-row__label">Not eligible</span>
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0">
+                    <span className="text-sm font-semibold">Not eligible</span>
                     <span>{audienceCounts.ineligibleCount}</span>
                   </div>
                 </>
               )}
               {audience === null ? (
-                <p className="hint-text">Loading...</p>
+                <p className="text-[13px] leading-snug text-muted">Loading...</p>
               ) : audience.length === 0 ? (
-                <p className="hint-text">No matching customers.</p>
+                <p className="text-[13px] leading-snug text-muted">No matching customers.</p>
               ) : (
                 <>
-                  <table className="data-table">
+                  <table className={tableClass.table}>
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>Eligibility</th>
+                        <th className={tableClass.th}>Name</th>
+                        <th className={tableClass.th}>Phone</th>
+                        <th className={tableClass.th}>Eligibility</th>
                       </tr>
                     </thead>
                     <tbody>
                       {audience.map((candidate) => (
-                        <tr key={candidate.customerId}>
-                          <td>{candidate.displayName ?? '—'}</td>
-                          <td>{candidate.phone ?? '—'}</td>
-                          <td>{candidate.eligible ? 'Eligible' : PROMOTION_ELIGIBILITY_REASON_LABELS[candidate.reason ?? 'NOT_ELIGIBLE']}</td>
+                        <tr className={tableClass.tr} key={candidate.customerId}>
+                          <td className={tableClass.td}>{candidate.displayName ?? '—'}</td>
+                          <td className={tableClass.td}>{candidate.phone ?? '—'}</td>
+                          <td className={tableClass.td}>{candidate.eligible ? 'Eligible' : PROMOTION_ELIGIBILITY_REASON_LABELS[candidate.reason ?? 'NOT_ELIGIBLE']}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   {audienceCursor && (
-                    <button className="button-secondary" onClick={handleLoadMoreAudience} style={{ marginTop: 12 }} type="button">
+                    <Button onClick={handleLoadMoreAudience} className="mt-3" variant="secondary">
                       Load more
-                    </button>
+                    </Button>
                   )}
                 </>
               )}
@@ -264,46 +265,46 @@ export function PromotionDetailView({ promotionId, onBack, onEdit, onDeleted }: 
           )}
 
           {showRedemptions && (
-            <div className="settings-card">
-              <h3 style={{ margin: 0 }}>Redemptions</h3>
+            <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6 [&>h3]:font-display [&>h3]:text-xl [&>h3]:font-medium">
+              <h3 className="m-0">Redemptions</h3>
               {redemptions === null ? (
-                <p className="hint-text">Loading...</p>
+                <p className="text-[13px] leading-snug text-muted">Loading...</p>
               ) : redemptions.length === 0 ? (
-                <p className="hint-text">No redemptions yet.</p>
+                <p className="text-[13px] leading-snug text-muted">No redemptions yet.</p>
               ) : (
                 <>
-                  <table className="data-table">
+                  <table className={tableClass.table}>
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>#</th>
-                        <th>Benefit</th>
-                        <th>Redeemed</th>
+                        <th className={tableClass.th}>Name</th>
+                        <th className={tableClass.th}>Phone</th>
+                        <th className={tableClass.th}>#</th>
+                        <th className={tableClass.th}>Benefit</th>
+                        <th className={tableClass.th}>Redeemed</th>
                       </tr>
                     </thead>
                     <tbody>
                       {redemptions.map((redemption, index) => (
-                        <tr key={`${redemption.customerId}-${redemption.usageIndex}-${index}`}>
-                          <td>{redemption.displayName ?? '—'}</td>
-                          <td>{redemption.phone ?? '—'}</td>
-                          <td>{redemption.usageIndex}</td>
-                          <td>
+                        <tr className={tableClass.tr} key={`${redemption.customerId}-${redemption.usageIndex}-${index}`}>
+                          <td className={tableClass.td}>{redemption.displayName ?? '—'}</td>
+                          <td className={tableClass.td}>{redemption.phone ?? '—'}</td>
+                          <td className={tableClass.td}>{redemption.usageIndex}</td>
+                          <td className={tableClass.td}>
                             {redemption.benefit.type === 'PERCENT_DISCOUNT' && `${redemption.benefit.value}%`}
                             {redemption.benefit.type === 'FIXED_DISCOUNT' && formatSom(redemption.benefit.value ?? 0)}
                             {redemption.benefit.type === 'FREE_PRODUCT' &&
                               `Free ${redemption.benefit.product?.name ?? ''} × ${redemption.benefit.quantity ?? 1}`}
                             {redemption.benefit.type === 'LOYALTY_POINTS' && `+${redemption.benefit.value} pts`}
                           </td>
-                          <td>{formatDateTime(redemption.redeemedAt)}</td>
+                          <td className={tableClass.td}>{formatDateTime(redemption.redeemedAt)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   {redemptionsCursor && (
-                    <button className="button-secondary" onClick={handleLoadMoreRedemptions} style={{ marginTop: 12 }} type="button">
+                    <Button onClick={handleLoadMoreRedemptions} className="mt-3" variant="secondary">
                       Load more
-                    </button>
+                    </Button>
                   )}
                 </>
               )}

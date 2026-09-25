@@ -3,7 +3,7 @@ import { fetchFinanceReconciliation } from '../lib/adminFinance';
 import { ApiError } from '../lib/api';
 import { formatDateTime, formatSom } from '../lib/format';
 import { FinanceReconciliation, FinanceReconciliationTransaction } from '../lib/types';
-import { Column, DataTable, EmptyState, ErrorState, KeyValue, LoadingState, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
+import { Button, Column, cx, DataTable, EmptyState, ErrorState, KeyValue, LoadingState, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
 import { FinanceRangeValue } from './FinancePeriodPicker';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
@@ -71,7 +71,7 @@ export function FinanceReconciliationTab({ ready, ...filters }: Props) {
   ];
 
   return (
-    <div className="stack" style={{ opacity: loading ? 0.6 : 1 }}>
+    <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
       <SectionCard
         actions={<StatusBadge dot tone={STATUS_TONE[data.status]}>{data.status}</StatusBadge>}
         description={
@@ -103,16 +103,16 @@ export function FinanceReconciliationTab({ ready, ...filters }: Props) {
         <StatCard hint="CUP orders + POS revenue" label="Total recognized revenue" strong value={formatSom(data.recognizedRevenue.totalMinor)} />
       </StatGrid>
 
-      <div className="grid-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <SectionCard description="Independent POS sales still not reflected in Finance's revenue, by reason." title="Pending recognition, by reason">
           {data.independentPosSales.pending.byReason.length > 0 ? (
             <KeyValue
               rows={data.independentPosSales.pending.byReason.map((c) => ({
                 key: c.category,
                 label: (
-                  <button className="button-secondary button--sm" onClick={() => setFilter(c.category)} type="button">
+                  <Button onClick={() => setFilter(c.category)} size="sm" variant="secondary">
                     {CATEGORY_LABEL[c.category] ?? c.category} ({c.count})
-                  </button>
+                  </Button>
                 ),
                 value: formatSom(c.amountMinor),
               }))}
@@ -130,11 +130,11 @@ export function FinanceReconciliationTab({ ready, ...filters }: Props) {
               { key: 'unlinked', label: '  — Poster customer not linked to CUP', value: formatSom(data.customerAttribution.unknownBreakdown.unlinkedPosterClient.amountMinor) },
             ]}
           />
-          <p className="hint-text">Unknown customer never means missing or excluded revenue — it is fully counted above.</p>
+          <p className="text-[13px] leading-snug text-muted">Unknown customer never means missing or excluded revenue — it is fully counted above.</p>
         </SectionCard>
       </div>
 
-      <div className="grid-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <SectionCard description="Every recognized sale (independent POS and CUP-originated) by whether its Poster spot maps to an active CUP branch." title="Branch attribution">
           <KeyValue
             rows={[
@@ -155,9 +155,9 @@ export function FinanceReconciliationTab({ ready, ...filters }: Props) {
       <SectionCard
         actions={
           filter && (
-            <button className="button-secondary button--sm" onClick={() => setFilter(null)} type="button">
+            <Button onClick={() => setFilter(null)} size="sm" variant="secondary">
               Clear filter ({CATEGORY_LABEL[filter] ?? filter})
-            </button>
+            </Button>
           )
         }
         description={`${data.scanned} receipt(s) scanned live from Poster for this period${data.truncated ? ' — window truncated, narrow the period for a complete picture' : ''}.`}

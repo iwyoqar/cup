@@ -3,7 +3,7 @@ import { createInvestment, deleteInvestment, fetchFinancePayback, fetchInvestmen
 import { ApiError } from '../lib/api';
 import { formatDate, formatSom } from '../lib/format';
 import { FinanceInvestment, FinancePayback } from '../lib/types';
-import { Column, ConfirmDialog, DataTable, EmptyState, ErrorState, KeyValue, LoadingState, Modal, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
+import { Button, Column, ConfirmDialog, DataTable, EmptyState, ErrorState, KeyValue, LoadingState, Modal, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -42,7 +42,7 @@ export function FinanceInvestmentsTab() {
   const columns: Column<FinanceInvestment>[] = [
     { key: 'date', header: 'Date', cell: (i) => formatDate(i.date) },
     { key: 'category', header: 'Category', cell: (i) => i.category },
-    { key: 'desc', header: 'Description', cell: (i) => <span className="table__primary">{i.description}</span> },
+    { key: 'desc', header: 'Description', cell: (i) => <span className="font-semibold text-black">{i.description}</span> },
     { key: 'branch', header: 'Branch', low: true, cell: (i) => i.branch?.name ?? 'All' },
     { key: 'source', header: 'Payment source', low: true, cell: (i) => i.paymentSource ?? '—' },
     { key: 'amount', header: 'Amount', numeric: true, cell: (i) => formatSom(i.amountMinor) },
@@ -51,15 +51,15 @@ export function FinanceInvestmentsTab() {
       header: '',
       actions: true,
       cell: (i) => (
-        <button className="button-secondary button--sm" onClick={() => setConfirmDelete(i)} type="button">
+        <Button onClick={() => setConfirmDelete(i)} size="sm" variant="secondary">
           Delete
-        </button>
+        </Button>
       ),
     },
   ];
 
   return (
-    <div className="stack">
+    <div className="flex min-w-0 flex-col gap-5">
       {error && <ErrorState message={error} onRetry={load} title="Investments could not be loaded" />}
 
       {payback && (
@@ -83,9 +83,9 @@ export function FinanceInvestmentsTab() {
 
       <SectionCard
         actions={
-          <button className="button-primary" onClick={() => setShowAdd(true)} type="button">
+          <Button onClick={() => setShowAdd(true)} variant="primary">
             + Investment
-          </button>
+          </Button>
         }
         description="Initial/capital investment — renovation, equipment, deposit, branding, etc. Never treated as a monthly operating expense."
         flush
@@ -152,19 +152,19 @@ function AddInvestmentModal({ onClose, onSaved }: { onClose: () => void; onSaved
     <Modal
       footer={
         <>
-          <button className="button-secondary" onClick={onClose} type="button">
+          <Button onClick={onClose} variant="secondary">
             Cancel
-          </button>
-          <button className="button-primary" disabled={saving} onClick={submit} type="button">
+          </Button>
+          <Button disabled={saving} onClick={submit} variant="primary">
             {saving ? 'Saving…' : 'Add investment'}
-          </button>
+          </Button>
         </>
       }
       onClose={onClose}
       title="New investment"
     >
-      {error && <p className="error-text">{error}</p>}
-      <div className="field">
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="inv-category">Category</label>
         <select id="inv-category" onChange={(e) => setCategory(e.target.value)} value={category}>
           {CATEGORY_SUGGESTIONS.map((c) => (
@@ -174,19 +174,19 @@ function AddInvestmentModal({ onClose, onSaved }: { onClose: () => void; onSaved
           ))}
         </select>
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="inv-desc">Description</label>
         <input id="inv-desc" onChange={(e) => setDescription(e.target.value)} value={description} />
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="inv-amount">Amount (so'm)</label>
         <input id="inv-amount" onChange={(e) => setAmount(e.target.value)} type="number" value={amount} />
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="inv-date">Date</label>
         <input id="inv-date" onChange={(e) => setDate(e.target.value)} type="date" value={date} />
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="inv-source">Payment source (optional)</label>
         <input id="inv-source" onChange={(e) => setPaymentSource(e.target.value)} value={paymentSource} />
       </div>

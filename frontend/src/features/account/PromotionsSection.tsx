@@ -43,25 +43,25 @@ export function PromotionsSection() {
   }, []);
 
   return (
-    <section className="account-section">
-      <h2 className="section-title">Aksiyalar</h2>
+    <section className="flex flex-col gap-3">
+      <h2 className="font-display text-section leading-[1.2] font-medium">Aksiyalar</h2>
 
       {error ? (
-        <p className="hint-text">Ma'lumotni yuklab bo'lmadi</p>
+        <p className="text-small leading-[1.45] text-muted">Ma'lumotni yuklab bo'lmadi</p>
       ) : !promotions ? (
         <SectionSkeleton height={120} />
       ) : promotions.length === 0 ? (
         <EmptyState variant="inline" title="Hozircha maxsus takliflar yo'q" />
       ) : (
-        <div className="cream-block" style={{ paddingTop: 'var(--space-3)', paddingBottom: 'var(--space-2)' }}>
+        <div className="flex flex-col gap-3 rounded-lg bg-cream px-4 pt-3 pb-2">
           {promotions.map((promotion) => (
-            <article className="offer" key={promotion.id}>
-              <div className="offer__benefit">{describeBenefit(promotion)}</div>
-              <div className="offer__name">{promotion.name}</div>
-              {promotion.description && <div className="offer__fine">{promotion.description}</div>}
-              {promotion.endsAt && <div className="offer__fine">{formatDateTime(promotion.endsAt)} gacha</div>}
+            <article className="flex flex-col gap-1 border-t border-line-strong pt-3 pb-4 first:border-t-0" key={promotion.id}>
+              <div className="font-display text-section leading-[1.15] font-medium text-terracotta-deep">{describeBenefit(promotion)}</div>
+              <div className="font-semibold">{promotion.name}</div>
+              {promotion.description && <div className="text-small text-muted-cream">{promotion.description}</div>}
+              {promotion.endsAt && <div className="text-small text-muted-cream">{formatDateTime(promotion.endsAt)} gacha</div>}
               {promotion.remainingUses !== null && (
-                <div className="offer__fine">Qolgan foydalanish: {promotion.remainingUses}</div>
+                <div className="text-small text-muted-cream">Qolgan foydalanish: {promotion.remainingUses}</div>
               )}
             </article>
           ))}

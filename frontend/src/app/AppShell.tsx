@@ -16,6 +16,8 @@ import { OrderStatusView } from '../features/orders/OrderStatusView';
 import { AccountView } from '../features/account/AccountView';
 import { useCartSync } from '../features/cart/useCartSync';
 import { refreshCatalogIfStale } from '../lib/catalog/catalogCache';
+import { buttonPrimary } from './buttonStyles';
+import { cx } from '../lib/cx';
 
 // Phase 1.7 spec section 11/12 state machine. "ready" is split further into a `view` (catalog/
 // cart/checkout/order/account) since the customer moves between those without re-running auth/
@@ -197,7 +199,7 @@ export function AppShell() {
 
   if (phase === 'booting' || phase === 'authenticating') {
     return (
-      <div className="app-shell">
+      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <StatusScreen title="CUP Coffee" message="Tayyorlanmoqda..." isLoading />
       </div>
     );
@@ -205,7 +207,7 @@ export function AppShell() {
 
   if (phase === 'error') {
     return (
-      <div className="app-shell">
+      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <StatusScreen
           title="Xatolik"
           message={errorMessage ?? "Noma'lum xatolik yuz berdi."}
@@ -218,7 +220,7 @@ export function AppShell() {
 
   if (phase === 'registration_required') {
     return (
-      <div className="app-shell">
+      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <RegistrationRequired />
       </div>
     );
@@ -226,17 +228,17 @@ export function AppShell() {
 
   if (phase === 'branch_selection') {
     return (
-      <div className="app-shell">
+      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {pendingBranchConflict ? (
-          <div className="screen">
-            <div className="top-bar">
-              <button className="top-bar__back" onClick={() => setPendingBranchConflict(null)} type="button">
+          <div className="flex flex-1 flex-col gap-6 px-4 pt-3 pb-8">
+            <div className="-mx-4 flex min-h-11 items-center gap-2 px-4">
+              <button className="min-h-11 cursor-pointer py-2.5 text-small font-semibold tracking-[0.02em] text-black" onClick={() => setPendingBranchConflict(null)} type="button">
                 ← Orqaga
               </button>
             </div>
-            <h1 className="display">Filialni almashtirish</h1>
-            <p className="hint-text">{branchActionError}</p>
-            <button className="button-primary" disabled={branchActionBusy} onClick={handleConfirmClearAndSwitch} type="button">
+            <h1 className="font-display text-display leading-[1.08] font-medium tracking-[-0.01em]">Filialni almashtirish</h1>
+            <p className="text-small leading-[1.45] text-muted">{branchActionError}</p>
+            <button className={cx(buttonPrimary, 'w-full')} disabled={branchActionBusy} onClick={handleConfirmClearAndSwitch} type="button">
               Savatni tozalab, filialni almashtirish
             </button>
           </div>
@@ -266,7 +268,7 @@ export function AppShell() {
     }
     if (view === 'checkout') {
       return (
-        <div className="app-shell">
+        <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           <CheckoutFlow
             cart={cart}
             onCartUpdated={setCart}
@@ -278,7 +280,7 @@ export function AppShell() {
     }
     if (view === 'cart') {
       return (
-        <div className="app-shell">
+        <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           <CartView
             cart={cart}
             sync={cartSync}
@@ -315,7 +317,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <StatusScreen title="CUP Coffee" message="Tayyorlanmoqda..." isLoading />
     </div>
   );

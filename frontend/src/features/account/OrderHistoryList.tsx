@@ -6,6 +6,8 @@ import { OrderHistoryCard } from './OrderHistoryCard';
 import { ErrorBanner } from '../../app/ErrorBanner';
 import { EmptyState } from '../../app/EmptyState';
 import { SectionSkeleton } from '../../app/SectionSkeleton';
+import { buttonSecondary } from '../../app/buttonStyles';
+import { cx } from '../../lib/cx';
 
 interface OrderHistoryListProps {
   onOpenOrder: (orderId: string) => void;
@@ -54,7 +56,7 @@ export function OrderHistoryList({ onOpenOrder, onGoToCatalog }: OrderHistoryLis
 
   if (items === null) {
     if (error) {
-      return <p className="hint-text">{error}</p>;
+      return <p className="text-small leading-[1.45] text-muted">{error}</p>;
     }
     return <SectionSkeleton height={160} />;
   }
@@ -71,15 +73,14 @@ export function OrderHistoryList({ onOpenOrder, onGoToCatalog }: OrderHistoryLis
   }
 
   return (
-    <div className="rows">
+    <div className="flex flex-col">
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
       {items.map((order) => (
         <OrderHistoryCard key={order.id} order={order} onOpen={() => onOpenOrder(order.id)} />
       ))}
       {nextCursor && (
         <button
-          className="button-secondary"
-          style={{ alignSelf: 'flex-start', marginTop: 'var(--space-3)' }}
+          className={cx(buttonSecondary, 'mt-3 self-start')}
           disabled={isLoadingMore}
           onClick={handleLoadMore}
           type="button"

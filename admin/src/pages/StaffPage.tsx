@@ -4,7 +4,7 @@ import { errorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { StaffMember } from '../lib/types';
-import { Column, ConfirmDialog, DataTable, EmptyState, ErrorState, FilterBar, LoadingState, Modal, PageHeader, SearchInput, SectionCard, StatusBadge } from '../ui';
+import { Button, Column, ConfirmDialog, DataTable, EmptyState, ErrorState, FilterBar, LoadingState, Modal, PageHeader, SearchInput, SectionCard, StatusBadge } from '../ui';
 
 // Staff accounts are NOT admins: baristas sign in at the separate Staff Panel and can only identify customers. There is no public signup — an account exists only
 // if it is created here. The table is ready for Poster-originated staff (a "Poster identity" column appears as soon as the API returns one); until then the
@@ -53,12 +53,12 @@ export function StaffPage() {
       header: 'Staff member',
       cell: (m) => (
         <>
-          <span className="table__primary">{m.displayName}</span>
-          <span className="table__sub">@{m.username}</span>
+          <span className="font-semibold text-black">{m.displayName}</span>
+          <span className="mt-0.5 block text-xs font-normal text-muted">@{m.username}</span>
         </>
       ),
     },
-    { key: 'branch', header: 'Branch', low: true, cell: (m) => m.branch?.name ?? <span className="hint-text">Not assigned</span> },
+    { key: 'branch', header: 'Branch', low: true, cell: (m) => m.branch?.name ?? <span className="text-[13px] leading-snug text-muted">Not assigned</span> },
     ...(hasPosterIdentity ? [{ key: 'poster', header: 'Poster identity', low: true, cell: (m: StaffMember) => (m.posterUserId ? `Poster #${m.posterUserId}` : '—') }] : []),
     { key: 'access', header: 'CUP access', cell: (m) => (m.isActive ? <StatusBadge dot tone="ok">Active</StatusBadge> : <StatusBadge dot>Deactivated</StatusBadge>) },
     { key: 'created', header: 'Created', low: true, cell: (m) => formatDate(m.createdAt) },
@@ -67,13 +67,13 @@ export function StaffPage() {
       header: '',
       actions: true,
       cell: (m) => (
-        <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <button className="button-secondary button--sm" onClick={() => (m.isActive ? setDeactivateFor(m) : void toggleActive(m))} type="button">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
+          <Button onClick={() => (m.isActive ? setDeactivateFor(m) : void toggleActive(m))} size="sm" variant="secondary">
             {m.isActive ? 'Deactivate' : 'Activate'}
-          </button>
-          <button className="button-secondary button--sm" onClick={() => setResetFor(m)} type="button">
+          </Button>
+          <Button onClick={() => setResetFor(m)} size="sm" variant="secondary">
             Reset password
-          </button>
+          </Button>
         </div>
       ),
     },
@@ -84,12 +84,12 @@ export function StaffPage() {
       <PageHeader
         actions={
           <>
-            <button className="button-secondary" disabled title="The Admin API cannot import staff from Poster yet" type="button">
+            <Button disabled title="The Admin API cannot import staff from Poster yet" variant="secondary">
               Sync from Poster
-            </button>
-            <button className="button-primary" onClick={() => setCreating(true)} type="button">
+            </Button>
+            <Button onClick={() => setCreating(true)} variant="primary">
               + New staff account
-            </button>
+            </Button>
           </>
         }
         description={item.description}
@@ -97,7 +97,7 @@ export function StaffPage() {
       />
 
       {error && <ErrorState message={error} title="Staff could not be updated" />}
-      {notice && <div className="callout callout--ok">{notice}</div>}
+      {notice && <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-ok bg-ok-bg text-ok">{notice}</div>}
 
       <FilterBar>
         <SearchInput label="Search staff" onChange={setQuery} placeholder="Search name, username or branch" value={query} />
@@ -113,9 +113,9 @@ export function StaffPage() {
               <EmptyState
                 action={
                   !query && (
-                    <button className="button-primary" onClick={() => setCreating(true)} type="button">
+                    <Button onClick={() => setCreating(true)} variant="primary">
                       + New staff account
-                    </button>
+                    </Button>
                   )
                 }
                 text={query ? 'No account matches this search.' : 'Create an account for each barista who will use the Staff Panel.'}
@@ -194,31 +194,31 @@ function CreateStaffModal({ branches, onClose, onCreated }: { branches: BranchOp
       dismissible={!busy}
       footer={
         <>
-          <button className="button-secondary" disabled={busy} onClick={onClose} type="button">
+          <Button disabled={busy} onClick={onClose} variant="secondary">
             Cancel
-          </button>
-          <button className="button-primary" disabled={busy || !username || !displayName || password.length < 8} form="staff-create-form" type="submit">
+          </Button>
+          <Button disabled={busy || !username || !displayName || password.length < 8} form="staff-create-form" type="submit" variant="primary">
             {busy ? 'Creating…' : 'Create account'}
-          </button>
+          </Button>
         </>
       }
       onClose={onClose}
       title="New staff account"
     >
-      <form className="stack" id="staff-create-form" onSubmit={submit}>
-        <div className="field">
+      <form className="flex min-w-0 flex-col gap-5" id="staff-create-form" onSubmit={submit}>
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label htmlFor="staff-username">Username</label>
           <input autoComplete="off" id="staff-username" onChange={(e) => setUsername(e.target.value)} value={username} />
         </div>
-        <div className="field">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label htmlFor="staff-name">Display name</label>
           <input id="staff-name" onChange={(e) => setDisplayName(e.target.value)} value={displayName} />
         </div>
-        <div className="field">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label htmlFor="staff-password">Password (min 8 characters)</label>
           <input autoComplete="new-password" id="staff-password" onChange={(e) => setPassword(e.target.value)} type="password" value={password} />
         </div>
-        <div className="field">
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label htmlFor="staff-branch">Branch</label>
           <select id="staff-branch" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
             <option value="">Not assigned</option>
@@ -229,7 +229,7 @@ function CreateStaffModal({ branches, onClose, onCreated }: { branches: BranchOp
             ))}
           </select>
         </div>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
       </form>
     </Modal>
   );
@@ -258,23 +258,23 @@ function ResetPasswordModal({ member, onClose, onDone }: { member: StaffMember; 
       dismissible={!busy}
       footer={
         <>
-          <button className="button-secondary" disabled={busy} onClick={onClose} type="button">
+          <Button disabled={busy} onClick={onClose} variant="secondary">
             Cancel
-          </button>
-          <button className="button-primary" disabled={busy || password.length < 8} form="staff-reset-form" type="submit">
+          </Button>
+          <Button disabled={busy || password.length < 8} form="staff-reset-form" type="submit" variant="primary">
             {busy ? 'Saving…' : 'Set password'}
-          </button>
+          </Button>
         </>
       }
       onClose={onClose}
       title={`New password for @${member.username}`}
     >
-      <form className="stack" id="staff-reset-form" onSubmit={submit}>
-        <div className="field">
+      <form className="flex min-w-0 flex-col gap-5" id="staff-reset-form" onSubmit={submit}>
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
           <label htmlFor="staff-new-password">New password (min 8 characters)</label>
           <input autoComplete="new-password" autoFocus id="staff-new-password" onChange={(e) => setPassword(e.target.value)} type="password" value={password} />
         </div>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
       </form>
     </Modal>
   );

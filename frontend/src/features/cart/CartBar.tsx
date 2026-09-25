@@ -14,14 +14,14 @@ export function CartBar({ cart, onOpen }: CartBarProps) {
     return null;
   }
   return (
-    <button className="cart-bar" onClick={onOpen} type="button">
-      <span className="cart-bar__info cart-bar__summary">
-        <span className="cart-bar__count">{itemCount} ta mahsulot</span>
-        <span className="cart-bar__total">{formatSom(cart.totalMinor)}</span>
+    <button className="sticky bottom-0 mx-4 mb-[calc(12px+env(safe-area-inset-bottom))] flex min-h-15 w-[calc(100%-32px)] animate-cart-bar-in cursor-pointer items-center justify-between gap-3 rounded-md bg-black py-2 pr-2 pl-4 text-left text-white active:opacity-92" onClick={onOpen} type="button">
+      <span className="flex min-w-0 flex-col">
+        <span className="text-micro font-bold tracking-[0.1em] text-cream uppercase">{itemCount} ta mahsulot</span>
+        <span className="text-lead font-semibold whitespace-nowrap tabular-nums">{formatSom(cart.totalMinor)}</span>
       </span>
-      <span className="cart-bar__cta">
-        <span className="cart-bar__cta-long">Buyurtmani ko'rish</span>
-        <span className="cart-bar__cta-short">Ko'rish</span>
+      <span className="inline-flex min-h-11 shrink-0 items-center rounded-sm bg-terracotta px-4 text-[12px] font-bold tracking-[0.06em] text-black uppercase">
+        <span className="max-[359px]:hidden">Buyurtmani ko'rish</span>
+        <span className="hidden max-[359px]:inline">Ko'rish</span>
       </span>
     </button>
   );

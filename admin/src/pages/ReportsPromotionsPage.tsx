@@ -25,7 +25,7 @@ function benefit(type: string, value: number | null, productName: string | null,
 }
 
 const columns: Column<ReportsPromotionRow>[] = [
-  { key: 'n', header: 'Promotion', cell: (p) => <span className="table__primary">{p.promotionName}</span> },
+  { key: 'n', header: 'Promotion', cell: (p) => <span className="font-semibold text-black">{p.promotionName}</span> },
   { key: 't', header: 'Type', low: true, cell: (p) => p.benefitType || '—' },
   { key: 's', header: 'Status (now)', cell: (p) => STATUS_LABEL[p.status] },
   { key: 'r', header: 'Redemptions', numeric: true, cell: (p) => num(p.redemptions) },
@@ -76,7 +76,7 @@ export function ReportsPromotionsPage() {
               <DataTable
                 columns={[
                   { key: 'd', header: 'Date', cell: (r) => formatDateTime(r.redeemedAt) },
-                  { key: 'p', header: 'Promotion', cell: (r) => <span className="table__primary">{r.promotionName}</span> },
+                  { key: 'p', header: 'Promotion', cell: (r) => <span className="font-semibold text-black">{r.promotionName}</span> },
                   { key: 'c', header: 'Customer', cell: (r) => r.customerName ?? 'Unknown customer' },
                   { key: 'o', header: 'Order', low: true, cell: (r) => (r.orderId ? r.orderId.slice(-8) : '—') },
                   { key: 'b', header: 'Branch', low: true, cell: (r) => r.branchName ?? '—' },
@@ -116,9 +116,9 @@ function PromotionDetail({ promotion, params, onClose }: { promotion: ReportsPro
           { key: 'd', label: 'Discount value', value: 'Not tracked' },
         ]}
       />
-      <h3 style={{ margin: '16px 0 8px' }}>Recent redemptions (latest 20 in period)</h3>
-      {error && <p className="error-text">{error}</p>}
-      {!data && loading && <p className="hint-text">Loading…</p>}
+      <h3 className="mt-4 mb-2 mx-0">Recent redemptions (latest 20 in period)</h3>
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      {!data && loading && <p className="text-[13px] leading-snug text-muted">Loading…</p>}
       {data && (
         <DataTable
           columns={[

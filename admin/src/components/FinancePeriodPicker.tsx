@@ -23,10 +23,10 @@ export function isFinanceRangeReady(value: FinanceRangeValue): boolean {
 
 export function FinancePeriodPicker({ value, onChange, disabled }: { value: FinanceRangeValue; onChange: (value: FinanceRangeValue) => void; disabled?: boolean }) {
   return (
-    <div className="range">
-      <label className="filter-bar__group">
-        <span className="filter-bar__label">Period</span>
-        <select className="select" disabled={disabled} onChange={(e) => onChange({ ...value, period: e.target.value as FinancePeriodKey })} value={value.period}>
+    <div className="flex flex-wrap items-end gap-3">
+      <label className="flex min-w-0 flex-col gap-1.5">
+        <span className="text-xs font-semibold text-muted">Period</span>
+        <select className="" disabled={disabled} onChange={(e) => onChange({ ...value, period: e.target.value as FinancePeriodKey })} value={value.period}>
           {OPTIONS.map((o) => (
             <option key={o.key} value={o.key}>
               {o.label}
@@ -36,15 +36,15 @@ export function FinancePeriodPicker({ value, onChange, disabled }: { value: Fina
       </label>
       {value.period === 'custom' && (
         <>
-          <label className="filter-bar__group">
-            <span className="filter-bar__label">From</span>
-            <input className="input" disabled={disabled} onChange={(e) => onChange({ ...value, startDate: e.target.value })} type="date" value={value.startDate} />
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-xs font-semibold text-muted">From</span>
+            <input className="" disabled={disabled} onChange={(e) => onChange({ ...value, startDate: e.target.value })} type="date" value={value.startDate} />
           </label>
-          <label className="filter-bar__group">
-            <span className="filter-bar__label">To</span>
-            <input className="input" disabled={disabled} onChange={(e) => onChange({ ...value, endDate: e.target.value })} type="date" value={value.endDate} />
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-xs font-semibold text-muted">To</span>
+            <input className="" disabled={disabled} onChange={(e) => onChange({ ...value, endDate: e.target.value })} type="date" value={value.endDate} />
           </label>
-          {!isFinanceRangeReady(value) && <span className="range__hint">Choose a start date that is not after the end date.</span>}
+          {!isFinanceRangeReady(value) && <span className="self-center text-[13px] text-err">Choose a start date that is not after the end date.</span>}
         </>
       )}
     </div>

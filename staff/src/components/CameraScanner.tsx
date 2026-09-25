@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CameraUnavailableError, ScanSession, startCameraScan } from '../lib/scanner';
+import { Button } from './ui';
 
 interface CameraScannerProps {
   onCode: (text: string) => void;
@@ -35,13 +36,13 @@ export function CameraScanner({ onCode, onClose }: CameraScannerProps) {
   }, []);
 
   return (
-    <div className="camera">
-      <video ref={videoRef} className="camera__video" muted />
-      <div className="camera__frame" aria-hidden="true" />
-      {error && <p className="camera__error">{error}. Kodni qo‘lda kiriting.</p>}
-      <button className="button button--secondary camera__close" onClick={onClose} type="button">
+    <div className="relative flex flex-col gap-3 overflow-hidden rounded-md bg-black pb-3">
+      <video ref={videoRef} className="aspect-square w-full bg-black object-cover" muted />
+      <div className="pointer-events-none absolute inset-x-[14%] top-[14%] aspect-square rounded-md border-[3px] border-terracotta" aria-hidden="true" />
+      {error && <p className="px-4 text-center text-cream">{error}. Kodni qo‘lda kiriting.</p>}
+      <Button onClick={onClose} className="self-center bg-white" variant="secondary">
         Yopish
-      </button>
+      </Button>
     </div>
   );
 }

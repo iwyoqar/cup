@@ -29,19 +29,19 @@ export function IdentitySection() {
   }, []);
 
   return (
-    <section className="account-section">
-      <h2 className="section-title">Shaxsiy CUP</h2>
-      <p className="hint-text">Baristaga ko'rsatib skaner qildiring.</p>
+    <section className="flex flex-col gap-3">
+      <h2 className="font-display text-section leading-[1.2] font-medium">Shaxsiy CUP</h2>
+      <p className="text-small leading-[1.45] text-muted">Baristaga ko'rsatib skaner qildiring.</p>
 
       {error ? (
-        <p className="hint-text">Kodni yuklab bo'lmadi</p>
+        <p className="text-small leading-[1.45] text-muted">Kodni yuklab bo'lmadi</p>
       ) : !identity ? (
         <SectionSkeleton height={320} />
       ) : (
-        <div className="identity">
-          <Suspense fallback={<div className="identity__qr identity__qr--loading skeleton-pulse" aria-hidden="true" />}>
+        <div className="flex flex-col items-center gap-4 rounded-md border border-line bg-white px-3 py-6">
+          <Suspense fallback={<div className="block aspect-square h-auto w-[min(100%,320px)] rounded-sm animate-pulse-soft bg-skeleton" aria-hidden="true" />}>
             <QrCode value={identity.qrPayload} />
-            <div className="identity__code">{identity.publicCode}</div>
+            <div className="text-center font-sans text-lead font-bold tracking-[0.14em] tabular-nums">{identity.publicCode}</div>
             <Code128Barcode value={identity.publicCode} />
           </Suspense>
         </div>

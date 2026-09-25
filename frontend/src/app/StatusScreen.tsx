@@ -1,3 +1,6 @@
+import { buttonPrimary } from './buttonStyles';
+import { cx } from '../lib/cx';
+
 interface StatusScreenProps {
   title: string;
   message?: string;
@@ -12,23 +15,23 @@ interface StatusScreenProps {
 // spinner; errors are plain serif copy on white.
 export function StatusScreen({ title, message, isLoading, actionLabel, onAction }: StatusScreenProps) {
   return (
-    <div className="screen screen--centered">
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 pt-3 pb-8 text-center">
       {isLoading ? (
         <>
-          <div className="status-screen__mark" role="status" aria-label="Yuklanmoqda">
+          <div className="pl-[0.32em] font-display text-[28px] tracking-[0.32em]" role="status" aria-label="Yuklanmoqda">
             CUP
           </div>
-          <div className="status-screen__bar" aria-hidden="true" />
-          {message && <p className="hint-text">{message}</p>}
+          <div className="h-0.5 w-14 overflow-hidden rounded-[2px] bg-skeleton after:block after:h-full after:w-[40%] after:animate-status-slide after:bg-terracotta after:content-['']" aria-hidden="true" />
+          {message && <p className="text-small leading-[1.45] text-muted">{message}</p>}
         </>
       ) : (
         <>
-          <h2 className="title">{title}</h2>
-          {message && <p className="hint-text">{message}</p>}
+          <h2 className="font-display text-title leading-[1.12] font-medium tracking-[-0.01em]">{title}</h2>
+          {message && <p className="text-small leading-[1.45] text-muted">{message}</p>}
         </>
       )}
       {actionLabel && onAction && (
-        <button className="button-primary" style={{ maxWidth: 280, marginTop: 8 }} onClick={onAction} type="button">
+        <button className={cx(buttonPrimary, 'mt-2 w-full max-w-[280px]')} onClick={onAction} type="button">
           {actionLabel}
         </button>
       )}

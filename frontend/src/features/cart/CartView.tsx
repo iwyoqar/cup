@@ -7,6 +7,8 @@ import { ErrorBanner } from '../../app/ErrorBanner';
 import { EmptyState } from '../../app/EmptyState';
 import { RewardPicker } from './RewardPicker';
 import { CartSync, CartProductRef } from './cartSync';
+import { buttonPrimary, buttonSecondary, buttonText } from '../../app/buttonStyles';
+import { cx } from '../../lib/cx';
 
 interface CartViewProps {
   cart: CartViewModel;
@@ -73,14 +75,14 @@ export function CartView({ cart, sync, isSyncing, syncError, onBack, onCheckout 
   }
 
   return (
-    <div className="screen">
-      <div className="top-bar">
-        <button className="top-bar__back" onClick={onBack} type="button">
+    <div className="flex flex-1 flex-col gap-6 px-4 pt-3 pb-8">
+      <div className="-mx-4 flex min-h-11 items-center gap-2 px-4">
+        <button className="min-h-11 cursor-pointer py-2.5 text-small font-semibold tracking-[0.02em] text-black" onClick={onBack} type="button">
           ← Menyu
         </button>
       </div>
 
-      <h1 className="display">Savat</h1>
+      <h1 className="font-display text-display leading-[1.08] font-medium tracking-[-0.01em]">Savat</h1>
 
       <ErrorBanner
         message={error ?? syncError}
@@ -101,25 +103,25 @@ export function CartView({ cart, sync, isSyncing, syncError, onBack, onCheckout 
         />
       ) : (
         <>
-          <ul className="cart-lines">
+          <ul className="m-0 list-none p-0">
             {cart.items.map((item) => (
-              <li className="cart-line" key={item.product.id}>
+              <li className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 border-b border-line py-4 first:pt-0" key={item.product.id}>
                 <div>
-                  <div className="cart-line__name">{item.product.name}</div>
-                  <div className="cart-line__unit">{formatSom(item.product.priceMinor)}</div>
+                  <div className="text-lead leading-[1.25] font-semibold">{item.product.name}</div>
+                  <div className="mt-0.5 text-small text-muted">{formatSom(item.product.priceMinor)}</div>
                 </div>
-                <div className="cart-line__total">{formatSom(item.lineTotalMinor)}</div>
-                <div className="cart-line__controls">
-                  <div className="qty-stepper">
+                <div className="text-right text-lead font-semibold whitespace-nowrap tabular-nums">{formatSom(item.lineTotalMinor)}</div>
+                <div className="col-span-full flex items-center justify-between gap-3">
+                  <div className="flex min-h-[47px] items-center justify-between overflow-hidden rounded-sm border-[1.5px] border-terracotta [&_button]:h-11 [&_button]:flex-[0_0_44px] [&_button]:cursor-pointer [&_button]:text-[22px] [&_button]:leading-none [&_button]:font-medium [&_button]:text-terracotta-deep [&_button]:transition-colors [&_button]:duration-120 [&_button]:ease-cup [&_button:active]:bg-cream w-[132px]">
                     <button aria-label="Kamaytirish" onClick={() => changeQuantity(item.product, -1)} type="button">
                       −
                     </button>
-                    <span className="qty-stepper__value">{item.quantity}</span>
+                    <span className="min-w-0 flex-1 text-center text-lead font-semibold tabular-nums">{item.quantity}</span>
                     <button aria-label="Ko'paytirish" onClick={() => changeQuantity(item.product, 1)} type="button">
                       +
                     </button>
                   </div>
-                  <button className="button-text" onClick={() => sync.setQuantity(item.product, 0)} type="button">
+                  <button className={cx(buttonText, 'text-muted')} onClick={() => sync.setQuantity(item.product, 0)} type="button">
                     O'chirish
                   </button>
                 </div>
@@ -128,36 +130,36 @@ export function CartView({ cart, sync, isSyncing, syncError, onBack, onCheckout 
           </ul>
 
           {cart.reward ? (
-            <div className="reward-line">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 rounded-md bg-cream p-4">
               <div>
-                <span className="reward-line__tag">Bonus</span>
-                <div className="reward-line__name">{cart.reward.productName}</div>
-                <div className="reward-line__program">{cart.reward.programName}</div>
+                <span className="inline-block rounded-[4px] bg-black px-2 py-[3px] text-micro font-bold tracking-[0.14em] text-cream uppercase">Bonus</span>
+                <div className="mt-2 text-body font-semibold">{cart.reward.productName}</div>
+                <div className="text-small text-muted-cream">{cart.reward.programName}</div>
               </div>
-              <div className="reward-line__price">
+              <div className="text-right text-lead font-bold whitespace-nowrap text-terracotta-deep">
                 {formatSom(0)}
-                <span className="reward-line__was">{formatSom(cart.reward.discountMinor)}</span>
+                <span className="block text-small font-medium text-muted-cream line-through">{formatSom(cart.reward.discountMinor)}</span>
               </div>
-              <button className="button-text" disabled={isRemovingReward} onClick={handleRemoveReward} type="button">
+              <button className={cx(buttonText, 'col-span-full justify-self-start text-muted-cream')} disabled={isRemovingReward} onClick={handleRemoveReward} type="button">
                 Bonusni olib tashlash
               </button>
             </div>
           ) : (
-            <button className="button-secondary" onClick={() => setShowRewardPicker(true)} type="button">
+            <button className={buttonSecondary} onClick={() => setShowRewardPicker(true)} type="button">
               Bepul coffee tanlash
             </button>
           )}
 
-          <button className="button-text" style={{ alignSelf: 'flex-start' }} disabled={isClearing} onClick={handleClear} type="button">
+          <button className={cx(buttonText, 'self-start text-muted')} disabled={isClearing} onClick={handleClear} type="button">
             Savatni tozalash
           </button>
 
-          <div className="order-footer">
-            <div className="summary__row">
-              <span className="summary__label">Jami</span>
-              <span className="summary__total">{formatSom(cart.totalMinor)}</span>
+          <div className="sticky bottom-0 -mx-4 mt-auto flex flex-col gap-3 border-t border-line bg-white px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-small font-bold tracking-[0.14em] text-muted uppercase">Jami</span>
+              <span className="font-display text-title font-medium whitespace-nowrap tabular-nums">{formatSom(cart.totalMinor)}</span>
             </div>
-            <button className="button-primary" disabled={isClearing || isSyncing} onClick={onCheckout} type="button">
+            <button className={cx(buttonPrimary, 'w-full')} disabled={isClearing || isSyncing} onClick={onCheckout} type="button">
               {isSyncing ? 'Saqlanmoqda...' : 'Buyurtma berish'}
             </button>
           </div>

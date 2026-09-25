@@ -8,6 +8,7 @@ import { ErrorBanner } from '../../app/ErrorBanner';
 import { EmptyState } from '../../app/EmptyState';
 import { SectionSkeleton } from '../../app/SectionSkeleton';
 import { CupLine } from '../../app/icons';
+import { cx } from '../../lib/cx';
 
 interface RewardPickerProps {
   onClose: () => void;
@@ -58,16 +59,16 @@ export function RewardPicker({ onClose, selectReward, onSelected }: RewardPicker
   const qualifyingProducts = activeProgram ? (products ?? []).filter((p) => p.categoryId === activeProgram.qualifyingCategoryId && p.isActive) : [];
 
   return (
-    <div className="screen reward-picker">
-      <div className="top-bar">
-        <button className="top-bar__back" onClick={onClose} type="button">
+    <div className="flex flex-1 flex-col gap-4 px-4 pt-3 pb-8">
+      <div className="-mx-4 flex min-h-11 items-center gap-2 px-4">
+        <button className="min-h-11 cursor-pointer py-2.5 text-small font-semibold tracking-[0.02em] text-black" onClick={onClose} type="button">
           ← Savat
         </button>
       </div>
 
       <div>
-        <div className="eyebrow">Bonus</div>
-        <h1 className="display" style={{ marginTop: 'var(--space-2)' }}>
+        <div className="text-micro font-bold tracking-[0.14em] text-muted uppercase">Bonus</div>
+        <h1 className="mt-2 font-display text-display leading-[1.08] font-medium tracking-[-0.01em]">
           Bepul coffee tanlash
         </h1>
       </div>
@@ -81,27 +82,27 @@ export function RewardPicker({ onClose, selectReward, onSelected }: RewardPicker
       ) : qualifyingProducts.length === 0 ? (
         <EmptyState variant="inline" title="Mos mahsulot topilmadi" />
       ) : (
-        <div className="branch-list">
+        <div className="flex flex-col gap-3">
           {qualifyingProducts.map((product) => {
             const isSelected = selectingProductId === product.id;
             return (
               <button
-                className={`reward-option${isSelected ? ' reward-option--selected' : ''}`}
+                className={cx('flex min-h-18 w-full cursor-pointer items-center gap-3 rounded-md bg-white text-left transition-[border-color,background-color] duration-120 ease-cup active:border-terracotta active:bg-cream-soft', isSelected ? 'border-2 border-terracotta bg-cream-soft p-[7px]' : 'border border-line p-2 disabled:opacity-50')}
                 disabled={selectingProductId !== null}
                 key={product.id}
                 onClick={() => handleSelect(activeProgram.programId, product.id)}
                 type="button"
               >
-                <span className="reward-option__visual">
+                <span className="flex size-14 shrink-0 items-center justify-center rounded-sm bg-cream [&_svg]:w-[30px] [&_svg]:fill-none [&_svg]:stroke-black [&_svg]:stroke-[1.8] [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]">
                   <CupLine />
                 </span>
-                <span className="reward-option__body">
-                  <span className="reward-option__name">{product.name}</span>
-                  <span className="reward-option__price" style={{ display: 'block' }}>
+                <span className="min-w-0 flex-1">
+                  <span className="leading-[1.25] font-semibold">{product.name}</span>
+                  <span className="block text-small text-muted">
                     {formatSom(product.priceMinor)}
                   </span>
                 </span>
-                <span className="reward-option__state">{isSelected ? 'Tanlanmoqda' : 'Tanlash'}</span>
+                <span className="shrink-0 pr-2 text-micro font-bold tracking-[0.1em] text-terracotta-deep uppercase">{isSelected ? 'Tanlanmoqda' : 'Tanlash'}</span>
               </button>
             );
           })}

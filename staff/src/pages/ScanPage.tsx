@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { CameraScanner } from '../components/CameraScanner';
 import { goCustomers, openCustomer } from '../lib/route';
+import { Button } from '../components/ui';
 
 // Scan-first. Three ways in, all of which just OPEN the customer's profile (which does the lookup): camera (opened on demand), a hardware / keyboard-wedge
 // scanner (characters typed fast + Enter, anywhere on the page), or typing the code by hand.
@@ -36,28 +37,28 @@ export function ScanPage() {
   };
 
   return (
-    <div className="scan">
-      <h1 className="scan__title">Mijozni skanerlash</h1>
+    <div className="mx-auto flex w-full max-w-[560px] flex-col gap-5 px-4 pt-5 pb-8">
+      <h1 className="font-display text-[30px] font-medium">Mijozni skanerlash</h1>
 
       {cameraOpen ? (
         <CameraScanner onClose={() => setCameraOpen(false)} onCode={(code) => openCustomer(code.trim())} />
       ) : (
-        <button className="button button--primary button--xl" onClick={() => setCameraOpen(true)} type="button">
+        <Button onClick={() => setCameraOpen(true)} size="xl" variant="primary">
           Kamera bilan skanerlash
-        </button>
+        </Button>
       )}
 
-      <form className="manual" onSubmit={submitManual}>
-        <label className="field">
+      <form className="flex flex-col gap-3" onSubmit={submitManual}>
+        <label className="flex flex-col gap-1.5 text-[14px] font-semibold">
           <span>QR topilmadimi? CUP kodini kiriting</span>
           <input autoCapitalize="characters" autoComplete="off" autoCorrect="off" maxLength={64} onChange={(e) => setManual(e.target.value)} placeholder="CUP-XXXXXXXX" value={manual} />
         </label>
-        <button className="button button--secondary" disabled={!manual.trim()} type="submit">
+        <Button disabled={!manual.trim()} type="submit" variant="secondary">
           Ochish
-        </button>
+        </Button>
       </form>
 
-      <button className="link-button link-button--block" onClick={goCustomers} type="button">
+      <button className="font-[inherit] leading-[inherit] min-h-11 cursor-pointer self-start border-0 bg-transparent px-1 py-0 text-left text-[14px] font-bold text-terracotta-deep disabled:opacity-50" onClick={goCustomers} type="button">
         Ism yoki telefon bo‘yicha qidirish →
       </button>
     </div>

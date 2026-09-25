@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { fetchCogsStatus, triggerCogsSync } from '../lib/adminFinance';
 import { FinancePnlOverview } from '../lib/types';
-import { StatusBadge } from '../ui';
+import { Button, StatusBadge } from '../ui';
 
 // Shared by Overview and P&L (both compute COGS from the same product-cost data) — one banner, not
 // duplicated per page.
@@ -22,14 +22,14 @@ export function FinanceCogsBanner({ data }: { data: FinancePnlOverview }) {
     }
   };
   return (
-    <div className="callout">
+    <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">
       <StatusBadge tone="warn">COGS data incomplete</StatusBadge> {data.cogs.missingRecipeProducts.length} product(s) sold in this period have no recipe configured in Poster yet, so their cost is not
       counted — gross profit shown here is an upper bound. Add a recipe (Poster's "Dishes") for: {data.cogs.missingRecipeProducts.slice(0, 5).map((p) => p.name).join(', ')}
       {data.cogs.missingRecipeProducts.length > 5 ? ', …' : ''}.{' '}
-      <button className="button-secondary button--sm" disabled={syncing} onClick={handleSync} type="button">
+      <Button disabled={syncing} onClick={handleSync} size="sm" variant="secondary">
         {syncing ? 'Checking…' : 'Re-check Poster now'}
-      </button>
-      {synced && <span className="hint-text"> {synced}</span>}
+      </Button>
+      {synced && <span className="text-[13px] leading-snug text-muted"> {synced}</span>}
     </div>
   );
 }

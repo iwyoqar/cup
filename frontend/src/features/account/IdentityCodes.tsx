@@ -26,7 +26,7 @@ export function QrCode({ value }: { value: string }) {
   }, [value]);
 
   if (!matrix) {
-    return <div className="identity__qr identity__qr--loading skeleton-pulse" aria-hidden="true" />;
+    return <div className="block aspect-square h-auto w-[min(100%,320px)] rounded-sm animate-pulse-soft bg-skeleton" aria-hidden="true" />;
   }
 
   const quiet = 4;
@@ -37,14 +37,14 @@ export function QrCode({ value }: { value: string }) {
 
   return (
     <svg
-      className="identity__qr"
+      className="block aspect-square h-auto w-[min(100%,320px)]"
       viewBox={`0 0 ${size} ${size}`}
       shapeRendering="crispEdges"
       role="img"
       aria-label={`QR kod: ${value}`}
     >
-      <rect width={size} height={size} className="identity__qr-bg" />
-      <path d={path} className="identity__qr-fg" />
+      <rect width={size} height={size} className="fill-white" />
+      <path d={path} className="fill-black" />
     </svg>
   );
 }
@@ -63,15 +63,15 @@ export function Code128Barcode({ value }: { value: string }) {
 
   return (
     <svg
-      className="identity__barcode"
+      className="block h-14 w-[min(100%,320px)]"
       viewBox={`0 0 ${width} 1`}
       preserveAspectRatio="none"
       shapeRendering="crispEdges"
       role="img"
       aria-label={`Shtrix-kod: ${value}`}
     >
-      <rect width={width} height={1} className="identity__qr-bg" />
-      <path d={bars.join('')} className="identity__qr-fg" />
+      <rect width={width} height={1} className="fill-white" />
+      <path d={bars.join('')} className="fill-black" />
     </svg>
   );
 }

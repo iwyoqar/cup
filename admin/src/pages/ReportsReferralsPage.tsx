@@ -20,7 +20,7 @@ type Referrer = ReportsReferralsOverview['referrers'][number];
 type Referred = ReportsReferralsOverview['referred'][number];
 
 const referrerColumns: Column<Referrer>[] = [
-  { key: 'n', header: 'Referrer', cell: (r) => <span className="table__primary">{r.name ?? '—'}</span> },
+  { key: 'n', header: 'Referrer', cell: (r) => <span className="font-semibold text-black">{r.name ?? '—'}</span> },
   { key: 'code', header: 'Code', low: true, cell: (r) => r.code ?? '—' },
   { key: 'c', header: 'Created', numeric: true, cell: (r) => num(r.referralsCreated) },
   { key: 'q', header: 'Qualified', numeric: true, cell: (r) => num(r.qualified) },
@@ -30,7 +30,7 @@ const referrerColumns: Column<Referrer>[] = [
 ];
 
 const referredColumns: Column<Referred>[] = [
-  { key: 'n', header: 'Referred customer', cell: (r) => <span className="table__primary">{r.referredName ?? '—'}</span> },
+  { key: 'n', header: 'Referred customer', cell: (r) => <span className="font-semibold text-black">{r.referredName ?? '—'}</span> },
   { key: 'by', header: 'Referrer', cell: (r) => r.referrerName ?? '—' },
   { key: 'd', header: 'Date', low: true, cell: (r) => formatDate(r.createdAt) },
   { key: 's', header: 'Status (now)', cell: (r) => r.status + (r.closeReason ? ` · ${r.closeReason}` : '') },
@@ -71,7 +71,7 @@ export function ReportsReferralsPage() {
               <StatCard hint="Qualifying purchases only" label="Qualifying purchase amount" value={formatSom(d.summary.qualifyingAmountMinor)} />
             </StatGrid>
 
-            <div className="grid-2">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <SectionCard description="Events recorded in the selected period (not a single cohort)." title="Referral funnel">
                 <HBarList items={d.funnel.map((f) => ({ name: STAGE_LABEL[f.stage], value: f.count, valueLabel: num(f.count) }))} />
               </SectionCard>

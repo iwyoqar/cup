@@ -6,6 +6,8 @@ import { fetchMyLoyaltyHistory, fetchMyLoyaltyOverview, setMyBirthday } from '..
 import { formatDateTime, formatSom } from '../../lib/format';
 import { LoyaltyHistoryItem, LoyaltyOverview, LoyaltyOverviewEnabled } from '../../types/api';
 import { LoyaltySection } from './LoyaltySection';
+import { buttonSecondary } from '../../app/buttonStyles';
+import { cx } from '../../lib/cx';
 
 interface LoyaltyHubProps {
   onOpenTransactions: () => void;
@@ -68,23 +70,23 @@ function Premium({ data, onOpenTransactions, onBirthdaySaved }: { data: LoyaltyO
   const barWidth = span === null ? 100 : Math.min(100, (xp.levelXP / span) * 100);
 
   return (
-    <section className="account-section lx">
-      <h2 className="section-title">Sodiqlik</h2>
+    <section className="flex flex-col gap-3 flex flex-col gap-4">
+      <h2 className="font-display text-section leading-[1.2] font-medium">Sodiqlik</h2>
 
       {level && (
-        <div className="lx-level" style={{ ['--lx-color' as string]: level.color }}>
-          <div className="lx-level__top">
-            <span className="lx-level__icon" aria-hidden="true">{level.icon}</span>
+        <div className="flex flex-col gap-3 rounded-lg border-t-4 border-t-[color:var(--lx-color,var(--color-terracotta))] bg-black px-4 py-6 text-cream" style={{ ['--lx-color' as string]: level.color }}>
+          <div className="flex items-center gap-3">
+            <span className="text-[34px] leading-none" aria-hidden="true">{level.icon}</span>
             <div>
-              <div className="lx-eyebrow">Daraja</div>
-              <div className="lx-level__name">{level.name}</div>
+              <div className="text-micro font-bold tracking-[0.1em] text-cream/70 uppercase">Daraja</div>
+              <div className="font-display text-title leading-[1.05] font-medium">{level.name}</div>
             </div>
-            {data.cashback.enabled && level.cashbackRateBps > 0 && <span className="lx-chip">{(level.cashbackRateBps / 100).toLocaleString('ru-RU')}% keshbek</span>}
+            {data.cashback.enabled && level.cashbackRateBps > 0 && <span className="ml-auto rounded-full border border-cream/50 px-2.5 py-[3px] text-micro font-bold whitespace-nowrap">{(level.cashbackRateBps / 100).toLocaleString('ru-RU')}% keshbek</span>}
           </div>
-          <div className="lx-bar" role="img" aria-label={`XP ${xp.levelXP}`}>
+          <div className="h-2 overflow-hidden rounded-full bg-cream/22 [&>span]:block [&>span]:h-full [&>span]:rounded-full [&>span]:bg-terracotta" role="img" aria-label={`XP ${xp.levelXP}`}>
             <span style={{ width: `${barWidth}%` }} />
           </div>
-          <div className="lx-level__meta">
+          <div className="flex justify-between gap-3 text-small text-cream/85 tabular-nums">
             <span>{xp.lifetimeXP.toLocaleString('ru-RU')} XP</span>
             {nextLevel ? (
               <span>
@@ -97,27 +99,27 @@ function Premium({ data, onOpenTransactions, onBirthdaySaved }: { data: LoyaltyO
         </div>
       )}
 
-      <div className="lx-wallets">
-        <div className="lx-tile">
-          <div className="lx-eyebrow">Ballar</div>
-          <div className="lx-tile__value">{data.points.balance.toLocaleString('ru-RU')}</div>
-          <div className="lx-tile__hint">jami {data.points.lifetimeEarned.toLocaleString('ru-RU')}</div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3">
+        <div className="min-w-0 rounded-lg bg-cream p-4">
+          <div className="text-micro font-bold tracking-[0.1em] text-muted-cream uppercase">Ballar</div>
+          <div className="mt-1 font-display text-[26px] leading-[1.1] font-medium tabular-nums [overflow-wrap:anywhere]">{data.points.balance.toLocaleString('ru-RU')}</div>
+          <div className="text-small text-muted-cream">jami {data.points.lifetimeEarned.toLocaleString('ru-RU')}</div>
         </div>
         {data.cashback.enabled && (
-          <div className="lx-tile">
-            <div className="lx-eyebrow">Keshbek</div>
-            <div className="lx-tile__value">{formatSom(data.cashback.balance)}</div>
-            <div className="lx-tile__hint">jami {formatSom(data.cashback.lifetimeEarned)}</div>
+          <div className="min-w-0 rounded-lg bg-cream p-4">
+            <div className="text-micro font-bold tracking-[0.1em] text-muted-cream uppercase">Keshbek</div>
+            <div className="mt-1 font-display text-[26px] leading-[1.1] font-medium tabular-nums [overflow-wrap:anywhere]">{formatSom(data.cashback.balance)}</div>
+            <div className="text-small text-muted-cream">jami {formatSom(data.cashback.lifetimeEarned)}</div>
           </div>
         )}
       </div>
 
       {data.streak.enabled && (
-        <div className="lx-streak">
-          <span className="lx-streak__flame" aria-hidden="true">🔥</span>
+        <div className="flex items-center gap-3 rounded-lg border border-line px-4 py-3">
+          <span className="text-[28px]" aria-hidden="true">🔥</span>
           <div>
-            <div className="lx-streak__value">{data.streak.current} kun ketma-ket</div>
-            <div className="lx-tile__hint">Eng yaxshi natija: {data.streak.best} kun</div>
+            <div className="font-semibold">{data.streak.current} kun ketma-ket</div>
+            <div className="text-small text-muted">Eng yaxshi natija: {data.streak.best} kun</div>
           </div>
         </div>
       )}
@@ -125,18 +127,18 @@ function Premium({ data, onOpenTransactions, onBirthdaySaved }: { data: LoyaltyO
       {data.birthday.enabled && <Birthday birthday={data.birthday} onSaved={onBirthdaySaved} />}
 
       <div>
-        <h3 className="lx-subtitle">Yutuqlar</h3>
+        <h3 className="mt-0 mb-3 font-display text-lead font-medium">Yutuqlar</h3>
         {data.achievements.length === 0 ? (
           <EmptyState variant="inline" title="Yutuqlar hali mavjud emas" />
         ) : (
-          <div className="lx-achievements">
+          <div className="grid grid-cols-2 gap-3">
             {data.achievements.map((a) => (
-              <div className={`lx-ach${a.unlocked ? ' lx-ach--on' : ''}`} key={a.code}>
-                <span className="lx-ach__icon" aria-hidden="true">{a.icon}</span>
-                <div className="lx-ach__name">{a.name}</div>
-                <div className="lx-tile__hint">{a.unlocked ? 'Ochilgan' : `${a.progress.current} / ${a.progress.target}`}</div>
+              <div className={cx('flex min-w-0 flex-col gap-0.5 rounded-md border p-3', a.unlocked ? 'border-transparent bg-cream-soft opacity-100' : 'border-line opacity-72')} key={a.code}>
+                <span className="text-[24px]" aria-hidden="true">{a.icon}</span>
+                <div className="text-body font-semibold [overflow-wrap:anywhere]">{a.name}</div>
+                <div className="text-small text-muted">{a.unlocked ? 'Ochilgan' : `${a.progress.current} / ${a.progress.target}`}</div>
                 {!a.unlocked && (
-                  <div className="lx-bar lx-bar--thin" aria-hidden="true">
+                  <div className="h-1 overflow-hidden rounded-full bg-track [&>span]:block [&>span]:h-full [&>span]:rounded-full [&>span]:bg-terracotta" aria-hidden="true">
                     <span style={{ width: `${a.progress.target > 0 ? Math.min(100, (a.progress.current / a.progress.target) * 100) : 0}%` }} />
                   </div>
                 )}
@@ -148,7 +150,7 @@ function Premium({ data, onOpenTransactions, onBirthdaySaved }: { data: LoyaltyO
 
       <History />
 
-      <button className="button-secondary" onClick={onOpenTransactions} type="button">
+      <button className={buttonSecondary} onClick={onOpenTransactions} type="button">
         Ballar tarixi
       </button>
     </section>
@@ -162,10 +164,10 @@ function Birthday({ birthday, onSaved }: { birthday: LoyaltyOverviewEnabled['bir
 
   if (birthday.eligible) {
     return (
-      <div className="lx-birthday lx-birthday--on">
-        <div className="lx-eyebrow">Tug‘ilgan kun</div>
-        <p className="lx-birthday__lead">Tug‘ilgan kuningiz bilan! 🎂</p>
-        <p className="lx-tile__hint">{birthday.rewardPoints > 0 ? `Sizga ${birthday.rewardPoints.toLocaleString('ru-RU')} ball sovg‘a mavjud.` : 'Sizga sovg‘a mavjud.'}</p>
+      <div className="flex flex-col gap-2 rounded-lg border border-transparent bg-cream-soft p-4">
+        <div className="text-micro font-bold tracking-[0.1em] text-muted uppercase">Tug‘ilgan kun</div>
+        <p className="m-0 font-display text-lead">Tug‘ilgan kuningiz bilan! 🎂</p>
+        <p className="text-small text-muted">{birthday.rewardPoints > 0 ? `Sizga ${birthday.rewardPoints.toLocaleString('ru-RU')} ball sovg‘a mavjud.` : 'Sizga sovg‘a mavjud.'}</p>
       </div>
     );
   }
@@ -186,16 +188,16 @@ function Birthday({ birthday, onSaved }: { birthday: LoyaltyOverviewEnabled['bir
   };
 
   return (
-    <div className="lx-birthday">
-      <div className="lx-eyebrow">Tug‘ilgan kun</div>
-      <p className="lx-tile__hint">Tug‘ilgan kuningizni kiriting — bir marta saqlanadi.</p>
-      <div className="lx-birthday__row">
+    <div className="flex flex-col gap-2 rounded-lg border border-line p-4">
+      <div className="text-micro font-bold tracking-[0.1em] text-muted uppercase">Tug‘ilgan kun</div>
+      <p className="text-small text-muted">Tug‘ilgan kuningizni kiriting — bir marta saqlanadi.</p>
+      <div className="flex items-center gap-2 [&_input]:min-h-11 [&_input]:min-w-0 [&_input]:flex-1 [&_input]:rounded-sm [&_input]:border [&_input]:border-line-strong [&_input]:px-3 [&_input]:[font:inherit]">
         <input aria-label="Tug‘ilgan kun" max={new Date().toISOString().slice(0, 10)} onChange={(e) => setValue(e.target.value)} type="date" value={value} />
-        <button className="button-secondary" disabled={!value || saving} onClick={save} type="button">
+        <button className={buttonSecondary} disabled={!value || saving} onClick={save} type="button">
           Saqlash
         </button>
       </div>
-      {error && <p className="hint-text">{error}</p>}
+      {error && <p className="text-small leading-[1.45] text-muted">{error}</p>}
     </div>
   );
 }
@@ -238,20 +240,20 @@ function History() {
 
   return (
     <div>
-      <h3 className="lx-subtitle">Tarix</h3>
-      {failed && <p className="hint-text">Tarixni yuklab bo‘lmadi</p>}
+      <h3 className="mt-0 mb-3 font-display text-lead font-medium">Tarix</h3>
+      {failed && <p className="text-small leading-[1.45] text-muted">Tarixni yuklab bo‘lmadi</p>}
       {items === null && !failed && <SectionSkeleton height={120} />}
       {items !== null && items.length === 0 && <EmptyState variant="inline" title="Tarix hali mavjud emas" />}
       {items !== null && items.length > 0 && (
-        <ul className="lx-history">
+        <ul className="mt-0 mb-3 list-none p-0">
           {items.map((item, i) => (
-            <li className="lx-history__row" key={`${item.type}-${item.at}-${i}`}>
-              <span className="lx-history__icon" aria-hidden="true">{HISTORY_ICON[item.type]}</span>
-              <div className="lx-history__main">
+            <li className="flex items-center gap-3 border-b border-line py-3" key={`${item.type}-${item.at}-${i}`}>
+              <span className="grid size-7 flex-none place-items-center rounded-full bg-cream text-[14px]" aria-hidden="true">{HISTORY_ICON[item.type]}</span>
+              <div className="min-w-0 flex-1 text-body [overflow-wrap:anywhere]">
                 <div>{HISTORY_TITLE[item.type]}</div>
-                <div className="lx-tile__hint">{[item.detail, formatDateTime(item.at)].filter(Boolean).join(' · ')}</div>
+                <div className="text-small text-muted">{[item.detail, formatDateTime(item.at)].filter(Boolean).join(' · ')}</div>
               </div>
-              <div className="lx-history__amount">
+              <div className="text-small font-semibold whitespace-nowrap tabular-nums">
                 {item.points !== null ? `${item.points > 0 ? '+' : ''}${item.points.toLocaleString('ru-RU')} ball` : item.cashbackMinor !== null ? `+${formatSom(item.cashbackMinor)}` : ''}
               </div>
             </li>
@@ -259,7 +261,7 @@ function History() {
         </ul>
       )}
       {next && (
-        <button className="button-secondary" disabled={loadingMore} onClick={more} type="button">
+        <button className={buttonSecondary} disabled={loadingMore} onClick={more} type="button">
           {loadingMore ? 'Yuklanmoqda…' : 'Yana'}
         </button>
       )}

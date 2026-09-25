@@ -3,25 +3,7 @@ import { formatSom } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { useReportsOverview } from '../lib/useReportsOverview';
 import { ReportsOverview } from '../lib/types';
-import {
-  BarChart,
-  ChartContainer,
-  Column,
-  DataTable,
-  DateRangePicker,
-  DateRangeValue,
-  EmptyState,
-  ErrorState,
-  FilterBar,
-  FilterField,
-  HBarList,
-  isRangeReady,
-  LoadingState,
-  PageHeader,
-  SectionCard,
-  StatCard,
-  StatGrid,
-} from '../ui';
+import { BarChart, ChartContainer, Column, cx, DataTable, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, FilterField, HBarList, isRangeReady, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
 
@@ -31,7 +13,7 @@ type Product = ReportsOverview['topProducts'][number];
 // profitability, that is Finance/Products-phase territory).
 function productColumns(revenueTotal: number): Column<Product>[] {
   return [
-    { key: 'name', header: 'Product', cell: (p) => <span className="table__primary">{p.name}</span> },
+    { key: 'name', header: 'Product', cell: (p) => <span className="font-semibold text-black">{p.name}</span> },
     { key: 'qty', header: 'Qty', numeric: true, cell: (p) => number(p.quantity) },
     { key: 'revenue', header: 'Revenue', numeric: true, cell: (p) => formatSom(p.revenue) },
     { key: 'share', header: 'Share of revenue', numeric: true, low: true, cell: (p) => (revenueTotal > 0 ? `${Math.round((p.revenue / revenueTotal) * 100)}%` : '—') },
@@ -53,7 +35,7 @@ export function ReportsSalesPage() {
       <FilterBar>
         <DateRangePicker onChange={setRange} value={range} />
         <FilterField label="Branch">
-          <select className="select" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
+          <select className="" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
             <option value="">All branches</option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -63,7 +45,7 @@ export function ReportsSalesPage() {
           </select>
         </FilterField>
         {data && !error && (
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
+          <span className="text-[13px] leading-snug text-muted self-center">
             {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
             {data.branch ? ` · ${data.branch.name}` : ' · All branches'}
             {loading && ' · updating…'}
@@ -75,7 +57,7 @@ export function ReportsSalesPage() {
       {!data && !error && ready && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity var(--motion-base) var(--ease)' }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <StatGrid>
             <StatCard hint="CUP + independent POS" label="Revenue" strong value={formatSom(data.revenue)} />
             <StatCard label="Orders / Receipts" value={number(data.orders)} />
@@ -86,14 +68,14 @@ export function ReportsSalesPage() {
           </StatGrid>
 
           {data.notes.length > 0 && (
-            <div className="callout">
+            <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">
               {data.notes.map((n) => (
                 <p key={n}>{n}</p>
               ))}
             </div>
           )}
 
-          <div className="grid-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <ChartContainer description="Revenue per business day." title="Revenue trend">
               <BarChart ariaLabel="Daily revenue" data={data.revenueByDay.map((d) => ({ label: d.date, value: d.revenue }))} format={formatSom} />
             </ChartContainer>

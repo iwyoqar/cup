@@ -10,7 +10,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ReactNode;
 }
 
-// Design System 2.0 button — pure Tailwind utilities (no ui/components.css `.btn*` classes). `sizing()` resolves
+// Design System 2.0 button — pure Tailwind utilities. `sizing()` resolves
 // height/padding/text-size as ONE string per (variant, size) combination rather than composing overlapping utilities
 // from separate strings — cx() does no conflict resolution (no tailwind-merge), so two classes for the same CSS
 // property (e.g. px-4 AND px-3) would have an unpredictable winner; every axis here is therefore set in exactly one

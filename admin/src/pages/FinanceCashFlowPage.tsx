@@ -6,7 +6,7 @@ import { FinanceRoi } from '../lib/types';
 import { FinanceFilterBar } from '../components/FinanceFilterBar';
 import { FinanceRangeValue, isFinanceRangeReady } from '../components/FinancePeriodPicker';
 import { useFinanceData } from '../components/useFinanceData';
-import { BarChart, ChartContainer, ErrorState, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
+import { BarChart, ChartContainer, cx, ErrorState, LoadingState, PageHeader, SectionCard, StatCard, StatGrid } from '../ui';
 
 export function FinanceCashFlowPage() {
   const { item } = findNav('finance-cash-flow');
@@ -34,7 +34,7 @@ export function FinanceCashFlowPage() {
       {!data && !error && <LoadingState variant="page" />}
 
       {data && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1 }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <StatGrid>
             <StatCard hint="not reconciled against a real statement — see note below" label="Opening balance" value={formatSom(data.openingBalance)} />
             <StatCard label="Cash in" value={formatSom(data.cashIn.total)} />
@@ -58,9 +58,9 @@ export function FinanceCashFlowPage() {
             />
           </ChartContainer>
           <SectionCard title="What this view does not cover">
-            <ul className="hint-text" style={{ margin: 0, paddingLeft: '1.1em' }}>
+            <ul className="text-[13px] leading-snug text-muted m-0 pl-[1.1em]">
               {data.limitations.map((l) => (
-                <li key={l} style={{ marginBottom: 'var(--space-1)' }}>
+                <li key={l} className="mb-1">
                   {l}
                 </li>
               ))}

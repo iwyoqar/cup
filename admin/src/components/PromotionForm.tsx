@@ -4,6 +4,7 @@ import { ApiError } from '../lib/api';
 import { CatalogProduct, fetchActiveProducts } from '../lib/adminCatalog';
 import { fetchSegments } from '../lib/adminSegments';
 import { Promotion, PromotionBenefitType, PROMOTION_BENEFIT_TYPE_LABELS, PROMOTION_BENEFIT_TYPES, Segment } from '../lib/types';
+import { Button, Toggle } from '../ui';
 
 interface PromotionFormProps {
   existing?: Promotion;
@@ -105,20 +106,20 @@ export function PromotionForm({ existing, onSaved, onCancel }: PromotionFormProp
     <form onSubmit={handleSubmit}>
       <h1>{existing ? 'Edit promotion' : 'Create promotion'}</h1>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="promo-name">Name</label>
         <input id="promo-name" onChange={(e) => setName(e.target.value)} type="text" value={name} />
       </div>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="promo-description">Description</label>
         <input id="promo-description" onChange={(e) => setDescription(e.target.value)} type="text" value={description} />
       </div>
 
-      <div className="field" style={{ maxWidth: 420 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[420px]">
         <label htmlFor="promo-segment">Audience segment (optional — leave blank for everyone)</label>
         {segments === null ? (
-          <p className="hint-text">Loading segments...</p>
+          <p className="text-[13px] leading-snug text-muted">Loading segments...</p>
         ) : (
           <select id="promo-segment" onChange={(e) => setSegmentId(e.target.value)} value={segmentId}>
             <option value="">Everyone</option>
@@ -133,12 +134,12 @@ export function PromotionForm({ existing, onSaved, onCancel }: PromotionFormProp
 
       <h3>Benefit</h3>
       {benefitLocked && (
-        <p className="hint-text">
+        <p className="text-[13px] leading-snug text-muted">
           This promotion has existing redemptions — its benefit type/value/product/quantity can no longer be changed.
         </p>
       )}
 
-      <div className="field" style={{ maxWidth: 260 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[260px]">
         <label htmlFor="promo-benefit-type">Type</label>
         <select
           disabled={benefitLocked}
@@ -155,7 +156,7 @@ export function PromotionForm({ existing, onSaved, onCancel }: PromotionFormProp
       </div>
 
       {benefitType === 'PERCENT_DISCOUNT' && (
-        <div className="field" style={{ maxWidth: 200 }}>
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[200px]">
           <label htmlFor="promo-benefit-value">Percentage (1-100)</label>
           <input
             disabled={benefitLocked}
@@ -170,7 +171,7 @@ export function PromotionForm({ existing, onSaved, onCancel }: PromotionFormProp
       )}
 
       {benefitType === 'FIXED_DISCOUNT' && (
-        <div className="field" style={{ maxWidth: 200 }}>
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[200px]">
           <label htmlFor="promo-benefit-value">Summa (so'm)</label>
           <input
             disabled={benefitLocked}
@@ -185,10 +186,10 @@ export function PromotionForm({ existing, onSaved, onCancel }: PromotionFormProp
 
       {benefitType === 'FREE_PRODUCT' && (
         <>
-          <div className="field" style={{ maxWidth: 320 }}>
+          <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[320px]">
             <label htmlFor="promo-benefit-product">Product</label>
             {products === null ? (
-              <p className="hint-text">Loading products...</p>
+              <p className="text-[13px] leading-snug text-muted">Loading products...</p>
             ) : (
               <select disabled={benefitLocked} id="promo-benefit-product" onChange={(e) => setBenefitProductId(e.target.value)} value={benefitProductId}>
                 <option value="">Select a product</option>
@@ -200,7 +201,7 @@ export function PromotionForm({ existing, onSaved, onCancel }: PromotionFormProp
               </select>
             )}
           </div>
-          <div className="field" style={{ maxWidth: 200 }}>
+          <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[200px]">
             <label htmlFor="promo-benefit-quantity">Quantity</label>
             <input
               disabled={benefitLocked}
@@ -215,7 +216,7 @@ export function PromotionForm({ existing, onSaved, onCancel }: PromotionFormProp
       )}
 
       {benefitType === 'LOYALTY_POINTS' && (
-        <div className="field" style={{ maxWidth: 200 }}>
+        <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[200px]">
           <label htmlFor="promo-benefit-value">Points</label>
           <input
             disabled={benefitLocked}
@@ -229,41 +230,38 @@ export function PromotionForm({ existing, onSaved, onCancel }: PromotionFormProp
       )}
 
       <h3>Validity</h3>
-      <div className="field" style={{ maxWidth: 260 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[260px]">
         <label htmlFor="promo-starts-at">Starts at</label>
         <input id="promo-starts-at" onChange={(e) => setStartsAt(e.target.value)} type="datetime-local" value={startsAt} />
       </div>
-      <div className="field" style={{ maxWidth: 260 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[260px]">
         <label htmlFor="promo-ends-at">Ends at (optional)</label>
         <input id="promo-ends-at" onChange={(e) => setEndsAt(e.target.value)} type="datetime-local" value={endsAt} />
       </div>
 
-      <div className="field" style={{ maxWidth: 260 }}>
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted max-w-[260px]">
         <label htmlFor="promo-usage-limit">Usage limit per customer (blank = unlimited)</label>
         <input id="promo-usage-limit" min={1} onChange={(e) => setUsageLimit(e.target.value)} type="number" value={usageLimit} />
       </div>
 
-      <div className="settings-row" style={{ maxWidth: 320, marginTop: 12 }}>
-        <span className="settings-row__label">Active</span>
-        <label className="toggle">
-          <input checked={isActive} onChange={(e) => setIsActive(e.target.checked)} type="checkbox" />
-          <span className="toggle__track" />
-        </label>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4 last:border-b-0 last:pb-0 max-w-[320px] mt-3">
+        <span className="text-sm font-semibold">Active</span>
+        <Toggle checked={isActive} label="Active" onChange={setIsActive} />
       </div>
 
       {error && (
-        <p className="error-text" style={{ marginTop: 16 }}>
+        <p className="text-[13px] font-semibold text-err mt-4">
           {error}
         </p>
       )}
 
-      <div className="settings-footer">
-        <button className="button-primary" disabled={isSaving} type="submit">
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <Button disabled={isSaving} type="submit" variant="primary">
           {isSaving ? 'Saving...' : 'Save'}
-        </button>
-        <button className="button-secondary" disabled={isSaving} onClick={onCancel} type="button">
+        </Button>
+        <Button disabled={isSaving} onClick={onCancel} variant="secondary">
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

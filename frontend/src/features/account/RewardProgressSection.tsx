@@ -3,6 +3,7 @@ import { CustomerRewardProgram } from '../../types/api';
 import { fetchMyRewards } from '../../lib/api/rewards';
 import { EmptyState } from '../../app/EmptyState';
 import { SectionSkeleton } from '../../app/SectionSkeleton';
+import { cx } from '../../lib/cx';
 
 // Above this many purchases a segmented bar gets too fine to read, so a continuous bar is used.
 const MAX_SEGMENTS = 12;
@@ -14,19 +15,19 @@ function RewardProgress({ program }: { program: CustomerRewardProgram }) {
   const filled = Math.max(0, Math.min(threshold, qualifyingCount));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+    <div className="flex flex-col gap-2">
       {threshold <= MAX_SEGMENTS ? (
-        <div className="progress" role="img" aria-label={`${filled} / ${threshold}`}>
+        <div className="flex gap-1" role="img" aria-label={`${filled} / ${threshold}`}>
           {Array.from({ length: threshold }, (_, index) => (
-            <span className={`progress__segment${index < filled ? ' progress__segment--filled' : ''}`} key={index} />
+            <span className={cx('h-2 flex-1 rounded-[2px]', index < filled ? 'bg-terracotta' : 'bg-track')} key={index} />
           ))}
         </div>
       ) : (
-        <div className="progress-bar" role="img" aria-label={`${filled} / ${threshold}`}>
-          <div className="progress-bar__fill" style={{ width: `${(filled / threshold) * 100}%` }} />
+        <div className="h-2 overflow-hidden rounded-[2px] bg-track" role="img" aria-label={`${filled} / ${threshold}`}>
+          <div className="h-full bg-terracotta transition-[width] duration-220 ease-cup" style={{ width: `${(filled / threshold) * 100}%` }} />
         </div>
       )}
-      <div className="progress-meta">
+      <div className="flex justify-between text-small font-semibold tabular-nums">
         <span>{filled}</span>
         <span>{threshold}</span>
       </div>
@@ -55,8 +56,8 @@ export function RewardProgressSection() {
   }, []);
 
   return (
-    <section className="account-section">
-      <h2 className="section-title">Bonus coffee</h2>
+    <section className="flex flex-col gap-3">
+      <h2 className="font-display text-section leading-[1.2] font-medium">Bonus coffee</h2>
 
       {!programs ? (
         <SectionSkeleton height={148} />
@@ -66,12 +67,12 @@ export function RewardProgressSection() {
         programs.map((program) => {
           const remaining = Math.max(1, program.threshold - program.qualifyingCount);
           return (
-            <div className="cream-block" key={program.programId}>
-              <div className="eyebrow">{programs.length > 1 ? program.program.name : 'Bonus'}</div>
+            <div className="flex flex-col gap-3 rounded-lg bg-cream px-4 py-6" key={program.programId}>
+              <div className="text-micro font-bold tracking-[0.14em] text-muted-cream uppercase">{programs.length > 1 ? program.program.name : 'Bonus'}</div>
               {program.availableRewards > 0 ? (
                 <>
-                  <p className="cream-block__lead">{program.availableRewards} ta bepul coffee mavjud</p>
-                  <p className="hint-text">
+                  <p className="font-display text-title leading-[1.12] font-medium">{program.availableRewards} ta bepul coffee mavjud</p>
+                  <p className="text-small leading-[1.45] text-muted-cream">
                     {program.redeemable
                       ? 'Savatda mos mahsulotni tanlang.'
                       : "Bepul mahsulot yig'ildi. Uni buyurtmada olish imkoniyati hozircha yoqilmagan."}
@@ -79,7 +80,7 @@ export function RewardProgressSection() {
                 </>
               ) : (
                 <>
-                  <p className="cream-block__lead">Yana {remaining} ta coffee va keyingisi bepul</p>
+                  <p className="font-display text-title leading-[1.12] font-medium">Yana {remaining} ta coffee va keyingisi bepul</p>
                   <RewardProgress program={program} />
                 </>
               )}

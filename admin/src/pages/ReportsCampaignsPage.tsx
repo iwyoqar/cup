@@ -16,7 +16,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 ];
 
 const columns: Column<ReportsCampaignRow>[] = [
-  { key: 'n', header: 'Campaign', cell: (c) => <span className="table__primary">{c.name}</span> },
+  { key: 'n', header: 'Campaign', cell: (c) => <span className="font-semibold text-black">{c.name}</span> },
   { key: 's', header: 'Status (now)', cell: (c) => c.status },
   { key: 'r', header: 'Recipients', numeric: true, cell: (c) => num(c.totalRecipients) },
   { key: 'ok', header: 'Successful sends', numeric: true, cell: (c) => num(c.successfulSends) },
@@ -83,7 +83,7 @@ function RecentActivity({ rows }: { rows: ReportsCampaignsOverview['recentActivi
     <DataTable
       columns={[
         { key: 'd', header: 'Date', cell: (r) => formatDateTime(r.at) },
-        { key: 'c', header: 'Campaign', cell: (r) => <span className="table__primary">{r.campaignName}</span> },
+        { key: 'c', header: 'Campaign', cell: (r) => <span className="font-semibold text-black">{r.campaignName}</span> },
         { key: 'u', header: 'Customer', cell: (r) => r.customerName ?? '—' },
         { key: 's', header: 'Status', cell: (r) => (r.status === 'sent' ? 'Sent' : 'Failed') },
         { key: 'e', header: 'Failure code', low: true, cell: (r) => r.errorCode ?? '—' },
@@ -114,8 +114,8 @@ function CampaignDetail({ campaign, range, onClose }: { campaign: ReportsCampaig
           { key: 'cv', label: 'Conversion / attributed revenue', value: 'Not currently attributable' },
         ]}
       />
-      <h3 style={{ margin: '16px 0 8px' }}>Recent activity</h3>
-      {data ? <RecentActivity rows={data.recentActivity} /> : <p className="hint-text">Loading…</p>}
+      <h3 className="mt-4 mb-2 mx-0">Recent activity</h3>
+      {data ? <RecentActivity rows={data.recentActivity} /> : <p className="text-[13px] leading-snug text-muted">Loading…</p>}
     </Modal>
   );
 }

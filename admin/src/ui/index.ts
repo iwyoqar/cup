@@ -7,6 +7,7 @@ export type { ButtonVariant } from './Button';
 export { SectionCard, StatCard, KPICard, StatGrid, KeyValue, Card } from './Cards';
 export { DataTable } from './DataTable';
 export type { Column } from './DataTable';
+export { tableClass } from './table';
 export { StatusBadge, HealthBadge, HEALTH_LABEL } from './StatusBadge';
 export type { BadgeTone, HealthState } from './StatusBadge';
 export { EmptyState, LoadingState, ErrorState } from './States';

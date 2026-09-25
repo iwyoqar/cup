@@ -4,6 +4,8 @@ import { fetchMyLoyalty } from '../../lib/api/loyalty';
 import { toUserMessage } from '../../lib/api/errors';
 import { getLoyaltyEarningCopy } from '../../lib/loyaltyCopy';
 import { SectionSkeleton } from '../../app/SectionSkeleton';
+import { buttonSecondary } from '../../app/buttonStyles';
+import { cx } from '../../lib/cx';
 
 interface LoyaltySectionProps {
   onOpenTransactions: () => void;
@@ -40,7 +42,7 @@ export function LoyaltySection({ onOpenTransactions }: LoyaltySectionProps) {
   }
 
   if (error) {
-    return <p className="hint-text">Ballar ma'lumotini yuklab bo'lmadi</p>;
+    return <p className="text-small leading-[1.45] text-muted">Ballar ma'lumotini yuklab bo'lmadi</p>;
   }
 
   if (!loyalty || !loyalty.enabled) {
@@ -50,14 +52,14 @@ export function LoyaltySection({ onOpenTransactions }: LoyaltySectionProps) {
   const earningCopy = getLoyaltyEarningCopy(loyalty);
 
   return (
-    <section className="cream-block">
-      <div className="eyebrow">Ballaringiz</div>
-      <div className="loyalty-balance">
-        <span className="loyalty-balance__value">{loyalty.balance.toLocaleString('ru-RU')}</span>
-        <span className="loyalty-balance__unit">ball</span>
+    <section className="flex flex-col gap-3 rounded-lg bg-cream px-4 py-6">
+      <div className="text-micro font-bold tracking-[0.14em] text-muted-cream uppercase">Ballaringiz</div>
+      <div className="flex items-baseline gap-2">
+        <span className="font-display text-[clamp(44px,14vw,60px)] leading-none font-medium tabular-nums">{loyalty.balance.toLocaleString('ru-RU')}</span>
+        <span className="text-body font-semibold">ball</span>
       </div>
-      {earningCopy && <p className="hint-text">{earningCopy}</p>}
-      <button className="button-secondary" onClick={onOpenTransactions} type="button">
+      {earningCopy && <p className="text-small leading-[1.45] text-muted-cream">{earningCopy}</p>}
+      <button className={cx(buttonSecondary, 'self-start')} onClick={onOpenTransactions} type="button">
         Ballar tarixi
       </button>
     </section>

@@ -3,7 +3,7 @@ import { createExpense, createExpenseCategory, deleteExpense, fetchExpenseCatego
 import { ApiError } from '../lib/api';
 import { formatDate, formatSom } from '../lib/format';
 import { FinanceExpense, FinanceExpenseCategory } from '../lib/types';
-import { Column, ConfirmDialog, DataTable, EmptyState, ErrorState, LoadingState, Modal, SectionCard, StatusBadge } from '../ui';
+import { Button, Column, ConfirmDialog, DataTable, EmptyState, ErrorState, LoadingState, Modal, SectionCard, StatusBadge } from '../ui';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -45,7 +45,7 @@ export function FinanceExpensesTab() {
 
   const columns: Column<FinanceExpense>[] = [
     { key: 'date', header: 'Date', cell: (e) => formatDate(e.date) },
-    { key: 'desc', header: 'Description', cell: (e) => <span className="table__primary">{e.description}</span> },
+    { key: 'desc', header: 'Description', cell: (e) => <span className="font-semibold text-black">{e.description}</span> },
     { key: 'cat', header: 'Category', low: true, cell: (e) => e.category.name },
     { key: 'branch', header: 'Branch', low: true, cell: (e) => e.branch?.name ?? 'All' },
     { key: 'status', header: 'Status', cell: (e) => (e.paymentStatus === 'PAID' ? <StatusBadge dot tone="ok">Paid</StatusBadge> : <StatusBadge dot tone="warn">Unpaid</StatusBadge>) },
@@ -56,34 +56,34 @@ export function FinanceExpensesTab() {
       header: '',
       actions: true,
       cell: (e) => (
-        <button className="button-secondary button--sm" onClick={() => setConfirmDelete(e)} type="button">
+        <Button onClick={() => setConfirmDelete(e)} size="sm" variant="secondary">
           Delete
-        </button>
+        </Button>
       ),
     },
   ];
 
   return (
-    <div className="stack">
+    <div className="flex min-w-0 flex-col gap-5">
       {error && <ErrorState message={error} onRetry={load} title="Expenses could not be loaded" />}
       <SectionCard
         actions={
           <>
-            <button className="button-secondary" onClick={() => setShowAddCategory(true)} type="button">
+            <Button onClick={() => setShowAddCategory(true)} variant="secondary">
               + Category
-            </button>
-            <button className="button-primary" onClick={() => setShowAddExpense(true)} type="button">
+            </Button>
+            <Button onClick={() => setShowAddExpense(true)} variant="primary">
               + Expense
-            </button>
+            </Button>
           </>
         }
         description="Every incurred expense — paid or not yet paid. Feeds the P&L for the period it was dated in."
         flush
         footer={
           nextCursor ? (
-            <button className="button-secondary" onClick={handleLoadMore} type="button">
+            <Button onClick={handleLoadMore} variant="secondary">
               Load more
-            </button>
+            </Button>
           ) : undefined
         }
         title="Expenses"
@@ -140,23 +140,23 @@ function AddCategoryModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
     <Modal
       footer={
         <>
-          <button className="button-secondary" onClick={onClose} type="button">
+          <Button onClick={onClose} variant="secondary">
             Cancel
-          </button>
-          <button className="button-primary" disabled={saving} onClick={submit} type="button">
+          </Button>
+          <Button disabled={saving} onClick={submit} variant="primary">
             {saving ? 'Saving…' : 'Create category'}
-          </button>
+          </Button>
         </>
       }
       onClose={onClose}
       title="New expense category"
     >
-      {error && <p className="error-text">{error}</p>}
-      <div className="field">
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="cat-name">Name</label>
         <input id="cat-name" onChange={(e) => setName(e.target.value)} value={name} />
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="cat-type">Type</label>
         <select id="cat-type" onChange={(e) => setType(e.target.value as 'OPERATING' | 'FINANCIAL')} value={type}>
           <option value="OPERATING">Operating (reduces Operating Profit)</option>
@@ -198,19 +198,19 @@ function AddExpenseModal({ categories, onClose, onSaved }: { categories: Finance
     <Modal
       footer={
         <>
-          <button className="button-secondary" onClick={onClose} type="button">
+          <Button onClick={onClose} variant="secondary">
             Cancel
-          </button>
-          <button className="button-primary" disabled={saving} onClick={submit} type="button">
+          </Button>
+          <Button disabled={saving} onClick={submit} variant="primary">
             {saving ? 'Saving…' : 'Add expense'}
-          </button>
+          </Button>
         </>
       }
       onClose={onClose}
       title="New expense"
     >
-      {error && <p className="error-text">{error}</p>}
-      <div className="field">
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="exp-category">Category</label>
         <select id="exp-category" onChange={(e) => setCategoryId(e.target.value)} value={categoryId}>
           {categories.map((c) => (
@@ -220,27 +220,27 @@ function AddExpenseModal({ categories, onClose, onSaved }: { categories: Finance
           ))}
         </select>
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="exp-desc">Description</label>
         <input id="exp-desc" onChange={(e) => setDescription(e.target.value)} value={description} />
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="exp-amount">Amount (so'm)</label>
         <input id="exp-amount" onChange={(e) => setAmount(e.target.value)} type="number" value={amount} />
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="exp-date">Date</label>
         <input id="exp-date" onChange={(e) => setDate(e.target.value)} type="date" value={date} />
       </div>
-      <div className="field">
+      <div className="flex flex-col gap-1.5 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
         <label htmlFor="exp-status">Payment status</label>
         <select id="exp-status" onChange={(e) => setPaymentStatus(e.target.value as 'PAID' | 'UNPAID')} value={paymentStatus}>
           <option value="PAID">Paid</option>
           <option value="UNPAID">Unpaid</option>
         </select>
       </div>
-      <div className="field field--row">
-        <label htmlFor="exp-recurring" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+      <div className="flex flex-row flex-wrap items-center gap-3 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-muted">
+        <label htmlFor="exp-recurring" className="flex items-center gap-2">
           <input checked={isRecurring} id="exp-recurring" onChange={(e) => setIsRecurring(e.target.checked)} type="checkbox" />
           <span>Repeats monthly (a new row is created automatically each month)</span>
         </label>

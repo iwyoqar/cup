@@ -3,30 +3,12 @@ import { formatSom } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { useReportsPayments } from '../lib/useReportsPayments';
 import { ReportsPaymentRow, ReportsPaymentsOverview } from '../lib/types';
-import {
-  ChartContainer,
-  Column,
-  DataTable,
-  DateRangePicker,
-  DateRangeValue,
-  EmptyState,
-  ErrorState,
-  FilterBar,
-  FilterField,
-  HBarList,
-  isRangeReady,
-  LoadingState,
-  PageHeader,
-  SectionCard,
-  StatCard,
-  StatGrid,
-  StatusBadge,
-} from '../ui';
+import { Button, ChartContainer, Column, cx, DataTable, DateRangePicker, DateRangeValue, EmptyState, ErrorState, FilterBar, FilterField, HBarList, isRangeReady, LoadingState, PageHeader, SectionCard, StatCard, StatGrid, StatusBadge } from '../ui';
 
 const share = (p: number) => `${p.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 
 const columns: Column<ReportsPaymentRow>[] = [
-  { key: 'name', header: 'Method', cell: (p) => <span className="table__primary">{p.name}</span> },
+  { key: 'name', header: 'Method', cell: (p) => <span className="font-semibold text-black">{p.name}</span> },
   { key: 'amount', header: 'Amount', numeric: true, cell: (p) => formatSom(p.amountMinor) },
   { key: 'share', header: 'Share', numeric: true, cell: (p) => share(p.sharePercent) },
 ];
@@ -50,7 +32,7 @@ export function ReportsPaymentsPage() {
         <DateRangePicker onChange={setRange} value={range} />
         {(data?.branchFilterSupported ?? true) && (
           <FilterField label="Branch">
-            <select className="select" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
+            <select className="" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
               <option value="">All branches</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -61,12 +43,12 @@ export function ReportsPaymentsPage() {
           </FilterField>
         )}
         {data && !error && (
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
+          <span className="text-[13px] leading-snug text-muted self-center">
             {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
             {loading && ' · updating…'}
           </span>
         )}
-        <span style={{ alignSelf: 'center' }}>
+        <span className="self-center">
           <StatusBadge>Source: Poster POS</StatusBadge>
         </span>
       </FilterBar>
@@ -75,7 +57,7 @@ export function ReportsPaymentsPage() {
       {!data && !error && ready && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className="stack" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity var(--motion-base) var(--ease)' }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           {data.available ? <PaymentsReport data={data} /> : <Unavailable data={data} onRetry={reload} />}
         </div>
       )}
@@ -92,9 +74,9 @@ function Unavailable({ data, onRetry }: { data: ReportsPaymentsOverview; onRetry
     <SectionCard title="Payment summary">
       <EmptyState
         action={
-          <button className="button-secondary" onClick={onRetry} type="button">
+          <Button onClick={onRetry} variant="secondary">
             Try again
-          </button>
+          </Button>
         }
         text={text}
         title="Payment report is temporarily unavailable."
@@ -120,7 +102,7 @@ function PaymentsReport({ data }: { data: ReportsPaymentsOverview }) {
       </SectionCard>
 
       {data.warnings.length > 0 && (
-        <div className="callout">
+        <div className="block space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed [&_p]:m-0 border-muted-cream bg-neutral-bg text-muted-cream">
           {data.warnings.map((w) => (
             <p key={w}>{w}</p>
           ))}
@@ -132,7 +114,7 @@ function PaymentsReport({ data }: { data: ReportsPaymentsOverview }) {
           <EmptyState text="Poster recorded no payments in this period." title="No payments" variant="inline" />
         </SectionCard>
       ) : (
-        <div className="grid-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <SectionCard description="Amount and share of each method Poster reported. Methods with no payments are omitted." flush title="Payment methods">
             <DataTable columns={columns} rowKey={(p) => p.paymentId} rows={data.payments} />
           </SectionCard>

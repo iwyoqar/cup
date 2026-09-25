@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DataQualityReport,
   fetchDataQuality,
@@ -14,7 +14,7 @@ import { formatDateTime, formatSom } from '../lib/format';
 import { PosterImportCategory, PosterImportDetail, PosterImportSummary } from '../lib/types';
 import { AdminPage, findNav } from '../lib/nav';
 import { SpotMappingCard } from '../components/SpotMappingCard';
-import { Modal, PageHeader } from '../ui';
+import { Button, cx, EmptyState, ErrorState, Input, Modal, PageHeader, SectionCard, Select, StatusBadge } from '../ui';
 
 const number = (n: number) => n.toLocaleString('ru-RU');
 const isoDate = (daysAgo: number) => new Date(Date.now() - daysAgo * 24 * 3600 * 1000).toISOString().slice(0, 10);
@@ -170,61 +170,57 @@ export function PosterImportPage({ onNavigate }: { onNavigate: (page: AdminPage)
   }, [previewCurrent, preview, acknowledged]);
 
   return (
-    <div className="analytics growth pi">
+    <div className="flex flex-col gap-5">
       <PageHeader description={findNav('pos-import').item.description} eyebrow="Poster POS" title={findNav('pos-import').item.label} />
-      <p className="analytics__note pi__lead">
+      <p className="-mt-2 max-w-3xl text-[13px] leading-relaxed text-muted">
         Reads closed Poster receipts (read-only) and records the ones that belong to a linked CUP customer as <strong>POS purchases</strong>. Nothing is written until the very last step, and
         nothing here changes Poster, CUP orders, points or existing rewards. Imported purchases DO count in analytics, branch intelligence, customer profiles and reward progress.
       </p>
 
-      <ol className="pi__steps" aria-label="Workflow">
+      <ol aria-label="Workflow" className="m-0 flex list-none flex-wrap gap-x-5 gap-y-2 p-0 text-[13px] text-muted">
         {['Check the branch mapping', 'Run a preview', 'Review the counts', 'Review unresolved / unattributed receipts', 'Confirm the refund policy', 'Import (confirmation dialog)', 'See the result'].map((label, i) => (
-          <li key={label}>
-            <span className="pi__step-n">{i + 1}</span>
+          <li className="flex items-center gap-2" key={label}>
+            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-black text-[11px] font-semibold text-cream">{i + 1}</span>
             {label}
           </li>
         ))}
       </ol>
 
-      <div className="callout">
-        <div className="row row--between">
-          <span>
-            <strong>Receipts also arrive automatically.</strong> Poster webhooks, the queue and the recovery check are monitored on their own page.
-          </span>
-          <button className="button-secondary button--sm" onClick={() => onNavigate('continuous-sync')} type="button">
-            Open Continuous Sync
-          </button>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border-l-[3px] border-muted-cream bg-neutral-bg px-4 py-3 text-sm text-muted-cream">
+        <span>
+          <strong className="text-black">Receipts also arrive automatically.</strong> Poster webhooks, the queue and the recovery check are monitored on their own page.
+        </span>
+        <Button onClick={() => onNavigate('continuous-sync')} size="sm" variant="secondary">
+          Open Continuous Sync
+        </Button>
       </div>
 
       <SpotMappingCard description="Step 1 of the import: receipts are imported only from Poster spots that map to an active CUP branch." error={mappingError} loading={mappingLoading} mapping={mapping} onReload={loadMapping} title="1. Poster spot mapping" />
 
-      <section className="analytics__panel" aria-label="Import preview">
-        <h2 className="analytics__h2">2. Import preview</h2>
-        <div className="analytics__custom pi__window">
-          <label>
-            From <input onChange={(e) => setSince(e.target.value)} type="date" value={since} />
-          </label>
-          <label>
-            To <input onChange={(e) => setUntil(e.target.value)} type="date" value={until} />
-          </label>
-          <label>
-            Limit{' '}
-            <input className="pi__limit" max={MAX_IMPORT_LIMIT} min={1} onChange={(e) => setLimit(Number(e.target.value))} type="number" value={limit} />
-          </label>
-          <button className="button-primary" disabled={previewBusy || !windowValid} onClick={runPreview} type="button">
+      <SectionCard title="2. Import preview">
+        <div aria-label="Import preview" className="flex flex-wrap items-end gap-3" role="group">
+          <LabeledField label="From">
+            <Input onChange={(e) => setSince(e.target.value)} type="date" value={since} />
+          </LabeledField>
+          <LabeledField label="To">
+            <Input onChange={(e) => setUntil(e.target.value)} type="date" value={until} />
+          </LabeledField>
+          <LabeledField label="Limit">
+            <Input className="w-24" max={MAX_IMPORT_LIMIT} min={1} onChange={(e) => setLimit(Number(e.target.value))} type="number" value={limit} />
+          </LabeledField>
+          <Button disabled={!windowValid} loading={previewBusy} onClick={runPreview} variant="primary">
             {previewBusy ? 'Reading Poster…' : 'Run preview'}
-          </button>
+          </Button>
         </div>
-        <p className="analytics__note">A preview only READS Poster and CUP. Windows are limited to 31 days and {MAX_IMPORT_LIMIT} receipts, oldest first. Changing these values locks the Import step again.</p>
-        {!windowValid && <p className="pi__warn">Choose a start date that is not after the end date and a limit between 1 and {MAX_IMPORT_LIMIT}.</p>}
+        <Note>A preview only READS Poster and CUP. Windows are limited to 31 days and {MAX_IMPORT_LIMIT} receipts, oldest first. Changing these values locks the Import step again.</Note>
+        {!windowValid && <Warn>Choose a start date that is not after the end date and a limit between 1 and {MAX_IMPORT_LIMIT}.</Warn>}
         {previewError && (
-          <div className="analytics__error" role="alert">
-            <span>{previewError}</span>
+          <div className="mt-3">
+            <ErrorState message={previewError} title="Preview failed" />
           </div>
         )}
         {preview && <PreviewResult stale={!previewCurrent} summary={preview} />}
-      </section>
+      </SectionCard>
 
       <QualitySection
         busy={qualityBusy}
@@ -237,31 +233,29 @@ export function PosterImportPage({ onNavigate }: { onNavigate: (page: AdminPage)
 
       <HistorySection branches={mapping?.spots.filter((s) => s.branch).map((s) => ({ id: s.branch!.id, name: s.branch!.name })) ?? []} reloadKey={historyKey} />
 
-      <section className="analytics__panel pi__action" aria-label="Import action">
-        <h2 className="analytics__h2">3. Import</h2>
-        {result && <ImportResult summary={result} />}
-        <p className="analytics__note">
-          Refund / return handling is <strong>unverified</strong>: Poster shows no trace of a refunded closed receipt in this account. Receipts with a negative amount or quantity are excluded, nothing is
-          imported as a negative sale, and an imported receipt is never reversed automatically.
-        </p>
-        <label className="pi__check">
-          <input checked={acknowledged} disabled={!previewCurrent} onChange={(e) => setAcknowledged(e.target.checked)} type="checkbox" />
-          <span>I understand the refund policy above.</span>
-        </label>
-        {blockers.length > 0 && (
-          <ul className="pi__blockers">
-            {blockers.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-        )}
-        <button className="button-danger" disabled={blockers.length > 0 || importBusy} onClick={() => { setImportError(null); setDialogOpen(true); }} type="button">
-          {preview && previewCurrent ? `Review and import ${number(preview.importable)} receipt${preview.importable === 1 ? '' : 's'}…` : 'Review and import…'}
-        </button>
-        <p className="analytics__note" style={{ marginBottom: 0 }}>
-          The button only opens a confirmation dialog. Nothing is written until you confirm there.
-        </p>
-      </section>
+      <SectionCard title="3. Import">
+        <div aria-label="Import action" className="flex flex-col items-start gap-3" role="group">
+          {result && <ImportResult summary={result} />}
+          <Note className="mt-0">
+            Refund / return handling is <strong>unverified</strong>: Poster shows no trace of a refunded closed receipt in this account. Receipts with a negative amount or quantity are excluded, nothing is
+            imported as a negative sale, and an imported receipt is never reversed automatically.
+          </Note>
+          <Check checked={acknowledged} disabled={!previewCurrent} onChange={setAcknowledged}>
+            I understand the refund policy above.
+          </Check>
+          {blockers.length > 0 && (
+            <ul className="m-0 list-disc space-y-0.5 pl-5 text-[13px] text-muted">
+              {blockers.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
+          )}
+          <Button disabled={blockers.length > 0 || importBusy} onClick={() => { setImportError(null); setDialogOpen(true); }} variant="danger">
+            {preview && previewCurrent ? `Review and import ${number(preview.importable)} receipt${preview.importable === 1 ? '' : 's'}…` : 'Review and import…'}
+          </Button>
+          <Note className="mt-0">The button only opens a confirmation dialog. Nothing is written until you confirm there.</Note>
+        </div>
+      </SectionCard>
 
       {dialogOpen && preview && (
         <ConfirmDialog busy={importBusy} error={importError} onCancel={() => setDialogOpen(false)} onConfirm={confirmImport} summary={preview} />
@@ -269,8 +263,6 @@ export function PosterImportPage({ onNavigate }: { onNavigate: (page: AdminPage)
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------------------------------------------- 1. mapping
 
 // ---------------------------------------------------------------------------------------------------------------- 2. preview
 
@@ -288,42 +280,33 @@ function PreviewResult({ summary, stale }: { summary: PosterImportSummary; stale
   const r = summary.refundPolicy;
 
   return (
-    <div className={stale ? 'pi__stale' : undefined}>
-      {stale && <p className="pi__warn">The dates or limit changed after this preview — it no longer matches. Run a new preview before importing.</p>}
-      <p className="analytics__range" style={{ margin: '12px 0' }}>
+    <div className={cx('mt-4', stale && 'opacity-55')}>
+      {stale && <Warn>The dates or limit changed after this preview — it no longer matches. Run a new preview before importing.</Warn>}
+      <p className="my-3 text-[13px] font-semibold text-muted-cream">
         Preview (nothing written) · {summary.window.since === summary.window.until ? summary.window.since : `${summary.window.since} → ${summary.window.until}`} · {number(summary.scanned)} receipts scanned
         {summary.truncated ? ' — more receipts exist in this window than the limit; raise the limit or narrow the dates' : ''}
       </p>
-      <div className="pi__counts">
-        <div className="pi__count pi__count--strong">
-          <div className="analytics__label">Importable</div>
-          <div className="pi__count-n">{number(summary.importable)}</div>
-        </div>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
+        <CountTile label="Importable" strong value={number(summary.importable)} />
         {CATEGORY_ORDER.filter((c) => c !== 'IMPORTABLE').map((c) => (
-          <div className="pi__count" key={c}>
-            <div className="analytics__label">{CATEGORY_LABELS[c]}</div>
-            <div className="pi__count-n">{number(summary.categories[c])}</div>
-          </div>
+          <CountTile key={c} label={CATEGORY_LABELS[c]} value={number(summary.categories[c])} />
         ))}
       </div>
-      <p className="analytics__note">
+      <Note>
         Totals: importable {formatSom(summary.revenueByCategoryMinor.IMPORTABLE)}
         {summary.partiallyPaid > 0 ? ` · ${summary.partiallyPaid} importable receipt${summary.partiallyPaid === 1 ? ' is' : 's are'} only partly paid (a free / discounted line)` : ''}. A receipt with no linked CUP customer is still
         imported (anonymously) as long as its branch and products are mapped. Poster reads: {summary.posterReads.transactions + summary.posterReads.deletedTransactions + summary.posterReads.incomingOrderLinks}.
-      </p>
-      <div className="pi__refund">
+      </Note>
+      <div className="mt-3 rounded-md border-l-[3px] border-terracotta bg-cream-soft px-4 py-3 text-[13px] leading-relaxed">
         <strong>Refund policy: {r.status.replace('_', ' ')}.</strong> {r.excludedReceipts} receipt{r.excludedReceipts === 1 ? '' : 's'} excluded for a negative amount / quantity.{' '}
         {r.deletedInPosterWindow === null ? 'Poster’s deleted-receipt list could not be read.' : `Poster lists ${r.deletedInPosterWindow} deleted receipt${r.deletedInPosterWindow === 1 ? '' : 's'} in this window.`}
-        {r.importedButDeletedInPoster.length > 0 && <span className="pi__warn"> Already imported but now deleted in Poster: #{r.importedButDeletedInPoster.join(', #')} — review manually (never reversed automatically).</span>}
+        {r.importedButDeletedInPoster.length > 0 && <span className="font-semibold text-err"> Already imported but now deleted in Poster: #{r.importedButDeletedInPoster.join(', #')} — review manually (never reversed automatically).</span>}
       </div>
 
-      <div className="pi__row" style={{ marginTop: 16 }}>
-        <h3 className="bi__h3" style={{ margin: 0 }}>
-          Receipts
-        </h3>
-        <select
+      <div className="mt-4 mb-2 flex flex-wrap items-center justify-between gap-3">
+        <SubTitle>Receipts</SubTitle>
+        <Select
           aria-label="Filter receipts"
-          className="analytics__select"
           onChange={(e) => {
             setFilter(e.target.value as typeof filter);
             setPage(1);
@@ -338,40 +321,40 @@ function PreviewResult({ summary, stale }: { summary: PosterImportSummary; stale
               {CATEGORY_LABELS[c]} ({summary.categories[c]})
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       {slice.length === 0 ? (
-        <p className="analytics__empty">{summary.details.length === 0 ? 'No closed receipts in this window.' : 'No receipts match this filter.'}</p>
+        <EmptyState text={summary.details.length === 0 ? 'No closed receipts in this window.' : 'No receipts match this filter.'} title="No receipts" variant="inline" />
       ) : (
-        <div className="c360__scroll">
-          <table className="analytics__table pi__table pi__table--wide">
+        <div className="overflow-x-auto">
+          <table className={TABLE}>
             <thead>
               <tr>
-                <th>Poster #</th>
-                <th>Closed</th>
-                <th>Branch</th>
-                <th>Customer</th>
-                <th className="analytics__num">Total</th>
-                <th className="analytics__num">Paid</th>
-                <th>Decision</th>
-                <th>Reason</th>
-                <th>Products</th>
+                <th className={TH}>Poster #</th>
+                <th className={TH}>Closed</th>
+                <th className={TH}>Branch</th>
+                <th className={TH}>Customer</th>
+                <th className={cx(TH, NUM)}>Total</th>
+                <th className={cx(TH, NUM)}>Paid</th>
+                <th className={TH}>Decision</th>
+                <th className={TH}>Reason</th>
+                <th className={TH}>Products</th>
               </tr>
             </thead>
             <tbody>
               {slice.map((d) => (
-                <tr key={d.posterTransactionId}>
-                  <td>#{d.posterTransactionId}</td>
-                  <td>{d.occurredAt ? formatDateTime(d.occurredAt) : '—'}</td>
-                  <td className="bi__name">{d.branchName ?? (d.posterSpotId ? `Spot #${d.posterSpotId} (no branch)` : '—')}</td>
-                  <td className="bi__name">{d.customerName ?? (d.hasPosterClient ? 'Unlinked Poster customer' : 'No customer')}</td>
-                  <td className="analytics__num">{d.totalMinor === undefined ? '—' : formatSom(d.totalMinor)}</td>
-                  <td className="analytics__num">{d.paidMinor === undefined ? '—' : formatSom(d.paidMinor)}</td>
-                  <td>
-                    <span className={`pi__badge ${d.decision === 'IMPORT' ? 'pi__badge--ok' : d.decision === 'UNRESOLVED' ? 'pi__badge--warn' : ''}`}>{DECISION_LABEL[d.decision]}</span>
+                <tr className={TR} key={d.posterTransactionId}>
+                  <td className={TD}>#{d.posterTransactionId}</td>
+                  <td className={cx(TD, 'whitespace-nowrap')}>{d.occurredAt ? formatDateTime(d.occurredAt) : '—'}</td>
+                  <td className={cx(TD, NAME)}>{d.branchName ?? (d.posterSpotId ? `Spot #${d.posterSpotId} (no branch)` : '—')}</td>
+                  <td className={cx(TD, NAME)}>{d.customerName ?? (d.hasPosterClient ? 'Unlinked Poster customer' : 'No customer')}</td>
+                  <td className={cx(TD, NUM)}>{d.totalMinor === undefined ? '—' : formatSom(d.totalMinor)}</td>
+                  <td className={cx(TD, NUM)}>{d.paidMinor === undefined ? '—' : formatSom(d.paidMinor)}</td>
+                  <td className={TD}>
+                    <StatusBadge tone={d.decision === 'IMPORT' ? 'ok' : d.decision === 'UNRESOLVED' ? 'warn' : 'neutral'}>{DECISION_LABEL[d.decision]}</StatusBadge>
                   </td>
-                  <td className="bi__name">{d.reason ? REASON_LABELS[d.reason] ?? d.reason : CATEGORY_LABELS[d.category]}</td>
-                  <td className="bi__name">
+                  <td className={cx(TD, NAME)}>{d.reason ? REASON_LABELS[d.reason] ?? d.reason : CATEGORY_LABELS[d.category]}</td>
+                  <td className={cx(TD, NAME)}>
                     {(d.lines ?? []).length === 0
                       ? '—'
                       : (d.lines ?? []).map((l) => `${l.productName ?? `Poster product #${l.posterProductId}`} ×${l.quantity}`).join(', ')}
@@ -391,133 +374,119 @@ function PreviewResult({ summary, stale }: { summary: PosterImportSummary; stale
 
 function QualitySection({ quality, error, busy, canLive, onLive, onStored }: { quality: DataQualityReport | null; error: string | null; busy: boolean; canLive: boolean; onLive: () => void; onStored: () => void }) {
   return (
-    <section className="analytics__panel" aria-label="Data quality">
-      <div className="pi__row">
-        <h2 className="analytics__h2">Data quality</h2>
-        <div className="pi__btns">
-          <button className="bi__open" disabled={busy} onClick={onStored} type="button">
+    <SectionCard
+      actions={
+        <>
+          <Button disabled={busy} onClick={onStored} size="sm" variant="secondary">
             {busy ? 'Loading…' : 'Refresh'}
-          </button>
-          <button className="bi__open" disabled={busy || !canLive} onClick={onLive} type="button" title="Reads Poster (read-only) for the dates above">
+          </Button>
+          <Button disabled={busy || !canLive} onClick={onLive} size="sm" title="Reads Poster (read-only) for the dates above" variant="secondary">
             Include live scan of the window
-          </button>
-        </div>
-      </div>
-      {error && (
-        <div className="analytics__error" role="alert">
-          <span>{error}</span>
-          <button className="analytics__retry" onClick={onStored} type="button">
-            Retry
-          </button>
-        </div>
-      )}
-      {!quality && !error && <p className="analytics__empty">Loading…</p>}
+          </Button>
+        </>
+      }
+      title="Data quality"
+    >
+      {error && <ErrorState message={error} onRetry={onStored} title="Data quality could not be loaded" />}
+      {!quality && !error && <EmptyState title="Loading…" variant="inline" />}
       {quality && (
-        <div className="pi__grid">
-          <div className="pi__card">
-            <h3 className="bi__h3">Branch</h3>
-            <dl className="bi__facts">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <QualityCard title="Branch">
+            <Facts>
               <Fact label="Poster spots" value={number(quality.branch.posterSpots)} />
               <Fact label="Mapped" value={number(quality.branch.mapped)} />
               <Fact label="Unmapped Poster spots" value={number(quality.branch.unmappedPosterSpots)} />
               <Fact label="CUP branches without a spot" value={number(quality.branch.unmappedBranches)} />
               <Fact label="Duplicate mappings" value={number(quality.branch.duplicateMappings)} />
               <Fact label="Inactive branches" value={number(quality.branch.inactiveBranches)} />
-            </dl>
-          </div>
-          <div className="pi__card">
-            <h3 className="bi__h3">Customer</h3>
-            <dl className="bi__facts">
+            </Facts>
+          </QualityCard>
+          <QualityCard title="Customer">
+            <Facts>
               <Fact label="CUP customers" value={number(quality.customer.customers)} />
               <Fact label="Linked to a Poster client" value={number(quality.customer.linkedToPoster)} />
               <Fact label="Not linked" value={number(quality.customer.notLinked)} />
-            </dl>
-            <p className="analytics__note">A receipt is only imported for a customer linked to its Poster client. No customer is ever created automatically.</p>
-          </div>
-          <div className="pi__card">
-            <h3 className="bi__h3">Product</h3>
-            <dl className="bi__facts">
+            </Facts>
+            <Note>A receipt is only imported for a customer linked to its Poster client. No customer is ever created automatically.</Note>
+          </QualityCard>
+          <QualityCard title="Product">
+            <Facts>
               <Fact label="Imported lines with a CUP product" value={number(quality.product.importedLinesMapped)} />
               <Fact label="Imported lines without one" value={number(quality.product.importedLinesUnmapped)} />
               <Fact label="Unresolved receipts (unmapped product)" value={number(quality.product.unresolvedReceipts)} />
-            </dl>
-            <p className="analytics__note">{quality.product.modifiersNote}</p>
-          </div>
-          <div className="pi__card">
-            <h3 className="bi__h3">Stored in CUP</h3>
-            <dl className="bi__facts">
+            </Facts>
+            <Note>{quality.product.modifiersNote}</Note>
+          </QualityCard>
+          <QualityCard title="Stored in CUP">
+            <Facts>
               {quality.stored.byStatus.length === 0 ? <Fact label="Imported / unresolved receipts" value="0" /> : quality.stored.byStatus.map((s) => <Fact key={s.status} label={s.status === 'IMPORTED' ? 'Imported' : s.status === 'UNRESOLVED' ? 'Unresolved (audit only)' : s.status} value={number(s.count)} />)}
               <Fact label="Imported revenue" value={formatSom(quality.stored.imported.totalMinor)} />
               <Fact label="Imported paid amount" value={formatSom(quality.stored.imported.paidMinor)} />
               <Fact label="Imported receipts without lines" value={number(quality.stored.importedWithoutItems)} hint={quality.stored.importedWithoutItems === 0 ? 'OK' : 'needs review'} />
-            </dl>
+            </Facts>
             {quality.stored.unresolvedReasons.length > 0 && (
-              <ul className="bi__list">
+              <MiniList>
                 {quality.stored.unresolvedReasons.map((u) => (
-                  <li key={u.reason}>
+                  <li className={MINI_ROW} key={u.reason}>
                     <span>{REASON_LABELS[u.reason] ?? u.reason}</span>
                     <strong>{number(u.count)}</strong>
                   </li>
                 ))}
-              </ul>
+              </MiniList>
             )}
             {quality.stored.perBranch.length > 0 && (
-              <ul className="bi__list">
+              <MiniList>
                 {quality.stored.perBranch.map((b) => (
-                  <li key={b.branch}>
-                    <span className="bi__name">{b.branch}</span>
-                    <strong>
+                  <li className={MINI_ROW} key={b.branch}>
+                    <span className={NAME}>{b.branch}</span>
+                    <strong className="whitespace-nowrap">
                       {number(b.count)} · {formatSom(b.totalMinor)}
                     </strong>
                   </li>
                 ))}
-              </ul>
+              </MiniList>
             )}
-          </div>
-          <div className="pi__card pi__card--wide">
-            <h3 className="bi__h3">Live scan (Poster window)</h3>
+          </QualityCard>
+          <QualityCard title="Live scan (Poster window)" wide>
             {quality.live.available ? (
               <>
-                <p className="analytics__note" style={{ marginTop: 0 }}>
+                <Note className="mt-0">
                   {quality.live.window.since} → {quality.live.window.until} · {number(quality.live.scanned)} receipts{quality.live.truncated ? ' (truncated by the limit)' : ''}
-                </p>
-                <div className="analytics__two">
-                  <dl className="bi__facts">
+                </Note>
+                <div className="mt-2 grid grid-cols-1 gap-x-8 gap-y-3 md:grid-cols-2">
+                  <Facts>
                     {CATEGORY_ORDER.map((c) => (
                       <Fact key={c} label={CATEGORY_LABELS[c]} value={number(quality.live.available ? quality.live.transactions[c] ?? 0 : 0)} hint={formatSom(quality.live.available ? quality.live.revenueMinor[c] ?? 0 : 0)} />
                     ))}
-                  </dl>
+                  </Facts>
                   <div>
-                    <dl className="bi__facts">
+                    <Facts>
                       <Fact label="Attributed receipts" value={number(quality.live.attribution.attributedTransactions)} hint={formatSom(quality.live.attribution.attributedRevenueMinor)} />
                       <Fact label="Unattributed receipts" value={number(quality.live.attribution.unattributedTransactions)} hint={formatSom(quality.live.attribution.unattributedRevenueMinor)} />
                       <Fact label="Scanned receipts with no Poster customer (any status)" value={number(quality.live.customers.receiptsWithoutPosterClient)} />
                       <Fact label="Scanned receipts whose Poster customer is not linked (any status)" value={number(quality.live.customers.receiptsWithUnlinkedPosterClient)} />
                       <Fact label="Partly paid receipts" value={number(quality.live.partiallyPaidReceipts)} />
-                    </dl>
-                    <p className="analytics__note">{quality.live.attribution.note}</p>
+                    </Facts>
+                    <Note>{quality.live.attribution.note}</Note>
                   </div>
                 </div>
               </>
             ) : (
-              <p className="analytics__note" style={{ margin: 0 }}>
-                Not loaded ({quality.live.reason}). Press “Include live scan of the window” to read Poster (read-only) for the dates above.
-              </p>
+              <Note className="m-0">Not loaded ({quality.live.reason}). Press “Include live scan of the window” to read Poster (read-only) for the dates above.</Note>
             )}
-          </div>
-          <div className="pi__card pi__card--wide">
-            <h3 className="bi__h3">Attribution gaps elsewhere (never assigned to a branch)</h3>
-            <dl className="bi__facts">
+          </QualityCard>
+          <QualityCard title="Attribution gaps elsewhere (never assigned to a branch)" wide>
+            <Facts>
               <Fact label="Loyalty ledger rows with no order" value={number(quality.unattributedEvents.loyaltyLedgerWithoutOrder.rows)} hint={`${number(quality.unattributedEvents.loyaltyLedgerWithoutOrder.points)} points`} />
               <Fact label="Reward redemptions with no order" value={number(quality.unattributedEvents.rewardRedemptionsWithoutOrder)} />
               <Fact label="Promotion redemptions with no order" value={number(quality.unattributedEvents.promotionRedemptionsWithoutOrder)} />
               <Fact label="Referrals qualified / not tied to a purchase" value={`${number(quality.unattributedEvents.referrals.qualified)} / ${number(quality.unattributedEvents.referrals.unattributed)}`} />
-            </dl>
-            <p className="analytics__note" style={{ marginBottom: 0 }}>{quality.unattributedEvents.note}</p>
-          </div>
+            </Facts>
+            <Note className="mb-0">{quality.unattributedEvents.note}</Note>
+          </QualityCard>
         </div>
       )}
-    </section>
+    </SectionCard>
   );
 }
 
@@ -558,112 +527,109 @@ function HistorySection({ branches, reloadKey }: { branches: { id: string; name:
   };
 
   return (
-    <section className="analytics__panel" aria-label="Import history">
-      <h2 className="analytics__h2">Import history</h2>
-      <div className="analytics__custom pi__filters">
-        <label>
-          From <input onChange={(e) => { setSince(e.target.value); setPage(1); }} type="date" value={since} />
-        </label>
-        <label>
-          To <input onChange={(e) => { setUntil(e.target.value); setPage(1); }} type="date" value={until} />
-        </label>
-        <select aria-label="Branch" className="analytics__select" onChange={(e) => { setBranchId(e.target.value); setPage(1); }} value={branchId}>
+    <SectionCard title="Import history">
+      <div aria-label="Import history filters" className="flex flex-wrap items-end gap-3" role="group">
+        <LabeledField label="From">
+          <Input onChange={(e) => { setSince(e.target.value); setPage(1); }} type="date" value={since} />
+        </LabeledField>
+        <LabeledField label="To">
+          <Input onChange={(e) => { setUntil(e.target.value); setPage(1); }} type="date" value={until} />
+        </LabeledField>
+        <Select aria-label="Branch" onChange={(e) => { setBranchId(e.target.value); setPage(1); }} value={branchId}>
           <option value="">All branches</option>
           {branches.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
             </option>
           ))}
-        </select>
-        <select aria-label="Status" className="analytics__select" onChange={(e) => { setStatus(e.target.value as typeof status); setPage(1); }} value={status}>
+        </Select>
+        <Select aria-label="Status" onChange={(e) => { setStatus(e.target.value as typeof status); setPage(1); }} value={status}>
           <option value="">All statuses</option>
           <option value="IMPORTED">Imported</option>
           <option value="UNRESOLVED">Unresolved (audit)</option>
-        </select>
+        </Select>
         <form
-          className="pi__search"
+          className="flex items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             changed(() => setCustomerApplied(customer))();
           }}
         >
-          <input aria-label="Customer name" maxLength={60} onChange={(e) => setCustomer(e.target.value)} placeholder="Customer name" type="search" value={customer} />
-          <button className="bi__open" type="submit">
+          <Input aria-label="Customer name" maxLength={60} onChange={(e) => setCustomer(e.target.value)} placeholder="Customer name" type="search" value={customer} />
+          <Button type="submit" variant="secondary">
             Search
-          </button>
+          </Button>
         </form>
-        <span className="analytics__hint">Source: POS</span>
+        <span className="self-center text-xs text-muted">Source: POS</span>
       </div>
-      {!rangeValid && <p className="pi__warn">Choose a start date that is not after the end date.</p>}
+      {!rangeValid && <Warn>Choose a start date that is not after the end date.</Warn>}
       {error && (
-        <div className="analytics__error" role="alert">
-          <span>{error}</span>
-          <button className="analytics__retry" onClick={() => setRetryKey((k) => k + 1)} type="button">
-            Retry
-          </button>
+        <div className="mt-3">
+          <ErrorState message={error} onRetry={() => setRetryKey((k) => k + 1)} title="Import history could not be loaded" />
         </div>
       )}
-      {loading && !data && <p className="analytics__empty">Loading…</p>}
+      {loading && !data && <EmptyState title="Loading…" variant="inline" />}
       {data && (
-        <div className={loading ? 'analytics__body--loading' : undefined}>
+        <div className={cx('mt-3 transition-opacity duration-200', loading && 'opacity-55')}>
           {data.items.length === 0 ? (
-            <p className="analytics__empty">{filtersActive ? 'No receipts match these filters.' : 'Nothing has been imported yet.'}</p>
+            <EmptyState text={filtersActive ? 'No receipts match these filters.' : 'Nothing has been imported yet.'} title="No receipts" variant="inline" />
           ) : (
-            <div className="c360__scroll">
-              <table className="analytics__table pi__table pi__table--wide">
+            <div className="overflow-x-auto">
+              <table className={TABLE}>
                 <thead>
                   <tr>
-                    <th>Poster #</th>
-                    <th>Closed</th>
-                    <th>Branch</th>
-                    <th>Customer</th>
-                    <th className="analytics__num">Amount</th>
-                    <th>Status</th>
-                    <th>Imported at</th>
-                    <th>Source</th>
+                    <th className={TH}>Poster #</th>
+                    <th className={TH}>Closed</th>
+                    <th className={TH}>Branch</th>
+                    <th className={TH}>Customer</th>
+                    <th className={cx(TH, NUM)}>Amount</th>
+                    <th className={TH}>Status</th>
+                    <th className={TH}>Imported at</th>
+                    <th className={TH}>Source</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.items.map((i) => (
-                    <tr key={i.posterTransactionId}>
-                      <td>#{i.posterTransactionId}</td>
-                      <td>{formatDateTime(i.occurredAt)}</td>
-                      <td className="bi__name">{i.branchName}</td>
-                      <td className="bi__name">{i.customerName ?? '—'}</td>
-                      <td className="analytics__num">{formatSom(i.totalMinor)}</td>
-                      <td>
-                        <span className={`pi__badge ${i.status === 'IMPORTED' ? 'pi__badge--ok' : 'pi__badge--warn'}`}>{i.status === 'IMPORTED' ? 'Imported' : 'Unresolved'}</span>
-                        {i.unresolvedReason && <span className="analytics__hint pi__sub">{REASON_LABELS[i.unresolvedReason] ?? i.unresolvedReason}</span>}
+                    <tr className={TR} key={i.posterTransactionId}>
+                      <td className={TD}>#{i.posterTransactionId}</td>
+                      <td className={cx(TD, 'whitespace-nowrap')}>{formatDateTime(i.occurredAt)}</td>
+                      <td className={cx(TD, NAME)}>{i.branchName}</td>
+                      <td className={cx(TD, NAME)}>{i.customerName ?? '—'}</td>
+                      <td className={cx(TD, NUM)}>{formatSom(i.totalMinor)}</td>
+                      <td className={TD}>
+                        <StatusBadge tone={i.status === 'IMPORTED' ? 'ok' : 'warn'}>{i.status === 'IMPORTED' ? 'Imported' : 'Unresolved'}</StatusBadge>
+                        {i.unresolvedReason && <span className="mt-0.5 block text-xs text-muted">{REASON_LABELS[i.unresolvedReason] ?? i.unresolvedReason}</span>}
                       </td>
-                      <td>{formatDateTime(i.importedAt)}</td>
-                      <td>{i.source}</td>
+                      <td className={cx(TD, 'whitespace-nowrap')}>{formatDateTime(i.importedAt)}</td>
+                      <td className={TD}>{i.source}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-          <p className="analytics__note" style={{ marginBottom: 0 }}>
+          <Note className="mb-0">
             {number(data.total)} receipt{data.total === 1 ? '' : 's'} · page {data.page} of {data.pages}
-          </p>
+          </Note>
           {data.pages > 1 && <Pager page={data.page} pages={data.pages} onPage={setPage} />}
         </div>
       )}
-    </section>
+    </SectionCard>
   );
 }
 
 // ---------------------------------------------------------------------------------------------------------------- import result / dialog
 
 function ImportResult({ summary }: { summary: PosterImportSummary }) {
+  const failed = summary.failed > 0;
   return (
-    <div className={summary.failed > 0 ? 'pi__result pi__result--warn' : 'pi__result'} role="status">
-      <strong>{summary.failed > 0 ? 'Import finished with failures.' : 'Import finished.'}</strong>
+    <div className={cx('w-full space-y-1 rounded-md border-l-[3px] px-4 py-3 text-sm', failed ? 'border-err bg-err-bg' : 'border-ok bg-ok-bg')} role="status">
+      <strong className={failed ? 'text-err' : 'text-ok'}>{failed ? 'Import finished with failures.' : 'Import finished.'}</strong>
       <div>
         Imported now: <strong>{number(summary.imported)}</strong>
         {summary.importedTransactionIds.length > 0 && <> (Poster #{summary.importedTransactionIds.join(', #')})</>} · already imported: {number(summary.alreadyImported)} · failed and rolled back: {number(summary.failed)} · unresolved kept for audit: {number(summary.unresolved)}
       </div>
-      {summary.failed > 0 && <div>Run a new preview and import again — completed receipts are skipped and only the missing ones are written.</div>}
+      {failed && <div>Run a new preview and import again — completed receipts are skipped and only the missing ones are written.</div>}
     </div>
   );
 }
@@ -678,21 +644,21 @@ function ConfirmDialog({ summary, busy, error, onCancel, onConfirm }: { summary:
       dismissible={!busy}
       footer={
         <>
-          <button className="button-secondary" disabled={busy} onClick={onCancel} type="button">
+          <Button disabled={busy} onClick={onCancel} variant="secondary">
             Cancel
-          </button>
-          <button className="button-danger" disabled={!understood || busy} onClick={onConfirm} type="button">
+          </Button>
+          <Button disabled={!understood} loading={busy} onClick={onConfirm} variant="danger">
             {busy ? 'Importing…' : `Import ${number(summary.importable)} receipt${summary.importable === 1 ? '' : 's'}`}
-          </button>
+          </Button>
         </>
       }
       onClose={onCancel}
       title={`Import ${number(summary.importable)} POS receipt${summary.importable === 1 ? '' : 's'}?`}
     >
-      <div className="callout callout--err">
+      <div className="rounded-md border-l-[3px] border-err bg-err-bg px-4 py-3 text-sm text-err">
         <strong>This action writes POS transaction data into CUP.</strong>
       </div>
-      <ul className="pi__dialog-list">
+      <ul className="my-4 list-disc space-y-1.5 pl-5 text-sm leading-relaxed">
         <li>
           {number(importIds.length)} receipt{importIds.length === 1 ? '' : 's'}, {formatSom(total)} in total (Poster #{importIds.slice(0, 12).join(', #')}
           {importIds.length > 12 ? `, … +${importIds.length - 12}` : ''}).
@@ -702,12 +668,11 @@ function ConfirmDialog({ summary, busy, error, onCancel, onConfirm }: { summary:
         <li>Nothing is changed in Poster, and no points, rewards, referrals or messages are created.</li>
         <li>Importing again is safe: receipts already imported are skipped.</li>
       </ul>
-      <label className="pi__check">
-        <input checked={understood} onChange={(e) => setUnderstood(e.target.checked)} type="checkbox" />
-        <span>I reviewed these {number(summary.importable)} receipts and want to write them into CUP.</span>
-      </label>
+      <Check checked={understood} onChange={setUnderstood}>
+        I reviewed these {number(summary.importable)} receipts and want to write them into CUP.
+      </Check>
       {error && (
-        <p className="error-text" role="alert">
+        <p className="mt-3 text-[13px] font-semibold text-err" role="alert">
           {error}
         </p>
       )}
@@ -717,13 +682,77 @@ function ConfirmDialog({ summary, busy, error, onCancel, onConfirm }: { summary:
 
 // ---------------------------------------------------------------------------------------------------------------- small pieces
 
+const TABLE = 'w-full min-w-[900px] border-separate border-spacing-0 text-sm';
+const TH = 'border-b border-line bg-white px-3 py-2.5 text-left text-[11px] font-semibold tracking-[0.08em] whitespace-nowrap text-muted uppercase';
+const TD = 'border-b border-line px-3 py-2.5 align-top';
+const TR = 'transition-colors duration-150 hover:bg-hover [&:last-child>td]:border-b-0';
+const NUM = 'text-right tabular-nums whitespace-nowrap';
+const NAME = 'max-w-[280px] [overflow-wrap:anywhere]';
+const MINI_ROW = 'flex items-baseline justify-between gap-3 py-1.5 text-[13px]';
+
+function LabeledField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs font-semibold text-muted">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function Note({ children, className }: { children: ReactNode; className?: string }) {
+  return <p className={cx('mt-2 text-[13px] leading-relaxed text-muted', className)}>{children}</p>;
+}
+
+function Warn({ children }: { children: ReactNode }) {
+  return <p className="mt-2 text-[13px] font-semibold text-err">{children}</p>;
+}
+
+function SubTitle({ children }: { children: ReactNode }) {
+  return <h3 className="m-0 text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">{children}</h3>;
+}
+
+function Check({ checked, disabled, onChange, children }: { checked: boolean; disabled?: boolean; onChange: (v: boolean) => void; children: ReactNode }) {
+  return (
+    <label className={cx('flex items-start gap-2.5 text-sm', disabled ? 'cursor-not-allowed opacity-55' : 'cursor-pointer')}>
+      <input checked={checked} className="mt-0.5 size-4 shrink-0 accent-terracotta" disabled={disabled} onChange={(e) => onChange(e.target.checked)} type="checkbox" />
+      <span>{children}</span>
+    </label>
+  );
+}
+
+function CountTile({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className={cx('rounded-md border px-3.5 py-3', strong ? 'border-black bg-black text-white' : 'border-line bg-white')}>
+      <div className={cx('text-[11px] font-semibold tracking-[0.06em] uppercase', strong ? 'text-cream' : 'text-muted')}>{label}</div>
+      <div className="mt-1 font-display text-2xl tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function QualityCard({ title, wide, children }: { title: string; wide?: boolean; children: ReactNode }) {
+  return (
+    <div className={cx('rounded-md border border-line p-4', wide && 'lg:col-span-2')}>
+      <SubTitle>{title}</SubTitle>
+      <div className="mt-2">{children}</div>
+    </div>
+  );
+}
+
+function Facts({ children }: { children: ReactNode }) {
+  return <dl className="m-0 divide-y divide-line">{children}</dl>;
+}
+
+function MiniList({ children }: { children: ReactNode }) {
+  return <ul className="m-0 mt-3 list-none divide-y divide-line border-t border-line p-0">{children}</ul>;
+}
+
 function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="bi__fact">
-      <dt>{label}</dt>
-      <dd>
+    <div className="flex items-baseline justify-between gap-4 py-1.5 text-[13px]">
+      <dt className="text-muted-cream">{label}</dt>
+      <dd className="m-0 text-right font-semibold whitespace-nowrap tabular-nums">
         {value}
-        {hint && <span className="analytics__hint"> · {hint}</span>}
+        {hint && <span className="font-normal text-muted"> · {hint}</span>}
       </dd>
     </div>
   );
@@ -731,16 +760,16 @@ function Fact({ label, value, hint }: { label: string; value: string; hint?: str
 
 function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
   return (
-    <div className="pi__pager">
-      <button className="bi__open" disabled={page <= 1} onClick={() => onPage(page - 1)} type="button">
+    <div className="mt-3 flex items-center justify-end gap-2 text-[13px] text-muted">
+      <Button disabled={page <= 1} onClick={() => onPage(page - 1)} size="sm" variant="secondary">
         Previous
-      </button>
+      </Button>
       <span>
         Page {page} of {pages}
       </span>
-      <button className="bi__open" disabled={page >= pages} onClick={() => onPage(page + 1)} type="button">
+      <Button disabled={page >= pages} onClick={() => onPage(page + 1)} size="sm" variant="secondary">
         Next
-      </button>
+      </Button>
     </div>
   );
 }

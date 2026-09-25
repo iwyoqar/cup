@@ -136,7 +136,7 @@ export function BranchIntelligencePage() {
       {!data && !error && customReady && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className="flex min-w-0 flex-col gap-5" style={{ opacity: loading ? 0.6 : 1 }}>
+        <div className={cx('flex min-w-0 flex-col gap-5 transition-opacity duration-200', loading && 'opacity-60')}>
           <Kpis card={selectedCard} data={data} />
 
           <BranchTable branches={data.branches} onSelect={setBranchId} selectedId={data.branch?.id ?? null} />
@@ -483,7 +483,7 @@ function Sources({ cup, pos }: { cup: SourceSlice; pos: SourceSlice }) {
   const row = (label: string, s: SourceSlice) => (
     <div>
       <div className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">{label}</div>
-      <div className="font-display text-4xl leading-none" style={{ margin: '8px 0 4px' }}>
+      <div className="font-display text-4xl leading-none mt-2 mb-1 mx-0">
         {number(s.orders)}
       </div>
       <div className="text-[13px] font-medium text-muted">

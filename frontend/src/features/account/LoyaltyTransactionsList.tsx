@@ -6,6 +6,8 @@ import { LoyaltyTransactionCard } from './LoyaltyTransactionCard';
 import { ErrorBanner } from '../../app/ErrorBanner';
 import { EmptyState } from '../../app/EmptyState';
 import { SectionSkeleton } from '../../app/SectionSkeleton';
+import { buttonSecondary } from '../../app/buttonStyles';
+import { cx } from '../../lib/cx';
 
 interface LoyaltyTransactionsListProps {
   onBack: () => void;
@@ -52,33 +54,32 @@ export function LoyaltyTransactionsList({ onBack }: LoyaltyTransactionsListProps
   };
 
   return (
-    <div className="screen">
-      <div className="top-bar">
-        <button className="top-bar__back" onClick={onBack} type="button">
+    <div className="flex flex-1 flex-col gap-6 px-4 pt-3 pb-8">
+      <div className="-mx-4 flex min-h-11 items-center gap-2 px-4">
+        <button className="min-h-11 cursor-pointer py-2.5 text-small font-semibold tracking-[0.02em] text-black" onClick={onBack} type="button">
           ← Hisobim
         </button>
       </div>
 
-      <h1 className="display">Ballar tarixi</h1>
+      <h1 className="font-display text-display leading-[1.08] font-medium tracking-[-0.01em]">Ballar tarixi</h1>
 
       {items === null ? (
         error ? (
-          <p className="hint-text">Ballar ma'lumotini yuklab bo'lmadi</p>
+          <p className="text-small leading-[1.45] text-muted">Ballar ma'lumotini yuklab bo'lmadi</p>
         ) : (
           <SectionSkeleton height={160} />
         )
       ) : items.length === 0 ? (
         <EmptyState variant="inline" title="Hali ballar tarixi yo'q" />
       ) : (
-        <div className="rows">
+        <div className="flex flex-col">
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
           {items.map((transaction) => (
             <LoyaltyTransactionCard key={transaction.id} transaction={transaction} />
           ))}
           {nextCursor && (
             <button
-              className="button-secondary"
-              style={{ alignSelf: 'flex-start', marginTop: 'var(--space-3)' }}
+              className={cx(buttonSecondary, 'mt-3 self-start')}
               disabled={isLoadingMore}
               onClick={handleLoadMore}
               type="button"
