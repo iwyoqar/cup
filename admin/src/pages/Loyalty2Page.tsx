@@ -177,7 +177,7 @@ export function Loyalty2Page() {
       <div className="settings-card">
         <h3 style={{ margin: 0 }}>Membership levels</h3>
         <p className="hint-text" style={{ margin: 0 }}>A customer&apos;s level is derived from lifetime spend (CUP + POS) — it is never assigned by hand. The lowest level must start at 0.</p>
-        <div className="c360__scroll">
+        <div className="overflow-x-auto">
           <table className="data-table" style={{ marginTop: 0, minWidth: 780 }}>
             <thead>
               <tr>
@@ -228,7 +228,7 @@ export function Loyalty2Page() {
       <div className="settings-card">
         <h3 style={{ margin: 0 }}>Achievements</h3>
         <p className="hint-text" style={{ margin: 0 }}>Unlock automatically, once per customer. Coffee achievements need a category before they can be activated.</p>
-        <div className="c360__scroll">
+        <div className="overflow-x-auto">
           <table className="data-table" style={{ marginTop: 0, minWidth: 860 }}>
             <thead>
               <tr>

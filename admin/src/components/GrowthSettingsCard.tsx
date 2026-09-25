@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ApiError } from '../lib/api';
 import { GrowthSettings, updateGrowthSettings } from '../lib/adminGrowth';
+import { Button, Input } from '../ui';
 
 type NumKey = Exclude<keyof GrowthSettings, 'recencyDaysBoundaries' | 'frequencyBoundaries' | 'monetaryBoundaries'>;
 type ListKey = 'recencyDaysBoundaries' | 'frequencyBoundaries' | 'monetaryBoundaries';
@@ -66,33 +67,33 @@ export function GrowthSettingsCard({ settings, onSaved }: { settings: GrowthSett
   };
 
   return (
-    <div className="growth__settings">
-      <p className="analytics__note" style={{ margin: 0 }}>
+    <div className="mt-3.5 flex flex-col gap-3.5">
+      <p className="m-0 text-[13px] font-medium text-muted">
         These thresholds only decide how customers are labelled. Lifecycle precedence: CHURNED, DORMANT, AT_RISK (by days since the last purchase), then NEW, LOYAL, ACTIVE. “Beyond” a threshold means strictly more days.
       </p>
-      <div className="growth__fields">
+      <div className="grid grid-cols-2 gap-x-5 gap-y-3">
         {NUMBERS.map((f) => (
-          <label className="growth__field" key={f.key}>
+          <label className="flex flex-col gap-1 text-[13px] text-muted" key={f.key}>
             <span>{f.label}</span>
-            <input min={0} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: Number(e.target.value) }))} type="number" value={draft[f.key]} />
+            <Input className="w-full" min={0} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: Number(e.target.value) }))} type="number" value={draft[f.key]} />
           </label>
         ))}
         {LISTS.map((f) => (
-          <label className="growth__field" key={f.key}>
+          <label className="flex flex-col gap-1 text-[13px] text-muted" key={f.key}>
             <span>
               {f.label}
-              <em>{f.hint}</em>
+              <em className="block text-xs not-italic">{f.hint}</em>
             </span>
-            <input onChange={(e) => setLists((l) => ({ ...l, [f.key]: e.target.value }))} value={lists[f.key]} />
+            <Input className="w-full" onChange={(e) => setLists((l) => ({ ...l, [f.key]: e.target.value }))} value={lists[f.key]} />
           </label>
         ))}
       </div>
-      {error && <p className="error-text">{error}</p>}
-      {notice && <p className="success-text">{notice}</p>}
+      {error && <p className="text-[13px] font-semibold text-err">{error}</p>}
+      {notice && <p className="text-[13px] font-semibold text-ok">{notice}</p>}
       <div>
-        <button className="button-primary" disabled={!changed || saving} onClick={save} type="button">
+        <Button loading={saving} disabled={!changed || saving} onClick={save} variant="primary">
           {saving ? 'Saving...' : 'Save thresholds'}
-        </button>
+        </Button>
       </div>
     </div>
   );

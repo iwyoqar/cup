@@ -1,4 +1,5 @@
 import { KeyboardEvent, useRef } from 'react';
+import { Button } from './Button';
 import { cx } from './cx';
 
 export interface TabItem<T extends string> {
@@ -51,28 +52,36 @@ interface PaginationProps {
   busy?: boolean;
 }
 
+// Numbered page buttons are a compact square shape (min-w-8 px-2) that doesn't fit Button's own sizing — composed
+// locally as one atomic string per state (never two classes fighting over the same padding/width utility, since
+// cx() has no tailwind-merge — see Button.tsx's sizing() comment for why that matters).
+const PAGE_BASE =
+  'inline-flex h-8 min-w-8 cursor-pointer items-center justify-center rounded-sm border border-transparent px-2 text-[13px] font-semibold whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-150 ease-out active:not-disabled:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45';
+const PAGE_ACTIVE = 'bg-terracotta text-black shadow-soft hover:not-disabled:brightness-[0.94]';
+const PAGE_INACTIVE = 'bg-transparent text-muted hover:not-disabled:bg-hover hover:not-disabled:text-black';
+
 // Previous / numbered pages (with gaps) / Next.
 export function Pagination({ page, pages, onPage, total, busy }: PaginationProps) {
   if (pages <= 1 && total === undefined) return null;
   const last = Math.max(pages, 1);
   const shown = [...new Set([1, page - 1, page, page + 1, last])].filter((p) => p >= 1 && p <= last).sort((a, b) => a - b);
   return (
-    <nav aria-label="Pagination" className="pager">
-      <span>{total !== undefined ? `${total.toLocaleString('ru-RU')} total` : `Page ${page} of ${last}`}</span>
-      <button className="btn btn-secondary btn-sm" disabled={busy || page <= 1} onClick={() => onPage(page - 1)} type="button">
+    <nav aria-label="Pagination" className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-4 py-3 text-[13px] text-muted">
+      <span className="mr-auto">{total !== undefined ? `${total.toLocaleString('ru-RU')} total` : `Page ${page} of ${last}`}</span>
+      <Button disabled={busy || page <= 1} onClick={() => onPage(page - 1)} size="sm" variant="secondary">
         Previous
-      </button>
+      </Button>
       {shown.map((p, i) => (
         <span className="contents" key={p}>
           {i > 0 && p - shown[i - 1] > 1 && <span aria-hidden="true">…</span>}
-          <button aria-current={p === page ? 'page' : undefined} className={cx('btn btn-sm min-w-8 px-2', p === page ? 'btn-primary' : 'btn-ghost')} disabled={busy} onClick={() => onPage(p)} type="button">
+          <button aria-current={p === page ? 'page' : undefined} className={cx(PAGE_BASE, p === page ? PAGE_ACTIVE : PAGE_INACTIVE)} disabled={busy} onClick={() => onPage(p)} type="button">
             {p}
           </button>
         </span>
       ))}
-      <button className="btn btn-secondary btn-sm" disabled={busy || page >= last} onClick={() => onPage(page + 1)} type="button">
+      <Button disabled={busy || page >= last} onClick={() => onPage(page + 1)} size="sm" variant="secondary">
         Next
-      </button>
+      </Button>
     </nav>
   );
 }

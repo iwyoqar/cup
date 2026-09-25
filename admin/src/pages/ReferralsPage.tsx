@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ReferralDetailView } from '../components/ReferralDetailView';
 import { ApiError } from '../lib/api';
+import { cx } from '../ui/cx';
 import {
   CLOSE_REASON_LABELS,
   fetchReferralSettings,
@@ -15,21 +16,12 @@ import {
 } from '../lib/adminReferrals';
 import { formatDate, formatDateTime } from '../lib/format';
 import { findNav } from '../lib/nav';
-import { ErrorState, LoadingState, PageHeader, StatCard, StatGrid } from '../ui';
+import { Button, DataTable, ErrorState, Input, LoadingState, PageHeader, Select, StatCard, StatGrid, Toggle } from '../ui';
 
 const message = (err: unknown) => {
   const m = err instanceof ApiError ? err.backendMessage : 'Request failed.';
   return typeof m === 'string' ? m : 'Request failed.';
 };
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="toggle">
-      <input checked={checked} onChange={(e) => onChange(e.target.checked)} type="checkbox" />
-      <span className="toggle__track" />
-    </label>
-  );
-}
 
 const num = (v: string) => (v === '' || !Number.isFinite(Number(v)) ? 0 : Math.trunc(Number(v)));
 
@@ -114,12 +106,17 @@ export function ReferralsPage() {
     <div>
       <PageHeader description={findNav('referrals').item.description} title={findNav('referrals').item.label} />
       {settings && (
-        <p className={`callout ${settings.enabled ? 'callout--ok' : 'callout--warn'}`}>
+        <p
+          className={cx(
+            'mb-5 block rounded-md border-l-[3px] px-4 py-3 text-sm leading-relaxed',
+            settings.enabled ? 'border-ok bg-ok-bg text-ok' : 'border-terracotta bg-cream-soft text-warn',
+          )}
+        >
           {settings.enabled ? 'The referral program is ON.' : 'The referral program is OFF — no invitation is attributed and no reward is granted.'}
         </p>
       )}
       {error && <ErrorState message={error} />}
-      {notice && <p className="success-text">{notice}</p>}
+      {notice && <p className="text-[13px] font-semibold text-ok">{notice}</p>}
 
       {summary && (
         <StatGrid>
@@ -132,114 +129,96 @@ export function ReferralsPage() {
       )}
 
       {draft && (
-        <div className="settings-card" style={{ marginTop: 16 }}>
-          <h3 style={{ margin: 0 }}>Referral rules</h3>
-          <div className="settings-row">
-            <span className="settings-row__label">Referral program enabled</span>
+        <div className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-6">
+          <h3 className="font-display text-xl font-medium">Referral rules</h3>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
+            <span className="text-sm font-semibold">Referral program enabled</span>
             <Toggle checked={draft.enabled} onChange={(v) => setD('enabled', v)} />
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Referrer reward (points) — after the friend’s first qualifying purchase</span>
-            <input min={0} onChange={(e) => setD('referrerRewardValue', num(e.target.value))} style={{ width: 110 }} type="number" value={draft.referrerRewardValue} />
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
+            <span className="text-sm font-semibold">Referrer reward (points) — after the friend’s first qualifying purchase</span>
+            <Input className="w-[110px]" min={0} onChange={(e) => setD('referrerRewardValue', num(e.target.value))} type="number" value={draft.referrerRewardValue} />
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Invited friend reward (points)</span>
-            <input min={0} onChange={(e) => setD('referredRewardValue', num(e.target.value))} style={{ width: 110 }} type="number" value={draft.referredRewardValue} />
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
+            <span className="text-sm font-semibold">Invited friend reward (points)</span>
+            <Input className="w-[110px]" min={0} onChange={(e) => setD('referredRewardValue', num(e.target.value))} type="number" value={draft.referredRewardValue} />
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Minimum qualifying purchase (so’m; 0 = any purchase above 0)</span>
-            <input min={0} onChange={(e) => setD('minimumPurchaseAmount', num(e.target.value))} style={{ width: 130 }} type="number" value={draft.minimumPurchaseAmount} />
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
+            <span className="text-sm font-semibold">Minimum qualifying purchase (so’m; 0 = any purchase above 0)</span>
+            <Input className="w-[130px]" min={0} onChange={(e) => setD('minimumPurchaseAmount', num(e.target.value))} type="number" value={draft.minimumPurchaseAmount} />
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Only the friend’s very first purchase can qualify</span>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
+            <span className="text-sm font-semibold">Only the friend’s very first purchase can qualify</span>
             <Toggle checked={draft.rewardOnFirstPurchaseOnly} onChange={(v) => setD('rewardOnFirstPurchaseOnly', v)} />
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Max successful referrals rewarded per referrer (0 = unlimited)</span>
-            <input min={0} onChange={(e) => setD('maxSuccessfulReferrals', num(e.target.value))} style={{ width: 110 }} type="number" value={draft.maxSuccessfulReferrals} />
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
+            <span className="text-sm font-semibold">Max successful referrals rewarded per referrer (0 = unlimited)</span>
+            <Input className="w-[110px]" min={0} onChange={(e) => setD('maxSuccessfulReferrals', num(e.target.value))} type="number" value={draft.maxSuccessfulReferrals} />
           </div>
-          <div className="settings-row">
-            <span className="settings-row__label">Attribution window (days; 0 = never expires)</span>
-            <input min={0} onChange={(e) => setD('attributionWindowDays', num(e.target.value))} style={{ width: 110 }} type="number" value={draft.attributionWindowDays} />
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <span className="text-sm font-semibold">Attribution window (days; 0 = never expires)</span>
+            <Input className="w-[110px]" min={0} onChange={(e) => setD('attributionWindowDays', num(e.target.value))} type="number" value={draft.attributionWindowDays} />
           </div>
-          <p className="hint-text" style={{ margin: 0 }}>
+          <p className="text-[13px] leading-snug text-muted">
             Rewards are paid in loyalty points through the existing points ledger (cashback is not available yet). Changing a rule never touches referrals or rewards that are already
             decided. Before enabling, review the reward values above: they are starting values.
           </p>
           <div>
-            <button className="button-primary" disabled={!changed || saving} onClick={save} type="button">
+            <Button disabled={!changed || saving} loading={saving} onClick={save} variant="primary">
               {saving ? 'Saving...' : 'Save settings'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      <h3>Referrals</h3>
+      <h3 className="mt-8 mb-4 font-display text-xl font-medium">Referrals</h3>
       <form
-        className="ref-filters"
+        className="mb-5 flex flex-wrap gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           loadList(filters);
         }}
       >
-        <select onChange={(e) => setF('status', e.target.value as ReferralFilters['status'])} value={filters.status ?? ''}>
+        <Select onChange={(e) => setF('status', e.target.value as ReferralFilters['status'])} value={filters.status ?? ''}>
           <option value="">All statuses</option>
           {REFERRAL_STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
-        </select>
-        <input onChange={(e) => setF('referrer', e.target.value)} placeholder="Referrer name or code" value={filters.referrer ?? ''} />
-        <input onChange={(e) => setF('referred', e.target.value)} placeholder="Invited friend name" value={filters.referred ?? ''} />
-        <input aria-label="From date" onChange={(e) => setF('from', e.target.value)} type="date" value={filters.from ?? ''} />
-        <input aria-label="To date" onChange={(e) => setF('to', e.target.value)} type="date" value={filters.to ?? ''} />
-        <button className="button-secondary" type="submit">
+        </Select>
+        <Input onChange={(e) => setF('referrer', e.target.value)} placeholder="Referrer name or code" value={filters.referrer ?? ''} />
+        <Input onChange={(e) => setF('referred', e.target.value)} placeholder="Invited friend name" value={filters.referred ?? ''} />
+        <Input aria-label="From date" onChange={(e) => setF('from', e.target.value)} type="date" value={filters.from ?? ''} />
+        <Input aria-label="To date" onChange={(e) => setF('to', e.target.value)} type="date" value={filters.to ?? ''} />
+        <Button type="submit" variant="secondary">
           Apply
-        </button>
+        </Button>
       </form>
 
       {rows === null && !error && <LoadingState variant="card" />}
-      {rows !== null && rows.length === 0 && <p className="hint-text">Hozircha takliflar yo&apos;q.</p>}
+      {rows !== null && rows.length === 0 && <p className="text-[13px] leading-snug text-muted">Hozircha takliflar yo&apos;q.</p>}
       {rows !== null && rows.length > 0 && (
         <>
-          <div className="c360__scroll">
-            <table className="data-table" style={{ minWidth: 860 }}>
-              <thead>
-                <tr>
-                  <th>Referrer</th>
-                  <th>Invited friend</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Qualified</th>
-                  <th>Rewards (points)</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.referrer.displayName ?? '—'}</td>
-                    <td>{r.referred.displayName ?? '—'}</td>
-                    <td title={r.closeReason ? (CLOSE_REASON_LABELS[r.closeReason] ?? r.closeReason) : undefined}>{r.status}</td>
-                    <td>{formatDate(r.createdAt)}</td>
-                    <td>{r.qualifiedAt ? formatDateTime(r.qualifiedAt) : '—'}</td>
-                    <td>{r.referrerRewardPoints || r.referredRewardPoints ? `${r.referrerRewardPoints} / ${r.referredRewardPoints}` : '—'}</td>
-                    <td>
-                      <button className="button-secondary" onClick={() => setDetailId(r.id)} type="button">
-                        Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            boxed
+            columns={[
+              { key: 'referrer', header: 'Referrer', cell: (r) => r.referrer.displayName ?? '—' },
+              { key: 'referred', header: 'Invited friend', cell: (r) => r.referred.displayName ?? '—' },
+              { key: 'status', header: 'Status', cell: (r) => <span title={r.closeReason ? (CLOSE_REASON_LABELS[r.closeReason] ?? r.closeReason) : undefined}>{r.status}</span> },
+              { key: 'created', header: 'Created', low: true, cell: (r) => formatDate(r.createdAt) },
+              { key: 'qualified', header: 'Qualified', low: true, cell: (r) => (r.qualifiedAt ? formatDateTime(r.qualifiedAt) : '—') },
+              { key: 'rewards', header: 'Rewards (points)', numeric: true, cell: (r) => (r.referrerRewardPoints || r.referredRewardPoints ? `${r.referrerRewardPoints} / ${r.referredRewardPoints}` : '—') },
+              { key: 'actions', header: '', actions: true, cell: (r) => <Button onClick={() => setDetailId(r.id)} size="sm" variant="secondary">Details</Button> },
+            ]}
+            rowKey={(r) => r.id}
+            rows={rows}
+          />
           {next && (
-            <div style={{ marginTop: 12 }}>
-              <button className="button-secondary" disabled={loadingMore} onClick={more} type="button">
+            <div className="mt-3">
+              <Button loading={loadingMore} onClick={more} variant="secondary">
                 {loadingMore ? 'Loading...' : 'Load more'}
-              </button>
+              </Button>
             </div>
           )}
         </>

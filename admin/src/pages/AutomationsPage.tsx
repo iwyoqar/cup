@@ -179,7 +179,7 @@ export function AutomationsPage() {
       {items !== null && items.length === 0 && <p className="hint-text">Hozircha avtomatlashtirishlar yo&apos;q.</p>}
       {items !== null && items.length > 0 && (
         <>
-          <div className="c360__scroll">
+          <div className="overflow-x-auto">
             <table className="data-table" style={{ minWidth: 860 }}>
               <thead>
                 <tr>

@@ -108,7 +108,7 @@ export function CustomersPage() {
           ) : (
             '—'
           )}
-          {customer.growth.rfmScore && <span className="growth__rfm"> {customer.growth.rfmScore}</span>}
+          {customer.growth.rfmScore && <span className="tabular-nums text-muted text-xs"> {customer.growth.rfmScore}</span>}
         </span>
       ),
     },

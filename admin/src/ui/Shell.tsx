@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { deriveHealth, overallState, PulseContext, pulseAttention, useSystemPulse } from '../lib/health';
 import { AdminPage, findNav, groupOf, NavGroup, NAV_GROUPS, NavItem } from '../lib/nav';
 import { AdminProfile } from '../lib/types';
+import { IconButton } from './Button';
 import { cx } from './cx';
 import { Icon } from './icons';
 import { HEALTH_DOT } from './StatusBadge';
@@ -220,9 +221,9 @@ export function AdminShell({ page, onNavigate, onLogout, admin, children }: Admi
 
         <div className="flex min-w-0 flex-col">
           <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur-md md:px-8">
-            <button aria-expanded={navOpen} aria-label="Open navigation" className="btn btn-icon -ml-2 lg:hidden" onClick={() => setNavOpen(true)} type="button">
+            <IconButton aria-expanded={navOpen} className="-ml-2 lg:hidden" label="Open navigation" onClick={() => setNavOpen(true)}>
               <Icon name="menu" />
-            </button>
+            </IconButton>
             <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[13px] text-muted">
               {group.label && <span className="hidden truncate sm:inline">{group.label}</span>}
               {group.label && (

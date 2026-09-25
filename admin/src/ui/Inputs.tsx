@@ -2,17 +2,31 @@ import { forwardRef, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, Texta
 import { cx } from './cx';
 import { Icon } from './icons';
 
-// Form controls share the `.input` / `.select` styles in ui/components.css (hover, terracotta focus ring, error, disabled).
+// Form controls — pure Tailwind (no ui/components.css `.input`/`.select`). Shared field chrome (border/hover/focus
+// ring/disabled/invalid) lives in FIELD_BASE so Input/Select/Textarea render identically to before.
+const FIELD_BASE =
+  'h-10 min-w-0 rounded-sm border border-line-strong bg-white px-3 text-sm text-black transition-[border-color,box-shadow] duration-150 ease-out hover:not-disabled:border-black/30 disabled:cursor-not-allowed disabled:bg-neutral-bg disabled:text-muted placeholder:text-muted/70 focus:border-terracotta focus:outline-none focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-terracotta)_18%,transparent)] aria-invalid:border-err';
+
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }>(function Input({ className, invalid, ...rest }, ref) {
-  return <input {...rest} aria-invalid={invalid || undefined} className={cx('input', className)} ref={ref} />;
+  return <input {...rest} aria-invalid={invalid || undefined} className={cx(FIELD_BASE, className)} ref={ref} />;
 });
 
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, ...rest }, ref) {
-  return <select {...rest} className={cx('select', className)} ref={ref} />;
+// The chevron is a fixed data-URI SVG, not a static token — kept as an inline style (merged with any caller style)
+// rather than an awkward Tailwind arbitrary-value class encoding a whole data: URL.
+const CHEVRON_STYLE = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236f6a63' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 10px center',
+  backgroundSize: '16px',
+} as const;
+
+export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, style, ...rest }, ref) {
+  return <select {...rest} className={cx(FIELD_BASE, 'appearance-none pr-9', className)} ref={ref} style={{ ...CHEVRON_STYLE, ...style }} />;
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean }>(function Textarea({ className, invalid, ...rest }, ref) {
-  return <textarea {...rest} aria-invalid={invalid || undefined} className={cx('input h-auto min-h-24 py-2.5 leading-relaxed', className)} ref={ref} />;
+  return <textarea {...rest} aria-invalid={invalid || undefined} className={cx(FIELD_BASE, 'h-auto min-h-24 py-2.5 leading-relaxed', className)} ref={ref} />;
 });
 
 interface SearchInputProps {
@@ -26,7 +40,10 @@ export function SearchInput({ value, onChange, placeholder = 'Search', label = '
   return (
     <div className="relative flex min-w-[220px] flex-1 items-end self-end">
       <Icon className="pointer-events-none absolute bottom-3 left-3 size-4 text-muted" name="search" />
-      <input aria-label={label} className="input w-full pl-9" onChange={(e) => onChange(e.target.value)} placeholder={placeholder} type="search" value={value} />
+      {/* pl-9! (important): FIELD_BASE's own px-3 sets the same padding-left utility axis, and cx() does not merge
+          conflicting utilities (no tailwind-merge) — the `!` suffix makes this override deterministic rather than
+          depending on Tailwind's generation order. */}
+      <Input aria-label={label} className="w-full pl-9!" onChange={(e) => onChange(e.target.value)} placeholder={placeholder} type="search" value={value} />
     </div>
   );
 }
@@ -76,21 +93,21 @@ export function DateRangePicker({ value, onChange, disabled }: DateRangePickerPr
   return (
     <div className="flex flex-wrap items-end gap-3">
       <FilterField label="Period">
-        <select className="select" disabled={disabled} onChange={(e) => onChange({ ...value, period: e.target.value as PeriodKey })} value={value.period}>
+        <Select disabled={disabled} onChange={(e) => onChange({ ...value, period: e.target.value as PeriodKey })} value={value.period}>
           {PERIOD_OPTIONS.map((p) => (
             <option key={p.key} value={p.key}>
               {p.label}
             </option>
           ))}
-        </select>
+        </Select>
       </FilterField>
       {value.period === 'custom' && (
         <>
           <FilterField label="From">
-            <input className="input" disabled={disabled} onChange={(e) => onChange({ ...value, startDate: e.target.value })} type="date" value={value.startDate} />
+            <Input disabled={disabled} onChange={(e) => onChange({ ...value, startDate: e.target.value })} type="date" value={value.startDate} />
           </FilterField>
           <FilterField label="To">
-            <input className="input" disabled={disabled} onChange={(e) => onChange({ ...value, endDate: e.target.value })} type="date" value={value.endDate} />
+            <Input disabled={disabled} onChange={(e) => onChange({ ...value, endDate: e.target.value })} type="date" value={value.endDate} />
           </FilterField>
           {!isRangeReady(value) && <span className="self-center text-[13px] text-err">Choose a start date that is not after the end date.</span>}
         </>

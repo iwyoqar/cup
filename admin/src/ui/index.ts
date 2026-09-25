@@ -1,4 +1,5 @@
 // The Admin component system (Design System 2.0, Tailwind). Import from '../ui' — never restyle the same thing page by page.
+export { cx } from './cx';
 export { AdminShell } from './Shell';
 export { PageHeader } from './PageHeader';
 export { Button, IconButton } from './Button';
@@ -17,6 +18,7 @@ export { ToastProvider, useToast } from './Toast';
 export type { ToastTone } from './Toast';
 export { Tabs, Pagination } from './Tabs';
 export type { TabItem } from './Tabs';
+export { Toggle } from './Toggle';
 export { ChartContainer, BarChart, HBarList } from './Charts';
 export { Icon } from './icons';
 export type { IconName } from './icons';

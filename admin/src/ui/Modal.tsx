@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { Button, IconButton } from './Button';
 import { cx } from './cx';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -48,11 +49,11 @@ function useDialogFocus(panel: React.RefObject<HTMLDivElement>, dismissible: boo
 
 function CloseButton({ onClose, disabled }: { onClose: () => void; disabled?: boolean }) {
   return (
-    <button aria-label="Close" className="btn btn-icon btn-sm -mr-2 shrink-0" disabled={disabled} onClick={onClose} type="button">
+    <IconButton className="-mr-2 shrink-0" disabled={disabled} label="Close" onClick={onClose} size="sm">
       <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth={1.8} viewBox="0 0 24 24">
         <path d="M6 6l12 12M18 6L6 18" />
       </svg>
-    </button>
+    </IconButton>
   );
 }
 
@@ -130,20 +131,19 @@ export function ConfirmDialog({ title, message, confirmLabel, cancelLabel = 'Can
       dismissible={!busy}
       footer={
         <>
-          <button className="btn btn-secondary" data-autofocus disabled={busy} onClick={onCancel} type="button">
+          <Button data-autofocus disabled={busy} onClick={onCancel} variant="secondary">
             {cancelLabel}
-          </button>
-          <button aria-busy={busy || undefined} className={cx('btn', tone === 'danger' ? 'btn-danger' : 'btn-primary')} disabled={busy} onClick={onConfirm} type="button">
-            {busy && <span aria-hidden="true" className="btn-spinner" />}
+          </Button>
+          <Button loading={busy} onClick={onConfirm} variant={tone === 'danger' ? 'danger' : 'primary'}>
             {busy ? 'Working…' : confirmLabel}
-          </button>
+          </Button>
         </>
       }
       onClose={onCancel}
       title={title}
     >
       <div className="leading-relaxed text-muted-cream">{message}</div>
-      {error && <p className="error-text mt-3">{error}</p>}
+      {error && <p className="mt-3 text-[13px] font-semibold text-err">{error}</p>}
     </Modal>
   );
 }

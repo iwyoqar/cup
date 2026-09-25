@@ -18,7 +18,8 @@ export interface Column<T> {
 interface DataTableProps<T> {
   columns: Column<T>[];
   rows: T[];
-  rowKey: (row: T) => string;
+  /** `index` is only for rows with no other stable identity (e.g. a static preview list with no id field). */
+  rowKey: (row: T, index: number) => string;
   onRowClick?: (row: T) => void;
   /** Shown instead of the table when there are no rows. */
   empty?: ReactNode;
@@ -29,34 +30,45 @@ interface DataTableProps<T> {
   loading?: boolean;
   /** Long tables: the table scrolls inside a 70vh box with a sticky header. */
   stickyHeader?: boolean;
+  /** Extra classes for one row (e.g. highlighting the selected row) — composed after the base row classes. */
+  rowClassName?: (row: T) => string | undefined;
 }
 
-// One table for the whole Admin (styles: `.table*` in ui/components.css, shared with raw tables in pages): quiet
-// uppercase header, 48 px rows, subtle hover, right-aligned tabular figures, horizontal scroll inside its own wrapper.
-export function DataTable<T>({ columns, rows, rowKey, onRowClick, empty, boxed, caption, loading, stickyHeader }: DataTableProps<T>) {
+// One table for the whole Admin — pure Tailwind (no `.table*` classes from ui/components.css). Quiet uppercase
+// header, 48px rows, subtle hover, right-aligned tabular figures, horizontal scroll inside its own wrapper. The
+// 760px breakpoint is an arbitrary value (`max-[760px]:*`) rather than Tailwind's default `md` (768px) to match the
+// exact breakpoint the legacy CSS used — this project's mobile/icon-rail breakpoints are deliberately exact values.
+const TH_BASE = 'border-b border-line bg-white px-4 py-3 text-left text-[11px] font-semibold tracking-[0.08em] whitespace-nowrap text-muted uppercase max-[760px]:px-3';
+const TD_BASE = 'h-12 border-b border-line px-4 py-3 align-middle max-[760px]:px-3 max-[760px]:whitespace-nowrap';
+const NUM = 'text-right whitespace-nowrap tabular-nums';
+const ACTIONS = 'text-right whitespace-nowrap';
+const LOW = 'max-[760px]:hidden';
+
+export function DataTable<T>({ columns, rows, rowKey, onRowClick, empty, boxed, caption, loading, stickyHeader, rowClassName }: DataTableProps<T>) {
   if (loading && rows.length === 0) return <TableSkeleton />;
   if (rows.length === 0) {
     return <>{empty ?? <EmptyState title="Nothing here yet" variant="inline" />}</>;
   }
-  const cls = (c: Column<T>) => cx(c.numeric && 'table__num', c.actions && 'table__actions', c.low && 'table__col--low') || undefined;
+  const thCls = (c: Column<T>) => cx(TH_BASE, c.numeric && NUM, c.actions && ACTIONS, c.low && LOW);
+  const tdCls = (c: Column<T>) => cx(TD_BASE, c.numeric && NUM, c.actions && ACTIONS, c.low && LOW);
   return (
-    <div className={cx('table-wrap', boxed && 'table-wrap--boxed', stickyHeader && 'table-wrap--sticky')}>
-      <table className="table">
+    <div className={cx('max-w-full overflow-x-auto', boxed && 'rounded-md border border-line bg-white', stickyHeader && 'max-h-[70vh] overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10')}>
+      <table className="w-full min-w-[560px] border-separate border-spacing-0 text-sm max-[760px]:min-w-full">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr>
             {columns.map((c) => (
-              <th className={cls(c)} key={c.key} scope="col">
+              <th className={thCls(c)} key={c.key} scope="col">
                 {c.header}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <tr
-              className={onRowClick ? 'table__row--click' : undefined}
-              key={rowKey(row)}
+              className={cx('transition-colors duration-150 ease-out hover:bg-hover [&:last-child_td]:border-b-0', onRowClick && 'cursor-pointer focus-visible:[outline-offset:-2px]', rowClassName?.(row))}
+              key={rowKey(row, index)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               onKeyDown={
                 onRowClick
@@ -71,7 +83,7 @@ export function DataTable<T>({ columns, rows, rowKey, onRowClick, empty, boxed, 
               tabIndex={onRowClick ? 0 : undefined}
             >
               {columns.map((c) => (
-                <td className={cls(c)} key={c.key}>
+                <td className={tdCls(c)} key={c.key}>
                   {c.cell(row)}
                 </td>
               ))}

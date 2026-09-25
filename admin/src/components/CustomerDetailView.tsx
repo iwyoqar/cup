@@ -6,7 +6,7 @@ import { LIFECYCLE_LABELS, OPPORTUNITY_LABELS, SIGNAL_LABELS } from '../lib/admi
 import { formatDate, formatDateTime, formatSom } from '../lib/format';
 import { REASON_LABELS } from '../lib/adminAutomations';
 import { AdminCustomer360, CustomerActivityItem } from '../lib/types';
-import { Column, ConfirmDialog, DataTable, EmptyState, ErrorState, KeyValue, LoadingState, SectionCard, StatCard, StatGrid, StatusBadge, TabItem, Tabs } from '../ui';
+import { Button, Column, ConfirmDialog, DataTable, EmptyState, ErrorState, KeyValue, LoadingState, SectionCard, StatCard, StatGrid, StatusBadge, TabItem, Tabs } from '../ui';
 
 interface CustomerDetailViewProps {
   customerId: string;
@@ -95,9 +95,9 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <button className="btn btn-ghost btn-sm -ml-3" onClick={onBack} type="button">
+        <Button className="-ml-3" onClick={onBack} size="sm" variant="ghost">
           ← {backLabel ?? 'Back to customers'}
-        </button>
+        </Button>
       </div>
 
       {error && <ErrorState message={error} onRetry={() => setReloadKey((k) => k + 1)} title="Customer could not be loaded" />}
@@ -124,7 +124,7 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
                   <SourceCard count={data.summary.cupOrderCount} empty="CUP buyurtmalari hali mavjud emas" label="CUP orders" revenue={data.summary.cupRevenueMinor} unit="orders" />
                   <SourceCard count={data.summary.posPurchaseCount} empty="POS xaridlari hali mavjud emas" label="POS purchases" revenue={data.summary.posRevenueMinor} unit="purchases" />
                 </div>
-                <div className="grid-2">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                   <LoyaltyCard data={data} />
                   <RewardsCard data={data} />
                 </div>
@@ -146,7 +146,7 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
 
             {tab === 'loyalty' && (
               <>
-                <div className="grid-2">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                   <LoyaltyCard data={data} />
                   <RewardsCard data={data} />
                 </div>
@@ -246,7 +246,7 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
 
             {tab === 'marketing' && (
               <>
-                <div className="grid-2">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                   <SectionCard title="Promotions">
                     {data.promotions.length === 0 ? (
                       <Empty text="Hozircha mos aksiyalar yo'q" />
@@ -318,15 +318,17 @@ export function CustomerDetailView({ customerId, onBack, onDeactivated, readOnly
                 />
                 {!readOnly && (
                   <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
-                    <button className="btn btn-secondary" disabled={regenerating} onClick={handleRegenerate} type="button">
+                    <Button disabled={regenerating} onClick={handleRegenerate} variant="secondary">
                       {regenerating ? 'Regenerating...' : 'Regenerate code'}
-                    </button>
-                    <button className="btn btn-ghost text-err" onClick={() => setConfirmingDeactivate(true)} type="button">
+                    </Button>
+                    {/* text-err!: Button's ghost variant already sets text-muted; cx() doesn't merge conflicting
+                        utilities, so `!` makes this override deterministic (see Button.tsx's sizing() comment). */}
+                    <Button className="text-err!" onClick={() => setConfirmingDeactivate(true)} variant="ghost">
                       Deactivate customer
-                    </button>
+                    </Button>
                   </div>
                 )}
-                {actionError && <p className="error-text mt-3">{actionError}</p>}
+                {actionError && <p className="mt-3 text-[13px] font-semibold text-err">{actionError}</p>}
               </SectionCard>
             )}
           </div>
@@ -621,10 +623,9 @@ function PurchaseActivity({ customerId }: { customerId: string }) {
       )}
       {items !== null && nextCursor && (
         <div className="border-t border-line px-4 py-3">
-          <button className="btn btn-secondary btn-sm" disabled={loadingMore} onClick={loadMore} type="button">
-            {loadingMore && <span aria-hidden="true" className="btn-spinner" />}
+          <Button loading={loadingMore} onClick={loadMore} size="sm" variant="secondary">
             {loadingMore ? 'Loading...' : 'Load more'}
-          </button>
+          </Button>
         </div>
       )}
     </SectionCard>

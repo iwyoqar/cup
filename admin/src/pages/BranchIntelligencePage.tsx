@@ -7,7 +7,7 @@ import { formatDate, formatSom } from '../lib/format';
 import { AnalyticsPeriodKey } from '../lib/types';
 import { RfmMatrix } from './GrowthPage';
 import { findNav } from '../lib/nav';
-import { FilterBar, FilterField, PageHeader } from '../ui';
+import { Button, cx, DataTable, EmptyState, ErrorState, FilterBar, FilterField, Input, LoadingState, PageHeader, SectionCard, Select, StatCard, StatGrid } from '../ui';
 
 const PERIODS: { key: AnalyticsPeriodKey; label: string }[] = [
   { key: 'today', label: 'Today' },
@@ -17,7 +17,19 @@ const PERIODS: { key: AnalyticsPeriodKey; label: string }[] = [
   { key: 'custom', label: 'Custom' },
 ];
 
-const PRIORITY_CLASS: Record<Priority, string> = { HIGH: 'growth__pill growth__pill--high', MEDIUM: 'growth__pill growth__pill--medium', LOW: 'growth__pill' };
+const PRIORITY_TONE: Record<Priority, string> = {
+  HIGH: 'bg-terracotta text-white border-terracotta',
+  MEDIUM: 'bg-cream border-transparent',
+  LOW: 'border-line',
+};
+const LIFECYCLE_FILL: Record<(typeof LIFECYCLE_STATES)[number], string> = {
+  NEW: 'bg-terracotta',
+  ACTIVE: 'bg-terracotta-deep',
+  LOYAL: 'bg-terracotta',
+  AT_RISK: 'bg-[#d9a441]',
+  DORMANT: 'bg-[#8b857c]',
+  CHURNED: 'bg-black',
+};
 const number = (n: number) => n.toLocaleString('ru-RU');
 const percent = (n: number) => `${n.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%`;
 const message = (err: unknown) => (err instanceof ApiError && err.status !== 0 && err.backendMessage !== 'network_error' && typeof err.backendMessage === 'string' ? err.backendMessage : "Ma'lumotni yuklab bo'lmadi");
@@ -73,20 +85,23 @@ export function BranchIntelligencePage() {
 
   const branches = data?.filters.branches ?? [];
   const detail = data?.detail ?? null;
-  const selectedCard = data?.branch ? data.branches.find((b) => b.branchId === data.branch!.id) ?? null : null;
+  const selectedCard = data?.branch ? (data.branches.find((b) => b.branchId === data.branch!.id) ?? null) : null;
 
   return (
-    <div className="analytics growth bi">
+    <div>
       <PageHeader description={findNav('branch-intelligence').item.description} title={findNav('branch-intelligence').item.label} />
       <FilterBar>
-          <FilterField label="Period"><select aria-label="Period" className="select" onChange={(e) => setPeriod(e.target.value as AnalyticsPeriodKey)} value={period}>
+        <FilterField label="Period">
+          <Select aria-label="Period" onChange={(e) => setPeriod(e.target.value as AnalyticsPeriodKey)} value={period}>
             {PERIODS.map((p) => (
               <option key={p.key} value={p.key}>
                 {p.label}
               </option>
             ))}
-          </select></FilterField>
-          <FilterField label="Branch"><select aria-label="Branch" className="select bi__branch-select" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
+          </Select>
+        </FilterField>
+        <FilterField label="Branch">
+          <Select aria-label="Branch" className="max-w-[260px] max-[760px]:max-w-full" onChange={(e) => setBranchId(e.target.value)} value={branchId}>
             <option value="">All branches</option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -94,62 +109,53 @@ export function BranchIntelligencePage() {
                 {b.isActive ? '' : ' (inactive)'}
               </option>
             ))}
-          </select></FilterField>
-        </FilterBar>
-
-      {period === 'custom' && (
-        <div className="analytics__custom">
-          <label>
-            From <input onChange={(e) => setStartDate(e.target.value)} type="date" value={startDate} />
-          </label>
-          <label>
-            To <input onChange={(e) => setEndDate(e.target.value)} type="date" value={endDate} />
-          </label>
-          {!customReady && <span className="analytics__note">Choose a start date that is not after the end date (up to 366 days).</span>}
-        </div>
-      )}
+          </Select>
+        </FilterField>
+        {period === 'custom' && (
+          <>
+            <FilterField label="From">
+              <Input onChange={(e) => setStartDate(e.target.value)} type="date" value={startDate} />
+            </FilterField>
+            <FilterField label="To">
+              <Input onChange={(e) => setEndDate(e.target.value)} type="date" value={endDate} />
+            </FilterField>
+            {!customReady && <span className="self-center text-[13px] text-err">Choose a start date that is not after the end date (up to 366 days).</span>}
+          </>
+        )}
+      </FilterBar>
 
       {data && !error && (
-        <p className="analytics__range">
+        <p className="mb-5 text-[13px] font-semibold tracking-[0.02em] text-muted">
           {data.period.startDate === data.period.endDate ? data.period.startDate : `${data.period.startDate} → ${data.period.endDate}`}
           {data.branch ? ` · ${data.branch.name}${data.branch.isActive ? '' : ' (inactive)'}` : ' · All branches'}
-          {loading && <span className="analytics__loading"> · updating…</span>}
+          {loading && <span> · updating…</span>}
         </p>
       )}
 
-      {error && (
-        <div className="analytics__error" role="alert">
-          <span>{error}</span>
-          <button className="analytics__retry" onClick={() => setReloadKey((k) => k + 1)} type="button">
-            Retry
-          </button>
-        </div>
-      )}
-
-      {!data && !error && customReady && <Skeleton />}
+      {error && <ErrorState message={error} onRetry={() => setReloadKey((k) => k + 1)} title="The figures could not be loaded" />}
+      {!data && !error && customReady && <LoadingState variant="page" />}
 
       {data && !error && (
-        <div className={`analytics__body${loading ? ' analytics__body--loading' : ''}`}>
-          <Kpis data={data} card={selectedCard} />
+        <div className="flex min-w-0 flex-col gap-5" style={{ opacity: loading ? 0.6 : 1 }}>
+          <Kpis card={selectedCard} data={data} />
 
-          <BranchTable branches={data.branches} selectedId={data.branch?.id ?? null} onSelect={setBranchId} />
+          <BranchTable branches={data.branches} onSelect={setBranchId} selectedId={data.branch?.id ?? null} />
 
-          <section className="analytics__panel" aria-label="Daily revenue and orders">
-            <h2 className="analytics__h2">{detail ? 'Daily revenue and orders' : 'Daily revenue'}</h2>
+          <SectionCard aria-label="Daily revenue and orders" title={detail ? 'Daily revenue and orders' : 'Daily revenue'}>
             {detail ? (
-              <div className="bi__charts">
-                <DayBars title="Revenue" days={detail.revenue.byDay} format={formatSom} tone="terracotta" />
-                <DayBars title="Orders" days={detail.orders.byDay} format={number} tone="black" />
+              <div className="flex flex-col gap-[18px]">
+                <DayBars days={detail.revenue.byDay} format={formatSom} title="Revenue" tone="terracotta" />
+                <DayBars days={detail.orders.byDay} format={number} title="Orders" tone="black" />
               </div>
             ) : allDays ? (
               <>
-                <DayBars title="Revenue, all branches" days={allDays} format={formatSom} tone="terracotta" />
-                <p className="analytics__note">Daily revenue of the whole business (includes purchases that carry no branch). Choose a branch above for its daily revenue, orders and customers.</p>
+                <DayBars days={allDays} format={formatSom} title="Revenue, all branches" tone="terracotta" />
+                <p className="mt-4 text-[13px] leading-snug text-muted">Daily revenue of the whole business (includes purchases that carry no branch). Choose a branch above for its daily revenue, orders and customers.</p>
               </>
             ) : (
-              <p className="analytics__empty">Choose a branch above to see its daily revenue and orders.</p>
+              <EmptyState text="Choose a branch above to see its daily revenue and orders." title="No branch selected" variant="inline" />
             )}
-          </section>
+          </SectionCard>
 
           {detail && data.branch ? <Detail data={data} detail={detail} /> : <AllBranchesNotes data={data} />}
 
@@ -170,83 +176,66 @@ function Kpis({ data, card }: { data: BranchIntelligenceOverview; card: BranchCa
   const fresh = branch ? card.newCustomers : s.newCustomers;
   const returning = branch ? card.returningCustomers : s.returningCustomers;
   return (
-    <section className="analytics__kpis bi__kpis" aria-label="Key figures">
-      <Kpi label="Revenue" value={formatSom(revenue)} hint={branch ? `${percent(card.revenueSharePercent)} of branch revenue` : undefined} strong />
-      <Kpi label="Orders" value={number(orders)} hint={branch ? `${percent(card.orderSharePercent)} of branch orders` : undefined} />
-      <Kpi label="Customers" value={number(customers)} />
-      <Kpi label="Average check" value={formatSom(average)} />
-      <Kpi label="New customers" value={number(fresh)} hint="First purchase ever, in this period" />
-      <Kpi label="Returning customers" value={number(returning)} hint={customers > 0 ? `${percent(Math.round((returning / customers) * 1000) / 10)} of customers` : undefined} />
-    </section>
-  );
-}
-
-function Kpi({ label, value, hint, strong }: { label: string; value: string; hint?: string; strong?: boolean }) {
-  return (
-    <div className={`analytics__kpi${strong ? ' analytics__kpi--strong' : ''}`}>
-      <div className="analytics__label">{label}</div>
-      <div className="analytics__kpi-value">{value}</div>
-      {hint && <div className="analytics__label growth__hint">{hint}</div>}
-    </div>
+    <StatGrid>
+      <StatCard hint={branch ? `${percent(card.revenueSharePercent)} of branch revenue` : undefined} label="Revenue" strong value={formatSom(revenue)} />
+      <StatCard hint={branch ? `${percent(card.orderSharePercent)} of branch orders` : undefined} label="Orders" value={number(orders)} />
+      <StatCard label="Customers" value={number(customers)} />
+      <StatCard label="Average check" value={formatSom(average)} />
+      <StatCard hint="First purchase ever, in this period" label="New customers" value={number(fresh)} />
+      <StatCard hint={customers > 0 ? `${percent(Math.round((returning / customers) * 1000) / 10)} of customers` : undefined} label="Returning customers" value={number(returning)} />
+    </StatGrid>
   );
 }
 
 // Side-by-side figures, listed by branch name. No ranking column, no sorting by performance, no highlighting of a "best" or "worst" branch.
 function BranchTable({ branches, selectedId, onSelect }: { branches: BranchCard[]; selectedId: string | null; onSelect: (id: string) => void }) {
   return (
-    <section className="analytics__panel" aria-label="Branch comparison">
-      <h2 className="analytics__h2">Branch comparison</h2>
+    <SectionCard aria-label="Branch comparison" flush={branches.length > 0} title="Branch comparison">
       {branches.length === 0 ? (
-        <p className="analytics__empty">{EMPTY}</p>
+        <EmptyState text={EMPTY} title="No data" variant="inline" />
       ) : (
-        <div className="c360__scroll">
-          <table className="analytics__table bi__table">
-            <thead>
-              <tr>
-                <th>Branch</th>
-                <th className="analytics__num">Revenue</th>
-                <th className="analytics__num">Share</th>
-                <th className="analytics__num">Orders</th>
-                <th className="analytics__num">Customers</th>
-                <th className="analytics__num">Avg check</th>
-                <th className="analytics__num">New</th>
-                <th className="analytics__num">Returning</th>
-                <th className="analytics__num">Active days</th>
-                <th>Last purchase</th>
-                <th aria-label="Open" />
-              </tr>
-            </thead>
-            <tbody>
-              {branches.map((b) => (
-                <tr className={b.branchId === selectedId ? 'bi__row--selected' : undefined} key={b.branchId}>
-                  <td className="bi__name">
-                    {b.branchName}
-                    {!b.isActive && <span className="growth__badge bi__badge">Inactive</span>}
-                  </td>
-                  <td className="analytics__num">{formatSom(b.revenueMinor)}</td>
-                  <td className="analytics__num">{percent(b.revenueSharePercent)}</td>
-                  <td className="analytics__num">{number(b.orders)}</td>
-                  <td className="analytics__num">{number(b.customers)}</td>
-                  <td className="analytics__num">{formatSom(b.averageOrderMinor)}</td>
-                  <td className="analytics__num">{number(b.newCustomers)}</td>
-                  <td className="analytics__num">{number(b.returningCustomers)}</td>
-                  <td className="analytics__num">{number(b.activeDays)}</td>
-                  <td>{b.lastPurchaseAt ? formatDate(b.lastPurchaseAt) : '—'}</td>
-                  <td>
-                    <button className="bi__open" disabled={b.branchId === selectedId} onClick={() => onSelect(b.branchId)} type="button">
-                      {b.branchId === selectedId ? 'Selected' : 'Details'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          boxed
+          columns={[
+            {
+              key: 'name',
+              header: 'Branch',
+              cell: (b) => (
+                <span className="block max-w-[240px] [overflow-wrap:anywhere]">
+                  {b.branchName}
+                  {!b.isActive && <span className="ml-2 inline-block rounded-full bg-[#efe9df] px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap">Inactive</span>}
+                </span>
+              ),
+            },
+            { key: 'revenue', header: 'Revenue', numeric: true, cell: (b) => formatSom(b.revenueMinor) },
+            { key: 'share', header: 'Share', numeric: true, low: true, cell: (b) => percent(b.revenueSharePercent) },
+            { key: 'orders', header: 'Orders', numeric: true, cell: (b) => number(b.orders) },
+            { key: 'customers', header: 'Customers', numeric: true, cell: (b) => number(b.customers) },
+            { key: 'avg', header: 'Avg check', numeric: true, low: true, cell: (b) => formatSom(b.averageOrderMinor) },
+            { key: 'new', header: 'New', numeric: true, low: true, cell: (b) => number(b.newCustomers) },
+            { key: 'returning', header: 'Returning', numeric: true, low: true, cell: (b) => number(b.returningCustomers) },
+            { key: 'activeDays', header: 'Active days', numeric: true, low: true, cell: (b) => number(b.activeDays) },
+            { key: 'last', header: 'Last purchase', low: true, cell: (b) => (b.lastPurchaseAt ? formatDate(b.lastPurchaseAt) : '—') },
+            {
+              key: 'actions',
+              header: '',
+              actions: true,
+              cell: (b) => (
+                <Button disabled={b.branchId === selectedId} onClick={() => onSelect(b.branchId)} size="sm" variant="secondary">
+                  {b.branchId === selectedId ? 'Selected' : 'Details'}
+                </Button>
+              ),
+            },
+          ]}
+          rowClassName={(b) => (b.branchId === selectedId ? 'bg-cream/45' : undefined)}
+          rowKey={(b) => b.branchId}
+          rows={branches}
+        />
       )}
-      <p className="analytics__note" style={{ marginBottom: 0 }}>
+      <p className="mt-4 mb-0 px-6 pb-5 text-[13px] leading-snug text-muted first:px-0 first:pb-0">
         Branches are listed by name. Share = the branch&apos;s part of the revenue of all branches with a mapped purchase. Inactive branches appear only when they had activity in the period.
       </p>
-    </section>
+    </SectionCard>
   );
 }
 
@@ -255,23 +244,21 @@ function AllBranchesNotes({ data }: { data: BranchIntelligenceOverview }) {
   const s = data.summary;
   return (
     <>
-      <div className="analytics__two">
-        <section className="analytics__panel" aria-label="Sales source">
-          <h2 className="analytics__h2">Sales source</h2>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <SectionCard aria-label="Sales source" title="Sales source">
           <Sources cup={s.sources.cup} pos={s.sources.pos} />
-        </section>
-        <section className="analytics__panel analytics__panel--cream" aria-label="Purchases without a branch">
-          <h2 className="analytics__h2">Not tied to a branch</h2>
-          <div className="analytics__split">
+        </SectionCard>
+        <SectionCard aria-label="Purchases without a branch" tone="cream" title="Not tied to a branch">
+          <div className="grid grid-cols-2 gap-4">
             <Figure label="Orders" value={number(s.unmapped.orders)} />
             <Figure label="Revenue" value={formatSom(s.unmapped.revenueMinor)} />
           </div>
-          <p className="analytics__note" style={{ marginBottom: 0 }}>
+          <p className="mt-4 mb-0 text-[13px] leading-snug text-muted">
             Purchases with no branch (for example a POS spot that is not mapped to a branch) count in the totals above, never in a branch row. {number(s.mapped.branchesWithActivity)} branches had activity in this period.
           </p>
-        </section>
+        </SectionCard>
       </div>
-      <p className="analytics__note">Choose a branch (or press Details in the table) for customer behavior, products, loyalty &amp; rewards, growth and the branch overview.</p>
+      <p className="text-[13px] leading-snug text-muted">Choose a branch (or press Details in the table) for customer behavior, products, loyalty &amp; rewards, growth and the branch overview.</p>
     </>
   );
 }
@@ -282,86 +269,79 @@ function Detail({ data, detail }: { data: BranchIntelligenceOverview; detail: Br
   const cb = detail.crossBranch;
   return (
     <>
-      <section className="analytics__panel" aria-label="Customer behavior">
-        <h2 className="analytics__h2">Customer behavior</h2>
-        <div className="analytics__two">
+      <SectionCard aria-label="Customer behavior" title="Customer behavior">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div>
-            <div className="analytics__split">
+            <div className="grid grid-cols-2 gap-4">
               <Figure label="New customers" value={number(detail.customers.new)} />
               <Figure label="Returning customers" value={number(detail.customers.returning)} />
             </div>
-            <p className="analytics__note">
+            <p className="my-4 text-[13px] leading-snug text-muted">
               {number(detail.customers.unique)} unique customers · returning rate {percent(detail.retention.returningRatePercent)}. New = first purchase ever happened here in this period.
               {differs && ` Analytics V1 counts ${number(v1.newCustomers)} new / ${number(v1.returningCustomers)} returning for the same period and branch (new = no sale anywhere before the period).`}
             </p>
-            <DayBars title="Customers per day" days={detail.customers.byDay} format={number} tone="black" />
+            <DayBars days={detail.customers.byDay} format={number} title="Customers per day" tone="black" />
           </div>
           <div>
-            <h3 className="bi__h3">Retention</h3>
-            <dl className="bi__facts">
-              <Fact label="Customers with 2+ purchases" value={number(detail.retention.customersWith2PlusPurchases)} hint={percent(detail.retention.repeatCustomerRatePercent)} />
+            <SubHeading>Retention</SubHeading>
+            <Facts>
+              <Fact hint={percent(detail.retention.repeatCustomerRatePercent)} label="Customers with 2+ purchases" value={number(detail.retention.customersWith2PlusPurchases)} />
               <Fact label="Customers with 3+ purchases" value={number(detail.retention.customersWith3PlusPurchases)} />
               <Fact label="Repeat purchases" value={number(detail.retention.repeatPurchases)} />
               <Fact label="Active days" value={`${number(detail.activity.activeDays)} of ${number(detail.activity.periodDays)}`} />
               <Fact label="Last purchase" value={detail.activity.lastPurchaseAt ? formatDate(detail.activity.lastPurchaseAt) : '—'} />
-            </dl>
-            <h3 className="bi__h3">Cross-branch purchasing</h3>
-            <dl className="bi__facts">
+            </Facts>
+            <SubHeading>Cross-branch purchasing</SubHeading>
+            <Facts>
               <Fact label="Purchased only at this branch" value={number(cb.purchasedOnlyHere)} />
               <Fact label="Purchased at 2+ branches" value={number(cb.purchasedAtTwoOrMoreBranches)} />
               <Fact label="Latest purchase was here" value={number(cb.latestPurchaseWasHere)} />
               <Fact label="Purchase here followed another branch" value={number(cb.purchaseDirectlyFollowedAnotherBranch)} />
-            </dl>
-            <p className="analytics__note" style={{ marginBottom: 0 }}>
-              Read from purchase records only — it does not say where a customer physically went.
-            </p>
+            </Facts>
+            <p className="mt-4 mb-0 text-[13px] leading-snug text-muted">Read from purchase records only — it does not say where a customer physically went.</p>
           </div>
         </div>
-      </section>
+      </SectionCard>
 
-      <section className="analytics__panel" aria-label="Product intelligence">
-        <h2 className="analytics__h2">Product intelligence</h2>
-        <div className="analytics__two">
-          <ProductTable title="Top by quantity" rows={detail.products.topByQuantity} />
-          <ProductTable title="Top by revenue" rows={detail.products.topByRevenue} />
+      <SectionCard aria-label="Product intelligence" title="Product intelligence">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <ProductTable rows={detail.products.topByQuantity} title="Top by quantity" />
+          <ProductTable rows={detail.products.topByRevenue} title="Top by revenue" />
         </div>
-        <div className="analytics__two" style={{ marginTop: 20 }}>
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div>
-            <h3 className="bi__h3">Categories</h3>
+            <SubHeading>Categories</SubHeading>
             {detail.products.categories.length === 0 ? (
-              <p className="analytics__empty">{EMPTY}</p>
+              <EmptyState text={EMPTY} title="No data" variant="inline" />
             ) : (
-              <div className="growth__bars">
+              <div className="flex flex-col gap-2.5">
                 {detail.products.categories.slice(0, 8).map((c) => (
-                  <div className="growth__bar-row bi__cat-row" key={c.name}>
-                    <span className="growth__bar-label bi__cat-label" title={c.name}>
+                  <div className="grid grid-cols-[minmax(70px,130px)_1fr_64px] items-center gap-2.5 text-sm" key={c.name}>
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap" title={c.name}>
                       {c.name}
                     </span>
-                    <span className="growth__bar-track">
-                      <span className="growth__bar-fill" style={{ width: `${Math.min(100, c.revenueSharePercent)}%` }} />
+                    <span className="h-3.5 overflow-hidden rounded-md bg-black/[0.06]">
+                      <span className="block h-full min-w-0.5 bg-black" style={{ width: `${Math.min(100, c.revenueSharePercent)}%` }} />
                     </span>
-                    <span className="growth__bar-num">{percent(c.revenueSharePercent)}</span>
+                    <span className="text-right whitespace-nowrap tabular-nums text-muted">{percent(c.revenueSharePercent)}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
           <div>
-            <h3 className="bi__h3">CUP orders vs POS purchases</h3>
+            <SubHeading>CUP orders vs POS purchases</SubHeading>
             <Sources cup={detail.sources.cup} pos={detail.sources.pos} />
           </div>
         </div>
-        <p className="analytics__note" style={{ marginBottom: 0 }}>
-          From stored order and imported POS lines only (Poster is never called). Lines without a mapped product are not counted.
-        </p>
-      </section>
+        <p className="mt-4 mb-0 text-[13px] leading-snug text-muted">From stored order and imported POS lines only (Poster is never called). Lines without a mapped product are not counted.</p>
+      </SectionCard>
 
-      <section className="analytics__panel" aria-label="Loyalty and rewards">
-        <h2 className="analytics__h2">Loyalty &amp; rewards</h2>
-        <div className="analytics__two">
+      <SectionCard aria-label="Loyalty and rewards" title="Loyalty &amp; rewards">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div>
-            <h3 className="bi__h3">Loyalty</h3>
-            <dl className="bi__facts">
+            <SubHeading>Loyalty</SubHeading>
+            <Facts>
               <Fact label="Customers with a loyalty account" value={number(detail.loyalty.customersWithLoyaltyAccount)} />
               <Fact label="Loyalty 2.0 members (purchased here)" value={number(detail.loyalty.loyalty2.members)} />
               <Fact label="Purchases accrued (Loyalty 2.0)" value={number(detail.loyalty.loyalty2.purchasesAccrued)} />
@@ -369,55 +349,52 @@ function Detail({ data, detail }: { data: BranchIntelligenceOverview; detail: Br
               <Fact label="Cashback earned" value={formatSom(detail.loyalty.loyalty2.cashbackEarnedMinor)} />
               <Fact label="Points earned on orders here" value={number(detail.loyalty.pointsLedger.attributed.earned)} />
               <Fact label="Points spent on orders here" value={number(detail.loyalty.pointsLedger.attributed.spent)} />
-            </dl>
-            <p className="analytics__note" style={{ marginBottom: 0 }}>
+            </Facts>
+            <p className="mt-4 mb-0 text-[13px] leading-snug text-muted">
               Points with no order behind them ({number(detail.loyalty.pointsLedger.unattributed.rows)} entries, {number(detail.loyalty.pointsLedger.unattributed.earned)} earned / {number(detail.loyalty.pointsLedger.unattributed.spent)} spent, all branches) are not assigned to any branch.
             </p>
           </div>
           <div>
-            <h3 className="bi__h3">Rewards</h3>
-            <dl className="bi__facts">
-              <Fact label="Customers with a reward available" value={number(detail.rewards.customersWithRewardAvailable)} hint="customer-level, today" />
+            <SubHeading>Rewards</SubHeading>
+            <Facts>
+              <Fact hint="customer-level, today" label="Customers with a reward available" value={number(detail.rewards.customersWithRewardAvailable)} />
               <Fact label="Rewards available" value={number(detail.rewards.rewardsAvailable)} />
               <Fact label="Redeemed at this branch" value={number(detail.rewards.redemptionsAtBranch)} />
               <Fact label="Redemptions with no order (all branches)" value={number(detail.rewards.unattributedRedemptions)} />
-            </dl>
+            </Facts>
             <NamedCounts rows={detail.rewards.redemptionsByProgram} />
-            <h3 className="bi__h3">Promotions</h3>
-            <dl className="bi__facts">
+            <SubHeading>Promotions</SubHeading>
+            <Facts>
               <Fact label="Promotion redemptions here" value={number(detail.promotions.redemptionsAtBranch)} />
               <Fact label="Redemptions with no order (all branches)" value={number(detail.promotions.unattributedRedemptions)} />
-            </dl>
+            </Facts>
             <NamedCounts rows={detail.promotions.redemptionsByPromotion} />
-            <h3 className="bi__h3">Referrals</h3>
-            <dl className="bi__facts">
+            <SubHeading>Referrals</SubHeading>
+            <Facts>
               <Fact label="Qualified through a purchase here" value={number(detail.referrals.qualifiedAtBranch)} />
               <Fact label="Of which rewarded" value={number(detail.referrals.rewardedAtBranch)} />
               <Fact label="Qualified elsewhere / unattributed" value={number(detail.referrals.qualifiedElsewhereOrUnattributed)} />
-            </dl>
+            </Facts>
           </div>
         </div>
-      </section>
+      </SectionCard>
 
       <GrowthBlock growth={detail.growth} />
 
-      <section className="analytics__panel analytics__panel--cream" aria-label="Branch overview">
-        <h2 className="analytics__h2">Branch overview — {data.branch?.name}</h2>
-        <div className="bi__snapshot">
+      <SectionCard aria-label="Branch overview" tone="cream" title={`Branch overview — ${data.branch?.name}`}>
+        <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-[18px] sm:grid-cols-3">
           <Figure label="Revenue" value={formatSom(detail.overview.revenueMinor)} />
           <Figure label="Orders" value={number(detail.overview.orders)} />
           <Figure label="Customers" value={number(detail.overview.customers)} />
           <Figure label="Average check" value={formatSom(detail.overview.averageOrderMinor)} />
           <Figure label="Returning rate" value={percent(detail.overview.returningRatePercent)} />
           <Figure label="CUP / POS revenue" value={`${percent(detail.overview.cupRevenueSharePercent)} / ${percent(detail.overview.posRevenueSharePercent)}`} />
-          <Figure label="Top category" value={detail.overview.topCategory ? detail.overview.topCategory.name : '—'} small />
-          <Figure label="Top product" value={detail.overview.topProduct ? detail.overview.topProduct.name : '—'} small />
+          <Figure label="Top category" small value={detail.overview.topCategory ? detail.overview.topCategory.name : '—'} />
+          <Figure label="Top product" small value={detail.overview.topProduct ? detail.overview.topProduct.name : '—'} />
           <Figure label="Growth opportunities" value={number(detail.overview.opportunityCount)} />
         </div>
-        <p className="analytics__note" style={{ marginBottom: 0 }}>
-          A factual snapshot of the figures above — not a score or a rating.
-        </p>
-      </section>
+        <p className="mb-0 text-[13px] leading-snug text-muted">A factual snapshot of the figures above — not a score or a rating.</p>
+      </SectionCard>
     </>
   );
 }
@@ -426,28 +403,27 @@ function Detail({ data, detail }: { data: BranchIntelligenceOverview; detail: Br
 function GrowthBlock({ growth }: { growth: BranchDetail['growth'] }) {
   const total = growth.lifecycle.total;
   return (
-    <section className="analytics__panel" aria-label="Growth intelligence">
-      <h2 className="analytics__h2">Growth intelligence</h2>
-      <p className="analytics__note" style={{ marginTop: 0 }}>
+    <SectionCard aria-label="Growth intelligence" title="Growth intelligence">
+      <p className="mt-0 text-[13px] leading-snug text-muted">
         As of {formatDate(growth.asOf)}, last {number(growth.lookbackDays)} days — customers of this branch by the same rules and thresholds as Growth Intelligence. It does not follow the period filter.
       </p>
-      <div className="analytics__two">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div>
-          <h3 className="bi__h3">Lifecycle</h3>
+          <SubHeading>Lifecycle</SubHeading>
           {total === 0 ? (
-            <p className="analytics__empty">{EMPTY}</p>
+            <EmptyState text={EMPTY} title="No data" variant="inline" />
           ) : (
-            <div className="growth__bars">
+            <div className="flex flex-col gap-2.5">
               {LIFECYCLE_STATES.map((s) => {
                 const n = growth.lifecycle.counts[s];
                 const pct = total > 0 ? (n / total) * 100 : 0;
                 return (
-                  <div className="growth__bar-row" key={s}>
-                    <span className="growth__bar-label">{LIFECYCLE_LABELS[s]}</span>
-                    <span className="growth__bar-track">
-                      <span className={`growth__bar-fill growth__bar-fill--${s.toLowerCase()}`} style={{ width: `${pct}%` }} />
+                  <div className="grid grid-cols-[76px_1fr_92px] items-center gap-2.5 text-sm max-[760px]:grid-cols-[62px_1fr_80px]" key={s}>
+                    <span className="truncate">{LIFECYCLE_LABELS[s]}</span>
+                    <span className="h-3.5 overflow-hidden rounded-md bg-black/[0.06]">
+                      <span className={cx('block h-full min-w-0.5', LIFECYCLE_FILL[s])} style={{ width: `${pct}%` }} />
                     </span>
-                    <span className="growth__bar-num">
+                    <span className="text-right whitespace-nowrap tabular-nums text-muted">
                       {number(n)} · {Math.round(pct)}%
                     </span>
                   </div>
@@ -457,97 +433,67 @@ function GrowthBlock({ growth }: { growth: BranchDetail['growth'] }) {
           )}
         </div>
         <div>
-          <h3 className="bi__h3">RFM</h3>
+          <SubHeading>RFM</SubHeading>
           <RfmMatrix matrix={growth.rfm.matrix} />
-          {growth.rfm.topScores.length > 0 && (
-            <p className="analytics__note" style={{ marginBottom: 0 }}>
-              Most common scores: {growth.rfm.topScores.map((t) => `${t.score} (${number(t.customers)})`).join(' · ')}
-            </p>
-          )}
+          {growth.rfm.topScores.length > 0 && <p className="mt-4 mb-0 text-[13px] leading-snug text-muted">Most common scores: {growth.rfm.topScores.map((t) => `${t.score} (${number(t.customers)})`).join(' · ')}</p>}
         </div>
       </div>
-      <h3 className="bi__h3">Signals</h3>
-      <div className="growth__chips">
+      <SubHeading>Signals</SubHeading>
+      <div className="mb-3.5 flex flex-wrap gap-2">
         {SIGNAL_TYPES.map((t) => (
-          <span className="growth__chip" key={t}>
+          <span className="rounded-full border border-line bg-white px-3 py-1 text-[13px]" key={t}>
             {SIGNAL_LABELS[t]} <strong>{number(growth.signals[t])}</strong>
           </span>
         ))}
       </div>
-      <h3 className="bi__h3">Opportunities</h3>
-      <div className="c360__scroll">
-        <table className="analytics__table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th className="analytics__num">Customers</th>
-              <th className="analytics__num">High</th>
-              <th className="analytics__num">Medium</th>
-              <th className="analytics__num">Low</th>
-            </tr>
-          </thead>
-          <tbody>
-            {OPPORTUNITY_TYPES.map((t) => {
-              const c = growth.opportunities.counts[t];
-              return (
-                <tr key={t}>
-                  <td>{OPPORTUNITY_LABELS[t]}</td>
-                  <td className="analytics__num">{number(c.total)}</td>
-                  <td className="analytics__num">{number(c.HIGH)}</td>
-                  <td className="analytics__num">{number(c.MEDIUM)}</td>
-                  <td className="analytics__num">{number(c.LOW)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <SubHeading>Opportunities</SubHeading>
+      <DataTable
+        boxed
+        columns={[
+          { key: 'type', header: 'Type', cell: (t: (typeof OPPORTUNITY_TYPES)[number]) => OPPORTUNITY_LABELS[t] },
+          { key: 'total', header: 'Customers', numeric: true, cell: (t) => number(growth.opportunities.counts[t].total) },
+          { key: 'high', header: 'High', numeric: true, low: true, cell: (t) => number(growth.opportunities.counts[t].HIGH) },
+          { key: 'medium', header: 'Medium', numeric: true, low: true, cell: (t) => number(growth.opportunities.counts[t].MEDIUM) },
+          { key: 'low', header: 'Low', numeric: true, low: true, cell: (t) => number(growth.opportunities.counts[t].LOW) },
+        ]}
+        rowKey={(t) => t}
+        rows={[...OPPORTUNITY_TYPES]}
+      />
       {growth.opportunities.top.length > 0 && (
-        <div className="c360__scroll" style={{ marginTop: 16 }}>
-          <table className="analytics__table">
-            <thead>
-              <tr>
-                <th>Priority</th>
-                <th>Opportunity</th>
-                <th>Customer</th>
-                <th>Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {growth.opportunities.top.map((o, i) => (
-                <tr key={i}>
-                  <td>
-                    <span className={PRIORITY_CLASS[o.priority]}>{o.priority}</span>
-                  </td>
-                  <td>{OPPORTUNITY_LABELS[o.type]}</td>
-                  <td>{o.customer.displayName ?? '—'}</td>
-                  <td>{o.reason}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-4">
+          <DataTable
+            boxed
+            columns={[
+              { key: 'priority', header: 'Priority', cell: (o) => <span className={cx('inline-block rounded-md border px-2 py-0.5 text-[11px] font-bold tracking-[0.08em]', PRIORITY_TONE[o.priority])}>{o.priority}</span> },
+              { key: 'opportunity', header: 'Opportunity', cell: (o) => OPPORTUNITY_LABELS[o.type] },
+              { key: 'customer', header: 'Customer', cell: (o) => o.customer.displayName ?? '—' },
+              { key: 'reason', header: 'Reason', cell: (o) => o.reason },
+            ]}
+            rowKey={(o, i) => `${o.customer.displayName ?? 'row'}-${i}`}
+            rows={growth.opportunities.top}
+          />
         </div>
       )}
-      <p className="analytics__note" style={{ marginBottom: 0 }}>
-        Suggestions for existing Segments and CRM Automations; nothing is sent from here.
-      </p>
-    </section>
+      <p className="mt-4 mb-0 text-[13px] leading-snug text-muted">Suggestions for existing Segments and CRM Automations; nothing is sent from here.</p>
+    </SectionCard>
   );
 }
 
 function Sources({ cup, pos }: { cup: SourceSlice; pos: SourceSlice }) {
   const row = (label: string, s: SourceSlice) => (
-    <div className="analytics__source">
-      <div className="analytics__label">{label}</div>
-      <div className="analytics__source-value">{number(s.orders)}</div>
-      <div className="analytics__hint">
+    <div>
+      <div className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">{label}</div>
+      <div className="font-display text-4xl leading-none" style={{ margin: '8px 0 4px' }}>
+        {number(s.orders)}
+      </div>
+      <div className="text-[13px] font-medium text-muted">
         {formatSom(s.revenueMinor)} · {percent(s.revenueSharePercent)} of revenue
       </div>
-      <div className="analytics__hint">{number(s.customers)} customers</div>
+      <div className="text-[13px] font-medium text-muted">{number(s.customers)} customers</div>
     </div>
   );
   return (
-    <div className="analytics__sources">
+    <div className="grid grid-cols-2 gap-4">
       {row('CUP orders', cup)}
       {row('POS purchases', pos)}
     </div>
@@ -557,33 +503,29 @@ function Sources({ cup, pos }: { cup: SourceSlice; pos: SourceSlice }) {
 function ProductTable({ title, rows }: { title: string; rows: ProductLine[] }) {
   return (
     <div>
-      <h3 className="bi__h3">{title}</h3>
+      <SubHeading>{title}</SubHeading>
       {rows.length === 0 ? (
-        <p className="analytics__empty">{EMPTY}</p>
+        <EmptyState text={EMPTY} title="No data" variant="inline" />
       ) : (
-        <div className="c360__scroll">
-          <table className="analytics__table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th className="analytics__num">Qty</th>
-                <th className="analytics__num">Revenue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
-                <tr key={`${p.name}-${p.category}`}>
-                  <td className="bi__name">
-                    {p.name}
-                    <span className="analytics__hint bi__sub">{p.category}</span>
-                  </td>
-                  <td className="analytics__num">{number(p.quantity)}</td>
-                  <td className="analytics__num">{formatSom(p.revenueMinor)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          boxed
+          columns={[
+            {
+              key: 'product',
+              header: 'Product',
+              cell: (p) => (
+                <span className="block max-w-[240px] [overflow-wrap:anywhere]">
+                  {p.name}
+                  <span className="block text-xs font-medium text-muted">{p.category}</span>
+                </span>
+              ),
+            },
+            { key: 'qty', header: 'Qty', numeric: true, cell: (p) => number(p.quantity) },
+            { key: 'revenue', header: 'Revenue', numeric: true, cell: (p) => formatSom(p.revenueMinor) },
+          ]}
+          rowKey={(p) => `${p.name}-${p.category}`}
+          rows={rows}
+        />
       )}
     </div>
   );
@@ -592,10 +534,10 @@ function ProductTable({ title, rows }: { title: string; rows: ProductLine[] }) {
 function NamedCounts({ rows }: { rows: { name: string; count: number }[] }) {
   if (rows.length === 0) return null;
   return (
-    <ul className="bi__list">
+    <ul className="mt-2 flex list-none flex-col gap-1 p-0 text-[13px]">
       {rows.map((r) => (
-        <li key={r.name}>
-          <span className="bi__name">{r.name}</span>
+        <li className="flex justify-between gap-3" key={r.name}>
+          <span className="block max-w-[240px] [overflow-wrap:anywhere]">{r.name}</span>
           <strong>{number(r.count)}</strong>
         </li>
       ))}
@@ -605,20 +547,30 @@ function NamedCounts({ rows }: { rows: { name: string; count: number }[] }) {
 
 function Figure({ label, value, small }: { label: string; value: string; small?: boolean }) {
   return (
-    <div className="bi__figure">
-      <div className="analytics__label">{label}</div>
-      <div className={small ? 'bi__figure-value bi__figure-value--small' : 'analytics__big bi__figure-value'}>{value}</div>
+    <div className="min-w-0">
+      <div className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">{label}</div>
+      <div className={cx('[overflow-wrap:anywhere]', small ? 'my-2 font-display text-xl leading-tight' : 'font-display text-[30px] leading-none')} style={small ? undefined : { margin: '8px 0 4px' }}>
+        {value}
+      </div>
     </div>
   );
 }
 
+function SubHeading({ children }: { children: React.ReactNode }) {
+  return <h3 className="mt-[18px] mb-2 text-xs font-bold tracking-[0.14em] text-muted uppercase">{children}</h3>;
+}
+
+function Facts({ children }: { children: React.ReactNode }) {
+  return <dl className="m-0 flex flex-col">{children}</dl>;
+}
+
 function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="bi__fact">
-      <dt>{label}</dt>
-      <dd>
+    <div className="flex justify-between gap-4 border-b border-line py-2 text-sm">
+      <dt className="min-w-0 text-black [overflow-wrap:anywhere]">{label}</dt>
+      <dd className="m-0 text-right font-semibold tabular-nums">
         {value}
-        {hint && <span className="analytics__hint"> · {hint}</span>}
+        {hint && <span className="text-[13px] font-medium text-muted"> · {hint}</span>}
       </dd>
     </div>
   );
@@ -638,15 +590,15 @@ function Definitions({ definitions }: { definitions: Record<string, string> }) {
     ['loyaltyAttribution', 'Loyalty, rewards, promotions'],
   ];
   return (
-    <details className="analytics__panel bi__defs">
-      <summary className="analytics__h2 bi__defs-summary">Definitions</summary>
-      <dl className="bi__def-list">
+    <details className="min-w-0 rounded-lg border border-line bg-white px-6 py-4 [&_summary]:pt-0 [&_summary]:pb-0">
+      <summary className="cursor-pointer font-display text-lg leading-tight font-medium text-black">Definitions</summary>
+      <dl className="mt-3 flex flex-col gap-3 text-[13px]">
         {labels
           .filter(([key]) => definitions[key])
           .map(([key, label]) => (
             <div key={key}>
-              <dt>{label}</dt>
-              <dd>{definitions[key]}</dd>
+              <dt className="font-bold">{label}</dt>
+              <dd className="mt-0.5 text-muted">{definitions[key]}</dd>
             </div>
           ))}
       </dl>
@@ -663,41 +615,27 @@ function DayBars({ title, days, format, tone }: { title: string; days: DayValue[
   const gap = days.length > 45 ? 1 : 4;
   const barWidth = Math.max(2, (width - gap * (days.length - 1)) / Math.max(1, days.length));
   return (
-    <div className="bi__chart">
-      <div className="bi__chart-head">
-        <span className="analytics__label">{title}</span>
-        <span className="analytics__hint">Total {format(total)}</span>
+    <div>
+      <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-3">
+        <span className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">{title}</span>
+        <span className="text-[13px] font-medium text-muted">Total {format(total)}</span>
       </div>
-      <svg className="analytics__chart bi__svg" role="img" aria-label={`${title} by day`} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        <line className="bi__baseline" x1="0" x2={width} y1={height - 0.5} y2={height - 0.5} />
+      <svg aria-label={`${title} by day`} className="h-[150px] w-full" preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`}>
+        <line stroke="var(--color-line-strong)" strokeWidth={1} x1="0" x2={width} y1={height - 0.5} y2={height - 0.5} />
         {days.map((d, i) => {
           const h = d.value === 0 || max === 0 ? 0 : Math.max(2, (d.value / max) * (height - 8));
           return (
-            <rect key={d.date} className={`bi__bar bi__bar--${tone}`} x={i * (barWidth + gap)} y={height - h} width={barWidth} height={h}>
+            <rect className={tone === 'terracotta' ? 'fill-terracotta' : 'fill-black'} height={h} key={d.date} width={barWidth} x={i * (barWidth + gap)} y={height - h}>
               <title>{`${d.date}: ${format(d.value)}`}</title>
             </rect>
           );
         })}
       </svg>
-      <div className="analytics__axis">
+      <div className="mt-1 flex justify-between text-xs text-muted">
         <span>{days[0]?.date}</span>
         {max === 0 && <span>No purchases in this period</span>}
         <span>{days[days.length - 1]?.date}</span>
       </div>
-    </div>
-  );
-}
-
-function Skeleton() {
-  return (
-    <div className="analytics__body" aria-busy="true">
-      <section className="analytics__kpis bi__kpis">
-        {[0, 1, 2, 3, 4, 5].map((n) => (
-          <div className="analytics__kpi analytics__skeleton" key={n} style={{ height: 88 }} />
-        ))}
-      </section>
-      <div className="analytics__panel analytics__skeleton" style={{ height: 240 }} />
-      <div className="analytics__panel analytics__skeleton" style={{ height: 200 }} />
     </div>
   );
 }
