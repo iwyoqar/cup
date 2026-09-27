@@ -169,6 +169,23 @@ export const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  // POS_SUBSCRIPTION_CASH_SALE_ENABLED gates POST /pos-widget/subscriptions/purchase-cash — its own independent interlock, same shape as the
+  // redemption flag above. It makes NO Poster mutation (a cash sale is a CUP financial event only, never a Poster transaction line — see
+  // docs/SUBSCRIPTIONS.md), so it carries none of that flag's Poster-mutation risk; it is still off by default because it activates a subscription
+  // and records real revenue.
+  POS_SUBSCRIPTION_CASH_SALE_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  // POS_SUBSCRIPTION_POSTER_PURCHASE_ENABLED gates POST /pos-widget/subscriptions/purchase-poster-order and .../check-payment — its own
+  // independent interlock, same shape as the two flags above. Unlike the redemption flag, this reuses addTransactionProduct at a REAL,
+  // non-zero price (never live-verified — the redemption/reward mechanism was only ever verified at price 0, and no order carrying an
+  // API-added line has ever been observed actually closing/getting paid in this project). Turn on only after a supervised live test on a
+  // disposable low-value real order, mirroring how POS_REWARD_REDEMPTION_ENABLED was rolled out.
+  POS_SUBSCRIPTION_POSTER_PURCHASE_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   SUBSCRIPTION_EXPIRY_INTERVAL_MS: z.coerce.number().int().min(60_000).default(15 * 60_000),
 });
 

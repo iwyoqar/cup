@@ -107,6 +107,24 @@ export class PosterImportRepository {
     });
   }
 
+  // Coffee Subscription — real Poster order purchase: every PENDING_PAYMENT purchase whose line-add already resolved a Poster transaction id
+  // in this batch. Read-only lookup; PosterTransactionImportService (not this repository) decides whether the receipt actually proves payment
+  // and, if so, calls SubscriptionsService.confirmPaid — the same domain method the on-demand widget check uses, so the non-overlapping-period
+  // and idempotency guarantees are never duplicated here.
+  async findPendingSubscriptionPurchasesForTransactions(posterTransactionIds: string[]): Promise<Map<string, { purchaseId: string; posterProductId: string; amountMinor: number }>> {
+    const map = new Map<string, { purchaseId: string; posterProductId: string; amountMinor: number }>();
+    if (posterTransactionIds.length === 0) return map;
+    const rows = await this.prisma.subscriptionPurchase.findMany({
+      where: { status: 'PAYMENT_PENDING', posterTransactionId: { in: posterTransactionIds } },
+      select: { id: true, posterTransactionId: true, amountMinor: true, subscription: { select: { posterProductId: true } } },
+    });
+    for (const r of rows) {
+      if (!r.posterTransactionId || !r.subscription.posterProductId) continue; // defensive: both are set together at line-add time
+      map.set(r.posterTransactionId, { purchaseId: r.id, posterProductId: r.subscription.posterProductId, amountMinor: r.amountMinor });
+    }
+    return map;
+  }
+
   async findKnownLinkedTransactionIds(posterTransactionIds: string[]): Promise<Set<string>> {
     const rows = await this.prisma.posterIncomingOrderLink.findMany({ where: { posterTransactionId: { in: posterTransactionIds } }, select: { posterTransactionId: true } });
     return new Set(rows.map((r) => r.posterTransactionId));

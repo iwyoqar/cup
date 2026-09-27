@@ -20,6 +20,15 @@ import {
   selectSubscriptionProduct,
   startSubscriptionRedeem,
   subscriptionTarget,
+  cancelCashSale,
+  closeCashSale,
+  confirmCashSale,
+  startCashSale,
+  cancelPosterPurchase,
+  checkPosterPurchasePayment,
+  closePosterPurchase,
+  confirmPosterPurchase,
+  startPosterPurchase,
 } from './store';
 import type { Phase } from './store';
 import { cx } from './cx';
@@ -75,6 +84,10 @@ export function App() {
         {w.phase === 'ERROR' && w.error && <ErrorView kind={w.error} />}
         {w.phase === 'READY' && w.overview && w.subscriptionRedemption.phase !== 'idle' ? (
           <SubscriptionRedemptionFlow overview={w.overview} />
+        ) : w.phase === 'READY' && w.overview && w.cashSale.phase !== 'idle' ? (
+          <CashSaleFlow overview={w.overview} />
+        ) : w.phase === 'READY' && w.overview && w.posterPurchase.phase !== 'idle' ? (
+          <PosterPurchaseFlow overview={w.overview} />
         ) : w.phase === 'READY' && w.overview && w.redemption.phase !== 'idle' ? (
           <RedemptionFlow />
         ) : w.phase === 'READY' && w.overview && w.promotionRedemption.phase !== 'idle' ? (
@@ -712,6 +725,60 @@ function subscriptionReasonText(reason: string | null, s: SubscriptionSummary): 
   }
 }
 
+// Coffee Subscription cash sale — the plan list shown when the customer has nothing usable to redeem, or (below the active card) to pre-sell a
+// renewal. Never shown at all when the feature is off or no plan is configured — the same guard the redemption button already applies to itself.
+function SubscriptionCashSalePanel({ summary }: { summary: SubscriptionSummary }) {
+  if (!summary.cashSale.enabled || summary.plans.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className={LABEL}>{summary.current ? 'Yangi obuna sotish (naqd)' : 'Coffee abonement sotish'}</div>
+      {summary.plans.map((p) => (
+        <button className={cx(BTN_GHOST, 'flex items-center justify-between gap-2 text-left')} key={p.id} onClick={() => startCashSale(p)} type="button">
+          <span className="flex flex-col">
+            <span className="text-[15px] font-semibold">{p.name}</span>
+            <span className="text-[12px] text-muted">
+              {p.durationDays} kun · {p.totalPortions} porsiya
+            </span>
+          </span>
+          <span className="flex flex-col items-end shrink-0">
+            <span className="text-[15px] font-bold whitespace-nowrap">{formatSom(p.priceMinor)}</span>
+            <span className="text-[11px] font-bold whitespace-nowrap text-terracotta-deep">Naqdga sotish</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Coffee Subscription real Poster order purchase — the plan list, shown next to the cash-sale panel. A plan with no (or no longer active)
+// Poster product mapping is still listed, per its own required message, rather than silently hidden (an admin can fix the mapping without
+// the cashier wondering why a plan disappeared). Needs a real open order (subscriptionTarget()) — this feature adds a line to an order.
+function SubscriptionPosterPurchasePanel({ summary }: { summary: SubscriptionSummary }) {
+  if (!summary.posterPurchase.enabled || summary.plans.length === 0) return null;
+  const target = subscriptionTarget();
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className={LABEL}>Poster orqali sotish</div>
+      {!target && <p className="m-0 text-[12px] text-muted">Avval Poster buyurtmasini oching.</p>}
+      {summary.plans.map((p) => {
+        const mapped = !!p.posterProduct && p.posterProduct.isActive;
+        return (
+          <button className={cx(BTN_GHOST, 'flex items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-45')} disabled={!mapped || !target} key={p.id} onClick={() => startPosterPurchase(p)} type="button">
+            <span className="flex flex-col">
+              <span className="text-[15px] font-semibold">{p.name}</span>
+              <span className="text-[12px] text-muted">{mapped ? `${p.durationDays} kun · ${p.totalPortions} porsiya` : 'Bu abonement mahsuloti Poster‘da mavjud emas yoki faol emas.'}</span>
+            </span>
+            <span className="flex shrink-0 flex-col items-end">
+              <span className="text-[15px] font-bold whitespace-nowrap">{formatSom(p.priceMinor)}</span>
+              {mapped && <span className="text-[11px] font-bold whitespace-nowrap text-terracotta-deep">Poster orqali sotish</span>}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function SubscriptionCard({ summary }: { summary: SubscriptionSummary | null }) {
   const w = useWidget();
   if (!summary) return null;
@@ -719,9 +786,13 @@ function SubscriptionCard({ summary }: { summary: SubscriptionSummary | null }) 
   if (!c) {
     const reason = subscriptionReasonText(summary.blockedReason, summary);
     return (
-      <div className="rounded-xl border border-line bg-white px-3.5 py-3">
-        <div className={LABEL}>Coffee abonement</div>
-        <div className="text-[14px] text-muted [overflow-wrap:anywhere]">{reason}</div>
+      <div className="flex flex-col gap-2.5">
+        <div className="rounded-xl border border-line bg-white px-3.5 py-3">
+          <div className={LABEL}>Coffee abonement</div>
+          <div className="text-[14px] text-muted [overflow-wrap:anywhere]">{reason}</div>
+        </div>
+        <SubscriptionCashSalePanel summary={summary} />
+        <SubscriptionPosterPurchasePanel summary={summary} />
       </div>
     );
   }
@@ -741,26 +812,30 @@ function SubscriptionCard({ summary }: { summary: SubscriptionSummary | null }) 
               : subscriptionReasonText(summary.products[0]?.reason ?? null, summary)
             : null;
   return (
-    <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
-      <div className="flex items-baseline justify-between gap-2">
-        <div className={LABEL}>Coffee abonement</div>
-        <span className="rounded-full bg-black px-2 py-px text-[11px] font-bold text-cream">{c.status === 'ACTIVE' ? 'FAOL' : c.status}</span>
+    <div className="flex flex-col gap-2.5">
+      <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className={LABEL}>Coffee abonement</div>
+          <span className="rounded-full bg-black px-2 py-px text-[11px] font-bold text-cream">{c.status === 'ACTIVE' ? 'FAOL' : c.status}</span>
+        </div>
+        <div className="mt-1 text-[22px] font-bold">{c.planName}</div>
+        <div className="mt-2 grid grid-cols-2 gap-x-3.5 gap-y-2">
+          <Fact label="Qolgan porsiya" value={`${c.remainingPortions} / ${c.totalPortions}`} />
+          <Fact label="Bugun" value={`${c.todayUsedPortions} / ${c.dailyPortionLimit}`} />
+          <Fact label="Oxirgi kofe" value={timeText(c.lastRedemptionAt)} />
+          <Fact label="Keyingisi" value={c.nextAvailableAt ? timeText(c.nextAvailableAt) : 'Hozir'} />
+          <Fact label="Muddati" value={dateText(c.endBusinessDate)} />
+          <Fact label="Kunlik qoldiq" value={`${c.todayRemainingPortions} porsiya`} />
+        </div>
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          <button className={BTN_PRIMARY} disabled={disabledReason !== null} onClick={startSubscriptionRedeem} type="button">
+            Obuna kofe olish
+          </button>
+          {disabledReason && <p className="m-0 text-[13px] font-semibold text-terracotta-deep">{disabledReason}</p>}
+        </div>
       </div>
-      <div className="mt-1 text-[22px] font-bold">{c.planName}</div>
-      <div className="mt-2 grid grid-cols-2 gap-x-3.5 gap-y-2">
-        <Fact label="Qolgan porsiya" value={`${c.remainingPortions} / ${c.totalPortions}`} />
-        <Fact label="Bugun" value={`${c.todayUsedPortions} / ${c.dailyPortionLimit}`} />
-        <Fact label="Oxirgi kofe" value={timeText(c.lastRedemptionAt)} />
-        <Fact label="Keyingisi" value={c.nextAvailableAt ? timeText(c.nextAvailableAt) : 'Hozir'} />
-        <Fact label="Muddati" value={dateText(c.endBusinessDate)} />
-        <Fact label="Kunlik qoldiq" value={`${c.todayRemainingPortions} porsiya`} />
-      </div>
-      <div className="mt-2.5 flex flex-col gap-1.5">
-        <button className={BTN_PRIMARY} disabled={disabledReason !== null} onClick={startSubscriptionRedeem} type="button">
-          Obuna kofe olish
-        </button>
-        {disabledReason && <p className="m-0 text-[13px] font-semibold text-terracotta-deep">{disabledReason}</p>}
-      </div>
+      <SubscriptionCashSalePanel summary={summary} />
+      <SubscriptionPosterPurchasePanel summary={summary} />
     </div>
   );
 }
@@ -895,6 +970,244 @@ function SubscriptionDone({ overview }: { overview: Overview }) {
   return (
     <div className="flex flex-col gap-2.5">
       <Notice tone="warn" title="Abonement kofesi berilmadi." hint={text ?? 'Buyurtma o‘zgartirilmadi.'} />
+      {close}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------- Coffee Subscription cash sale
+
+// Plain-words reasons for a REJECTED cash sale — a normal (not failure-of-the-request) outcome, same treatment as subscriptionReasonText above.
+const CASH_SALE_REJECTION_TEXT: Record<string, string> = {
+  PLAN_NOT_FOUND: 'Bu reja endi mavjud emas. Ro‘yxatni yangilash uchun mijoz kartasini qayta oching.',
+  PENDING_PURCHASE_EXISTS: 'Mijozning to‘lovi kutilayotgan boshqa obunasi bor. Avval uni admin panelda bekor qiling.',
+  CONFLICT: 'Holat o‘zgardi. Mijoz kartasini yangilab, qayta urinib ko‘ring.',
+};
+
+function CashSaleFlow({ overview }: { overview: Overview }) {
+  const w = useWidget();
+  const r = w.cashSale;
+  const summary = overview.subscription ?? null;
+  if (r.phase === 'applying') {
+    return (
+      <div className="flex flex-col gap-2.5" aria-busy="true">
+        <div className="rounded-xl border border-black bg-black px-3.5 py-3 text-white">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-cream uppercase">Coffee abonement</div>
+          <div className="my-1 text-[24px] leading-[1.15] font-semibold">Naqd to‘lov tasdiqlanmoqda…</div>
+        </div>
+        <div className="h-[52px] animate-cw-pulse rounded-xl bg-[#ece6da]" />
+      </div>
+    );
+  }
+  if (r.phase === 'done') return <CashSaleDone />;
+  if (r.phase === 'confirming' && r.selected) {
+    const p = r.selected;
+    const current = summary?.current ?? null;
+    return (
+      <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3">
+        <div className={LABEL}>Tasdiqlang</div>
+        <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{p.name}</div>
+        <div className="grid grid-cols-2 gap-x-3.5 gap-y-2">
+          <Fact label="Mijoz" value={overview.customer?.displayName ?? '—'} />
+          <Fact label="Narx" value={formatSom(p.priceMinor)} />
+          <Fact label="Muddat" value={`${p.durationDays} kun`} />
+          <Fact label="Porsiya" value={`${p.totalPortions}`} />
+          <Fact label="Kunlik limit" value={`${p.dailyPortionLimit}`} />
+          <Fact label="To‘lov" value="Naqd" />
+        </div>
+        {current && <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Joriy abonement {dateText(current.endBusinessDate)} da tugaydi — yangisi shundan keyin boshlanadi.</p>}
+        <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Naqd pul olinganini tasdiqlagandan so‘ng obunani bekor qilib bo‘lmaydi (pul qaytarilmaydi).</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button className={BTN_GHOST} onClick={cancelCashSale} type="button">
+            Bekor qilish
+          </button>
+          <button className={BTN_PRIMARY} onClick={confirmCashSale} type="button">
+            Naqd to‘lovni tasdiqlash
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Notice hint="Qaytadan tanlang." title="Reja tanlanmagan" tone="warn" />
+      <button className={BTN_GHOST} onClick={cancelCashSale} type="button">
+        Orqaga
+      </button>
+    </div>
+  );
+}
+
+function CashSaleDone() {
+  const r = useWidget().cashSale;
+  const close = (
+    <button className={BTN_PRIMARY} onClick={closeCashSale} type="button">
+      Yopish
+    </button>
+  );
+  if (r.transportError) {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <Notice tone="warn" title="So‘rovni yuborib bo‘lmadi." hint="Naqd pul olingan bo‘lsa, mijoz kartasini yangilab tekshiring — qayta bosishdan oldin." />
+        {close}
+      </div>
+    );
+  }
+  const res = r.result;
+  if (res?.status === 'ACTIVATED') {
+    const s = res.subscription;
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
+          <div className={LABEL}>✓ Abonement faollashtirildi</div>
+          <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{s.planName}</div>
+          <div className="grid grid-cols-2 gap-x-3.5 gap-y-2">
+            <Fact label="Porsiya" value={`${s.usage.remainingPortions} / ${s.usage.totalPortions}`} />
+            <Fact label="Amal qiladi" value={dateText(s.endBusinessDate)} />
+            <Fact label="Holat" value={s.effectiveStatus === 'SCHEDULED' ? 'Navbatda' : 'Faol'} />
+            <Fact label="To‘lov" value="Naqd" />
+          </div>
+          {s.effectiveStatus === 'SCHEDULED' && <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Boshlanadi: {dateText(s.startBusinessDate)}</p>}
+        </div>
+        {close}
+      </div>
+    );
+  }
+  const text = res?.status === 'REJECTED' ? (CASH_SALE_REJECTION_TEXT[res.reason] ?? res.reason) : null;
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Notice tone="warn" title="Abonement sotilmadi." hint={text ?? 'Naqd pul olingan bo‘lsa, admin bilan bog‘laning.'} />
+      {close}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------- Coffee Subscription real Poster order purchase
+
+const POSTER_PURCHASE_REJECTION_TEXT: Record<string, string> = {
+  PLAN_NOT_FOUND: 'Bu reja endi mavjud emas. Ro‘yxatni yangilash uchun mijoz kartasini qayta oching.',
+  PLAN_NOT_MAPPED: 'Bu abonement mahsuloti Poster‘da mavjud emas yoki faol emas.',
+  PENDING_PURCHASE_EXISTS: 'Mijozning to‘lovi kutilayotgan boshqa obunasi bor. Avval uni admin panelda bekor qiling.',
+  CONFLICT: 'Holat o‘zgardi. Mijoz kartasini yangilab, qayta urinib ko‘ring.',
+  ORDER_NOT_CONFIRMED: 'Ochiq buyurtmani tasdiqlab bo‘lmadi — buyurtma o‘zgartirilmadi.',
+  CLIENT_MISMATCH: 'Ochiq buyurtma boshqa mijozga tegishli.',
+  INVALID_CONTEXT: 'Kassa ma’lumoti aniqlanmadi.',
+  POSTER_MUTATION_FAILED: 'Poster mahsulotni qo‘shmadi — buyurtma o‘zgartirilmadi.',
+  POSTER_TRANSACTION_UNAVAILABLE: 'Ochiq buyurtmani tasdiqlab bo‘lmadi — buyurtma o‘zgartirilmadi.',
+  PURCHASE_NOT_FOUND: 'Xarid topilmadi.',
+  WRONG_ACCOUNT: 'Bu xarid boshqa kassaga tegishli.',
+};
+
+function PosterPurchaseFlow({ overview }: { overview: Overview }) {
+  const w = useWidget();
+  const r = w.posterPurchase;
+  if (r.phase === 'applying') {
+    return (
+      <div className="flex flex-col gap-2.5" aria-busy="true">
+        <div className="rounded-xl border border-black bg-black px-3.5 py-3 text-white">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-cream uppercase">Coffee abonement</div>
+          <div className="my-1 text-[24px] leading-[1.15] font-semibold">Buyurtmaga qo‘shilmoqda…</div>
+        </div>
+        <div className="h-[52px] animate-cw-pulse rounded-xl bg-[#ece6da]" />
+      </div>
+    );
+  }
+  if (r.phase === 'awaiting_payment' || r.phase === 'checking') {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
+          <div className={LABEL}>{r.selected?.name ?? 'Coffee abonement'}</div>
+          <div className="my-1 text-[22px] leading-[1.15] font-semibold">To‘lovni Poster orqali yakunlang</div>
+          <p className="m-0 text-[13px] text-muted-cream">
+            {r.selected ? formatSom(r.selected.priceMinor) : ''} — mijoz Poster kassasida to‘lasin. To‘lovni tasdiqlagandan so‘ng obuna faollashadi. Pul qaytarilmaydi.
+          </p>
+        </div>
+        <button className={BTN_PRIMARY} disabled={r.phase === 'checking'} onClick={checkPosterPurchasePayment} type="button">
+          {r.phase === 'checking' ? 'Tekshirilmoqda…' : 'To‘lovni tekshirish'}
+        </button>
+        <button className={BTN_GHOST} onClick={closePosterPurchase} type="button">
+          Yopish (kuzatishda qoladi)
+        </button>
+      </div>
+    );
+  }
+  if (r.phase === 'done') return <PosterPurchaseDone />;
+  if (r.phase === 'confirming' && r.selected) {
+    const p = r.selected;
+    const target = subscriptionTarget();
+    return (
+      <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3">
+        <div className={LABEL}>Tasdiqlang</div>
+        <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{p.name}</div>
+        <div className="grid grid-cols-2 gap-x-3.5 gap-y-2">
+          <Fact label="Mijoz" value={overview.customer?.displayName ?? '—'} />
+          <Fact label="Narx" value={formatSom(p.priceMinor)} />
+          <Fact label="Muddat" value={`${p.durationDays} kun`} />
+          <Fact label="Porsiya" value={`${p.totalPortions}`} />
+          <Fact label="To‘lov" value="Poster orqali" />
+        </div>
+        <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Mahsulot joriy Poster buyurtmasiga real narxda qo‘shiladi — mijoz uni Poster orqali to‘laydi.</p>
+        {!target && <p className="mx-0 mt-1 mb-0 text-[13px] font-semibold text-terracotta-deep">Avval Poster buyurtmasini oching.</p>}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button className={BTN_GHOST} onClick={cancelPosterPurchase} type="button">
+            Bekor qilish
+          </button>
+          <button className={BTN_PRIMARY} disabled={!target} onClick={confirmPosterPurchase} type="button">
+            Buyurtmaga qo‘shish
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Notice hint="Qaytadan tanlang." title="Reja tanlanmagan" tone="warn" />
+      <button className={BTN_GHOST} onClick={cancelPosterPurchase} type="button">
+        Orqaga
+      </button>
+    </div>
+  );
+}
+
+function PosterPurchaseDone() {
+  const r = useWidget().posterPurchase;
+  const close = (
+    <button className={BTN_PRIMARY} onClick={closePosterPurchase} type="button">
+      Yopish
+    </button>
+  );
+  if (r.transportError) {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <Notice tone="warn" title="So‘rovni yuborib bo‘lmadi." hint="Mijoz kartasini yangilab, holatni tekshiring — qayta bosishdan oldin." />
+        {close}
+      </div>
+    );
+  }
+  const res = r.result;
+  if (res?.status === 'ACTIVATED') {
+    const s = res.subscription;
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
+          <div className={LABEL}>✓ Abonement faollashtirildi</div>
+          <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{s.planName}</div>
+          <div className="grid grid-cols-2 gap-x-3.5 gap-y-2">
+            <Fact label="Porsiya" value={`${s.usage.remainingPortions} / ${s.usage.totalPortions}`} />
+            <Fact label="Amal qiladi" value={dateText(s.endBusinessDate)} />
+            <Fact label="Holat" value={s.effectiveStatus === 'SCHEDULED' ? 'Navbatda' : 'Faol'} />
+            <Fact label="To‘lov" value="Poster orqali" />
+          </div>
+          {s.effectiveStatus === 'SCHEDULED' && <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Boshlanadi: {dateText(s.startBusinessDate)}</p>}
+        </div>
+        {close}
+      </div>
+    );
+  }
+  const text = res?.status === 'REJECTED' ? (POSTER_PURCHASE_REJECTION_TEXT[res.reason] ?? res.reason) : null;
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Notice tone="warn" title="Abonement sotilmadi." hint={text ?? 'Poster‘da tekshirib ko‘ring.'} />
       {close}
     </div>
   );

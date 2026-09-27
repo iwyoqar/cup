@@ -30,6 +30,17 @@ export interface SubscriptionPaymentProvider {
   startPayment(input: StartPaymentInput): Promise<StartPaymentResult>;
 }
 
+// CASH is deliberately NOT a SubscriptionPaymentProvider and is never registered below: there is no startPayment (nothing to redirect to) and no
+// webhook to verify — the cashier confirming cash was received IS the confirmation authority (see pos-widget-subscription.service.ts#purchaseCash,
+// which calls SubscriptionsService.confirmPaid directly with source: 'PAYMENT'). It only reuses SubscriptionPurchase.provider as a plain tag so
+// Admin/Finance can tell a cash sale apart from a future real provider, exactly like `docs/SUBSCRIPTIONS.md` documents for `provider`.
+export const CASH_PROVIDER = 'CASH';
+
+// Also not a SubscriptionPaymentProvider, for the same reason: CUP never calls a payment API for this path either. Poster itself takes the
+// payment (by whatever method the register already supports — cash, card, Uzcard, ...); CUP only adds the priced line to the order and
+// later confirms the order closed paid (poster-order-mutation.service.ts + pos-widget-subscription.service.ts#checkPosterOrderPayment).
+export const POSTER_ORDER_PROVIDER = 'POSTER_ORDER';
+
 @Injectable()
 export class SubscriptionPaymentRegistry {
   private readonly providers: SubscriptionPaymentProvider[] = [];

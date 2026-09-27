@@ -14,6 +14,8 @@ export const planCreateSchema = z
     cooldownMinutes: int(PLAN_LIMITS.cooldownMinutes),
     isActive: z.boolean().optional(),
     sortOrder: z.number().int().min(0).max(1000).optional(),
+    // Coffee Subscription — real Poster order purchase. Nullable so an update can explicitly clear a mapping (unmap), not just set one.
+    productId: z.string().min(1).max(64).nullable().optional(),
   })
   .strict();
 

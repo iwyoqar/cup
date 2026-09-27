@@ -36,6 +36,8 @@ export class AdminSubscriptionsController {
     return {
       manualActivationEnabled: this.config.env.SUBSCRIPTIONS_MANUAL_ACTIVATION_ENABLED,
       posRedemptionEnabled: this.config.env.POS_SUBSCRIPTION_REDEMPTION_ENABLED,
+      posCashSaleEnabled: this.config.env.POS_SUBSCRIPTION_CASH_SALE_ENABLED,
+      posPosterPurchaseEnabled: this.config.env.POS_SUBSCRIPTION_POSTER_PURCHASE_ENABLED,
       paymentProviders: this.payments.available(),
       policy: SUBSCRIPTION_POLICY,
     };
@@ -77,6 +79,13 @@ export class AdminSubscriptionsController {
   @Get('products')
   products() {
     return this.plans.listMappings();
+  }
+
+  // Coffee Subscription — real Poster order purchase. The plan form's "Poster mahsulot" dropdown source: every active synced product, no
+  // live Poster call (reuses the catalog CUP already syncs).
+  @Get('eligible-products')
+  eligibleProducts() {
+    return this.plans.eligibleProducts();
   }
 
   @Post('products')

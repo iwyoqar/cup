@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { PosterModule } from '../poster/poster.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { PosterImportController } from './poster-import.controller';
 import { PosterImportHistoryService } from './poster-import-history.service';
 import { PosterImportQualityService } from './poster-import-quality.service';
@@ -11,7 +12,7 @@ import { PosterSpotMappingService } from './poster-spot-mapping.service';
 import { PosterTransactionImportService } from './poster-transaction-import.service';
 
 @Module({
-  imports: [AdminAuthModule, PosterModule],
+  imports: [AdminAuthModule, PosterModule, SubscriptionsModule],
   controllers: [PosterImportController],
   providers: [
     PosterImportRepository,

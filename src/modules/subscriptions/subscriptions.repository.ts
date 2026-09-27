@@ -18,6 +18,8 @@ export interface PlanInput {
   cooldownMinutes: number;
   isActive: boolean;
   sortOrder: number;
+  // Coffee Subscription — real Poster order purchase. Undefined = leave unchanged (update only); null = explicitly unmap.
+  productId?: string | null;
 }
 
 @Injectable()
@@ -26,19 +28,19 @@ export class SubscriptionsRepository {
 
   // ---- plans ------------------------------------------------------------------------------------------------------------------------
   listPlans(onlyActive: boolean) {
-    return this.prisma.subscriptionPlan.findMany({ where: onlyActive ? { isActive: true } : {}, orderBy: [{ sortOrder: 'asc' }, { priceMinor: 'asc' }] });
+    return this.prisma.subscriptionPlan.findMany({ where: onlyActive ? { isActive: true } : {}, orderBy: [{ sortOrder: 'asc' }, { priceMinor: 'asc' }], include: { product: { select: { id: true, name: true, posterProductId: true, priceMinor: true, isActive: true } } } });
   }
   findPlan(id: string) {
-    return this.prisma.subscriptionPlan.findUnique({ where: { id } });
+    return this.prisma.subscriptionPlan.findUnique({ where: { id }, include: { product: { select: { id: true, name: true, posterProductId: true, priceMinor: true, isActive: true } } } });
   }
   countPlans() {
     return this.prisma.subscriptionPlan.count();
   }
   createPlan(data: PlanInput, actor: string | null) {
-    return this.prisma.subscriptionPlan.create({ data: { ...data, createdBy: actor, updatedBy: actor } });
+    return this.prisma.subscriptionPlan.create({ data: { ...data, createdBy: actor, updatedBy: actor }, include: { product: { select: { id: true, name: true, posterProductId: true, priceMinor: true, isActive: true } } } });
   }
   updatePlan(id: string, data: Partial<PlanInput>, actor: string | null) {
-    return this.prisma.subscriptionPlan.update({ where: { id }, data: { ...data, updatedBy: actor } });
+    return this.prisma.subscriptionPlan.update({ where: { id }, data: { ...data, updatedBy: actor }, include: { product: { select: { id: true, name: true, posterProductId: true, priceMinor: true, isActive: true } } } });
   }
 
   // ---- product mappings -------------------------------------------------------------------------------------------------------------
@@ -62,7 +64,13 @@ export class SubscriptionsRepository {
     return this.prisma.subscriptionProduct.update({ where: { id }, data: { ...data, updatedBy: actor } });
   }
   findProduct(productId: string) {
-    return this.prisma.product.findUnique({ where: { id: productId }, select: { id: true, name: true, isActive: true, posterProductId: true } });
+    return this.prisma.product.findUnique({ where: { id: productId }, select: { id: true, name: true, isActive: true, posterProductId: true, priceMinor: true } });
+  }
+
+  // Coffee Subscription — real Poster order purchase. The Admin plan-mapping dropdown: every ACTIVE synced product (posterProductId is
+  // always set — see catalog sync), never a live Poster call (reuses the catalog CUP already syncs, per the feature's own design).
+  listEligibleProducts() {
+    return this.prisma.product.findMany({ where: { isActive: true }, select: { id: true, name: true, posterProductId: true, priceMinor: true, category: { select: { name: true } } }, orderBy: { name: 'asc' } });
   }
 
   // ---- subscriptions ----------------------------------------------------------------------------------------------------------------

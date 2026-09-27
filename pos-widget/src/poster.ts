@@ -182,6 +182,6 @@ export function cupGet(url: string): Promise<CupResponse> {
 // (REDEEM_REQUEST_TIMEOUT_MS, see its own comment above), since these two calls are the only ones that trigger a real, multi-hop Poster mutation on our
 // backend. Whether Poster's real POST signs that body the way our backend expects is UNVERIFIED (docs/PHASE-22-AUDIT.md §7) — this function does not and
 // cannot change that; it only sends the documented shape.
-export function cupPost(url: string, data: unknown): Promise<CupResponse> {
-  return callPoster(url, { method: 'post', headers: ['Accept: application/json', 'Content-Type: application/json'], data, timeout: REDEEM_REQUEST_TIMEOUT_MS });
+export function cupPost(url: string, data: unknown, extraHeaders: string[] = []): Promise<CupResponse> {
+  return callPoster(url, { method: 'post', headers: ['Accept: application/json', 'Content-Type: application/json', ...extraHeaders], data, timeout: REDEEM_REQUEST_TIMEOUT_MS });
 }

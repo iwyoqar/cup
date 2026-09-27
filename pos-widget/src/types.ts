@@ -129,8 +129,25 @@ export interface SubscriptionProductView {
   reason: string | null;
 }
 
+// Coffee Subscription cash sale — plan terms straight from the DB (mirrors the backend's PlanView). Never a price, duration or portion count the
+// widget invents: these are exactly what a real payment would need to match.
+export interface SubscriptionPlanView {
+  id: string;
+  name: string;
+  description: string | null;
+  priceMinor: number;
+  durationDays: number;
+  totalPortions: number;
+  dailyPortionLimit: number;
+  cooldownMinutes: number;
+  // Coffee Subscription — real Poster order purchase. Null when the plan has no mapping yet — only cash sale is offered for it.
+  posterProduct: { posterProductId: string; name: string; isActive: boolean } | null;
+}
+
 export interface SubscriptionSummary {
   redemption: { enabled: boolean };
+  cashSale: { enabled: boolean };
+  posterPurchase: { enabled: boolean };
   current: {
     planName: string;
     status: string;
@@ -150,6 +167,7 @@ export interface SubscriptionSummary {
   blockedReason: string | null;
   products: SubscriptionProductView[];
   recent: { productName: string; portionCost: number; at: string | null; branchName: string | null }[];
+  plans: SubscriptionPlanView[];
 }
 
 export type SubscriptionRedemptionStatus = 'REQUESTED' | 'POSTER_MUTATING' | 'CONFIRMED' | 'FAILED' | 'UNKNOWN';
@@ -162,3 +180,23 @@ export interface RedeemSubscriptionResult {
   portionCost: number | null;
   after: { remainingPortions: number; totalPortions: number; todayRemainingPortions: number; nextAvailableAt: string | null } | null;
 }
+
+// Coffee Subscription cash sale — mirrored from the backend's PurchaseSubscriptionCashResult. A REJECTED result is a normal outcome (plan turned off,
+// a pending purchase already exists, ...), never a transport failure — same OK/ErrorKind split as every other write call in this widget.
+export interface CashSaleSubscriptionView {
+  planName: string;
+  effectiveStatus: string;
+  startBusinessDate: string | null;
+  endBusinessDate: string | null;
+  usage: { totalPortions: number; remainingPortions: number };
+}
+
+export type PurchaseSubscriptionCashResult = { status: 'ACTIVATED'; subscription: CashSaleSubscriptionView } | { status: 'REJECTED'; reason: string };
+
+// Coffee Subscription — real Poster order purchase. ADDED_TO_ORDER means the line was added and the purchase is still PENDING_PAYMENT: the
+// customer still has to pay through Poster, and CUP has no synchronous "is this paid" check — see checkPosterOrderPayment. purchase.id is
+// what the widget then polls / manually checks with. A REJECTED result (plan not mapped, a pending purchase already exists, ...) is a normal
+// outcome, never a transport failure.
+export type PurchaseSubscriptionPosterOrderResult = { status: 'ADDED_TO_ORDER'; purchase: { id: string }; planName: string } | { status: 'REJECTED'; reason: string };
+
+export type CheckPosterOrderPaymentResult = { status: 'ACTIVATED'; subscription: CashSaleSubscriptionView } | { status: 'PENDING_PAYMENT' } | { status: 'REJECTED'; reason: string };

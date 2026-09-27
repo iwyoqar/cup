@@ -19,9 +19,10 @@ import { PosWidgetPromotionRedemptionRepository } from './pos-widget-promotion-r
 import { PosWidgetPromotionRedemptionService } from './pos-widget-promotion-redemption.service';
 import { PosWidgetRewardRedemptionRepository } from './pos-widget-reward-redemption.repository';
 import { PosWidgetRewardRedemptionService } from './pos-widget-reward-redemption.service';
+import { PosterOrderMutationService } from './poster-order-mutation.service';
 import { PosterPromotionMutationService } from './poster-promotion-mutation.service';
 import { PosterRewardMutationService } from './poster-reward-mutation.service';
-import { PosPromotionRedemptionGuard, PosRewardRedemptionGuard, PosSubscriptionRedemptionGuard, PosWidgetController, PosWidgetGuard } from './pos-widget.controller';
+import { PosPromotionRedemptionGuard, PosRewardRedemptionGuard, PosSubscriptionCashSaleGuard, PosSubscriptionPosterPurchaseGuard, PosSubscriptionRedemptionGuard, PosWidgetController, PosWidgetGuard } from './pos-widget.controller';
 
 // Phase 21 — the Poster POS widget backend. Composes existing READ services only (customers, loyalty, Loyalty 2.0, rewards, promotions, customer metrics, imported
 // POS activity, the catalog) and reuses staff_scan_events for the audit.
@@ -38,6 +39,15 @@ import { PosPromotionRedemptionGuard, PosRewardRedemptionGuard, PosSubscriptionR
 // Phase 23 adds a SECOND write path: POST /pos-widget/promotions/redeem, gated by its own independent operator interlock (POS_PROMOTION_REDEMPTION_ENABLED).
 // Composes PromotionsModule's existing eligibility/redemption logic (no second promotion engine) and PosterPromotionMutationService — reward and
 // promotion redemption remain separate concepts throughout (separate attempt tables, separate flags, separate audit actions, separate per-order rules).
+//
+// Coffee Subscription adds a THIRD write path: POST /pos-widget/subscriptions/purchase-cash, gated by its own independent interlock
+// (POS_SUBSCRIPTION_CASH_SALE_ENABLED). Unlike every write path above, this one makes NO Poster mutation at all — it composes only
+// SubscriptionsService's existing purchase/activation methods (no second payment system); see pos-widget-subscription.service.ts#purchaseCash.
+//
+// Coffee Subscription adds a FOURTH write path: POST /pos-widget/subscriptions/purchase-poster-order (+ its .../check-payment companion),
+// gated by its own independent interlock (POS_SUBSCRIPTION_POSTER_PURCHASE_ENABLED). This one DOES mutate Poster — a real, non-zero-price
+// addTransactionProduct call via the new PosterOrderMutationService (poster-order-mutation.service.ts), never live-verified unlike the
+// price-0 mechanism reward/promotion/redemption share.
 @Module({
   imports: [CustomersModule, LoyaltyModule, Loyalty2Module, RewardsModule, PromotionsModule, CustomerMetricsModule, PosterImportModule, CatalogModule, BranchModule, StaffModule, PosterModule, SubscriptionsModule],
   controllers: [PosWidgetController],
@@ -55,8 +65,13 @@ import { PosPromotionRedemptionGuard, PosRewardRedemptionGuard, PosSubscriptionR
     PosterPromotionMutationService,
     PosPromotionRedemptionGuard,
     // Coffee Subscription: summary (read-only) + redemption behind POS_SUBSCRIPTION_REDEMPTION_ENABLED, reusing PosterRewardMutationService.
+    // + cash sale behind its own independent POS_SUBSCRIPTION_CASH_SALE_ENABLED (no Poster mutation at all — see purchaseCash).
+    // + real Poster order purchase behind POS_SUBSCRIPTION_POSTER_PURCHASE_ENABLED, reusing PosterOrderMutationService.
     PosWidgetSubscriptionService,
     PosSubscriptionRedemptionGuard,
+    PosSubscriptionCashSaleGuard,
+    PosterOrderMutationService,
+    PosSubscriptionPosterPurchaseGuard,
   ],
 })
 export class PosWidgetModule {}

@@ -208,6 +208,7 @@ model Product {
   posterImportedItems PosterImportedTransactionItem[]
   subscriptionProduct     SubscriptionProduct?
   subscriptionRedemptions SubscriptionRedemption[]
+  subscriptionPlans       SubscriptionPlan[]
 
   @@map("products")
 }
@@ -1370,6 +1371,12 @@ model SubscriptionPlan {
   cooldownMinutes   Int
   isActive          Boolean                @default(true)
   sortOrder         Int                    @default(0)
+  // Coffee Subscription — real Poster order purchase. The EXISTING CUP Product this plan sells (never a Poster id duplicated here:
+  // product.posterProductId is the source of truth). Nullable: a plan with no mapping can still be sold via cash, just not through a
+  // real Poster order. product.priceMinor is validated to match this plan's priceMinor when the mapping is set (subscription-plans.service.ts)
+  // — never silently overwritten either direction.
+  productId         String?
+  product           Product?               @relation(fields: [productId], references: [id])
   createdBy         String?
   updatedBy         String?
   createdAt         DateTime               @default(now())
@@ -1422,6 +1429,9 @@ model Subscription {
   totalPortions     Int
   dailyPortionLimit Int
   cooldownMinutes   Int
+  // Coffee Subscription — real Poster order purchase: a snapshot of which Poster product this subscription's purchase was tied to
+  // (mirrors the other plan-term snapshot fields above). Null for a cash-sale purchase, or a plan bought before it had a mapping.
+  posterProductId   String?
   startsAt          DateTime?
   endsAt            DateTime?
   startBusinessDate String?
@@ -1443,9 +1453,11 @@ model Subscription {
   @@map("subscriptions")
 }
 
-// The purchase / payment lifecycle, provider-agnostic. status: CREATED -> PAYMENT_PENDING -> PAID | FAILED | CANCELLED. No payment
-// provider is integrated yet: `provider`/`providerPaymentId` stay null until one is. No card number or payment credential is ever
-// stored. activationSource is 'PAYMENT' (a future confirmed provider payment) or 'ADMIN_MANUAL' (the protected development/manual
+// The purchase / payment lifecycle, provider-agnostic. status: CREATED -> PAYMENT_PENDING -> PAID | FAILED | CANCELLED. Two confirmed
+// payment paths exist today: provider 'CASH' (a cashier confirms cash was received, no Poster mutation) and provider 'POSTER_ORDER'
+// (the plan's mapped product is added to the customer's real Poster order at its real price; confirmed once that order is observed
+// paid/closed — see poster-order-mutation.service.ts and the posterXxx fields below). No card number or payment credential is ever
+// stored. activationSource is 'PAYMENT' (a real payment, either provider) or 'ADMIN_MANUAL' (the protected development/manual
 // activation — NOT a payment; excluded from subscription revenue). A refund status deliberately does not exist (no-refund policy).
 model SubscriptionPurchase {
   id                String           @id @default(cuid())
@@ -1470,6 +1482,19 @@ model SubscriptionPurchase {
   cancelledAt       DateTime?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+  // Coffee Subscription — real Poster order purchase (provider 'POSTER_ORDER'). Same shape as SubscriptionRedemption's own Poster
+  // linkage fields, on purpose: posterOrderId is the widget's claim (for traceability only, never trusted for anything); posterTransactionId
+  // is the independently-resolved REST transaction id, set as soon as the line is added (BEFORE payment is confirmed) so a retried
+  // click can detect the line already exists and never add it twice; posterTransactionProductId is the added line's own id, used by
+  // the importer to recognise this exact line on the closed receipt and strip it from ordinary POS-sale revenue.
+  posterAccount              String?
+  posterSpotId               String?
+  posterTabletId             String?
+  posterOrderId              String?
+  posterTransactionId        String?   @unique
+  posterTransactionProductId String?
+  reconciliationStatus       String?
+  reconciledAt               DateTime?
 
   @@unique([provider, providerPaymentId])
   @@index([customerId, status])

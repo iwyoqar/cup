@@ -307,7 +307,7 @@ export class SubscriptionsAdminService {
   async revenue(q: PeriodQuery, now = new Date()) {
     const r = this.range(q, now);
     const [paid, runningNow] = await Promise.all([
-      this.prisma.subscriptionPurchase.findMany({ where: { status: 'PAID', paidAt: { gte: r.from, lt: r.to } }, select: { kind: true, amountMinor: true, activationSource: true, paidAt: true, planId: true, plan: { select: { name: true } } } }),
+      this.prisma.subscriptionPurchase.findMany({ where: { status: 'PAID', paidAt: { gte: r.from, lt: r.to } }, select: { kind: true, amountMinor: true, activationSource: true, provider: true, paidAt: true, planId: true, plan: { select: { name: true } } } }),
       this.prisma.subscription.count({ where: { status: 'ACTIVE', startsAt: { lte: now }, endsAt: { gt: now } } }),
     ]);
     const viaPayment = paid.filter((p) => p.activationSource === 'PAYMENT');
@@ -320,6 +320,16 @@ export class SubscriptionsAdminService {
         row.revenueMinor += p.amountMinor;
       } else row.manualCount += 1;
       byPlan.set(p.planId, row);
+    }
+    // Coffee Subscription cash sale — the same "provider" tag SubscriptionPurchase already carried (see subscription-payments.ts#CASH_PROVIDER) broken
+    // out by payment method, so a real future provider (Click, Payme, ...) slots into this same table with zero shape changes.
+    const byProvider = new Map<string, { provider: string; count: number; revenueMinor: number }>();
+    for (const p of viaPayment) {
+      const key = p.provider ?? 'UNKNOWN';
+      const row = byProvider.get(key) ?? { provider: key, count: 0, revenueMinor: 0 };
+      row.count += 1;
+      row.revenueMinor += p.amountMinor;
+      byProvider.set(key, row);
     }
     const byDay = new Map(enumerateDates(r.startDate, r.endDate).map((d) => [d, { date: d, count: 0, revenueMinor: 0 }]));
     for (const p of viaPayment) {
@@ -338,10 +348,11 @@ export class SubscriptionsAdminService {
       activeSubscriptions: runningNow,
       manualActivations: { count: manual.length, nominalMinor: manual.reduce((s, p) => s + p.amountMinor, 0) },
       byPlan: [...byPlan.values()].sort((a, b) => b.revenueMinor - a.revenueMinor),
+      byProvider: [...byProvider.values()].sort((a, b) => b.revenueMinor - a.revenueMinor),
       byDay: [...byDay.values()],
       paymentProvidersIntegrated: false,
       notes: [
-        'Subscription revenue counts only purchases confirmed PAID by a payment provider. No provider is integrated yet, so this is 0 until one is.',
+        'Subscription revenue counts purchases confirmed PAID by cash (at the register) or by a payment provider. No online provider (Click, Payme, ...) is integrated yet, so only cash sales appear until one is.',
         'Manual (admin) activations are listed separately and are never revenue.',
         'Redeeming subscription coffee is consumption, not a sale: it adds no revenue anywhere in CUP.',
         'Revenue is shown when paid (cash basis). Deferred recognition over the subscription period is not supported by CUP Finance yet.',

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { CatalogProduct, fetchActiveProducts } from '../lib/adminCatalog';
-import { errorText, SubPlan, SubProductMapping, subscriptionsApi, useSubscriptionsGet } from '../lib/adminSubscriptions';
+import { EligibleProduct, errorText, PlanFormBody, SubPlan, SubProductMapping, subscriptionsApi, useSubscriptionsGet } from '../lib/adminSubscriptions';
 import { formatSom } from '../lib/format';
 import { findNav } from '../lib/nav';
 import { Button, Column, DataTable, EmptyState, FilterField, Input, Modal, PageHeader, SectionCard, Select, StatusBadge, Toggle, useToast } from '../ui';
 import { num, ReportBody } from './reportsShared';
 
-type PlanForm = Omit<SubPlan, 'id'>;
-const EMPTY: PlanForm = { name: '', description: null, priceMinor: 0, durationDays: 30, totalPortions: 30, dailyPortionLimit: 3, cooldownMinutes: 60, isActive: true };
+type PlanForm = PlanFormBody;
+const EMPTY: PlanForm = { name: '', description: null, priceMinor: 0, durationDays: 30, totalPortions: 30, dailyPortionLimit: 3, cooldownMinutes: 60, isActive: true, productId: null };
 
 // Plans + the drinks a subscription covers. Editing a plan changes FUTURE purchases only: each existing subscription keeps the terms it was
 // bought with. Drink eligibility is an explicit product → portions mapping (never guessed from product names): hot and iced, standard and
@@ -22,6 +22,7 @@ export function SubscriptionsPlansPage() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [newProduct, setNewProduct] = useState('');
   const [newCost, setNewCost] = useState(1);
+  const eligibleProducts = useSubscriptionsGet<EligibleProduct[]>('/eligible-products');
 
   useEffect(() => {
     fetchActiveProducts().then(setProducts).catch(() => setProducts([]));
@@ -61,13 +62,30 @@ export function SubscriptionsPlansPage() {
     { key: 'po', header: 'Portions', numeric: true, cell: (p) => num(p.totalPortions) },
     { key: 'l', header: 'Daily limit', numeric: true, cell: (p) => num(p.dailyPortionLimit) },
     { key: 'c', header: 'Cooldown', numeric: true, cell: (p) => `${num(p.cooldownMinutes)} min` },
+    {
+      key: 'pp',
+      header: 'Poster Product',
+      low: true,
+      cell: (p) =>
+        p.posterProduct ? (
+          <span className="flex flex-col">
+            <span className="font-semibold text-black">{p.posterProduct.name}</span>
+            <span className="text-xs text-muted">
+              Poster #{p.posterProduct.posterProductId}
+              {p.posterProduct.isActive ? '' : ' · inactive'}
+            </span>
+          </span>
+        ) : (
+          <span className="text-xs text-muted">Not mapped — no real Poster order purchase</span>
+        ),
+    },
     { key: 's', header: 'Status', cell: (p) => <StatusBadge tone={p.isActive ? 'ok' : 'neutral'}>{p.isActive ? 'active' : 'inactive'}</StatusBadge> },
     {
       key: 'a',
       header: '',
       actions: true,
       cell: (p) => (
-        <Button onClick={() => setEditing({ id: p.id, form: { name: p.name, description: p.description, priceMinor: p.priceMinor, durationDays: p.durationDays, totalPortions: p.totalPortions, dailyPortionLimit: p.dailyPortionLimit, cooldownMinutes: p.cooldownMinutes, isActive: p.isActive } })} size="sm" variant="secondary">
+        <Button onClick={() => setEditing({ id: p.id, form: { name: p.name, description: p.description, priceMinor: p.priceMinor, durationDays: p.durationDays, totalPortions: p.totalPortions, dailyPortionLimit: p.dailyPortionLimit, cooldownMinutes: p.cooldownMinutes, isActive: p.isActive, productId: p.posterProduct?.productId ?? null } })} size="sm" variant="secondary">
           Edit
         </Button>
       ),
@@ -100,6 +118,8 @@ export function SubscriptionsPlansPage() {
       <Input min={0} onChange={(e) => set({ [key]: Math.max(0, Math.trunc(Number(e.target.value) || 0)) } as Partial<PlanForm>)} type="number" value={String(f?.[key] ?? '')} />
     </FilterField>
   );
+  const selectedPosterProduct = f?.productId ? (eligibleProducts.data ?? []).find((p) => p.id === f.productId) : null;
+  const priceMismatch = f && selectedPosterProduct && selectedPosterProduct.priceMinor !== f.priceMinor;
 
   return (
     <>
@@ -168,7 +188,7 @@ export function SubscriptionsPlansPage() {
               <Button disabled={saving} onClick={() => setEditing(null)} variant="secondary">
                 Cancel
               </Button>
-              <Button disabled={saving || !f.name.trim() || f.priceMinor < 1 || f.durationDays < 1 || f.totalPortions < 1 || f.dailyPortionLimit < 1} loading={saving} onClick={() => void savePlan()} variant="primary">
+              <Button disabled={saving || !f.name.trim() || f.priceMinor < 1 || f.durationDays < 1 || f.totalPortions < 1 || f.dailyPortionLimit < 1 || !!priceMismatch} loading={saving} onClick={() => void savePlan()} variant="primary">
                 Save
               </Button>
             </>
@@ -189,7 +209,26 @@ export function SubscriptionsPlansPage() {
               <Toggle checked={f.isActive} label="Plan active" onChange={(v) => set({ isActive: v })} />
               Available for purchase
             </label>
+            <FilterField label="Poster mahsulot">
+              <Select onChange={(e) => set({ productId: e.target.value || null })} value={f.productId ?? ''}>
+                <option value="">Not mapped — no real Poster order purchase</option>
+                {(eligibleProducts.data ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {formatSom(p.priceMinor)} (Poster #{p.posterProductId})
+                  </option>
+                ))}
+              </Select>
+            </FilterField>
           </div>
+          {selectedPosterProduct && (
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+              <span className="text-muted">Subscription narxi</span>
+              <span className="font-semibold text-black">{formatSom(f.priceMinor)}</span>
+              <span className="text-muted">Poster product narxi</span>
+              <span className="font-semibold text-black">{formatSom(selectedPosterProduct.priceMinor)}</span>
+            </div>
+          )}
+          {priceMismatch && <p className="mt-2 text-sm font-semibold text-err">Subscription narxi va Poster product narxi mos emas. Saqlashdan oldin birini to‘g‘rilang.</p>}
         </Modal>
       )}
     </>

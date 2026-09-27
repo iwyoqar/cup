@@ -56,9 +56,9 @@ export function posterPriceToCupUzs(raw: string | number): number {
   return uzs;
 }
 
-// CUP -> Poster. Used for the only monetary value CUP ever sends Poster: the explicit price of a
-// free reward line (0). Every other order line deliberately omits `price`, so Poster prices it
-// from its own catalog.
+// CUP -> Poster. Used for the explicit prices CUP ever sends Poster: a free reward/promotion line
+// (0) and, since Coffee Subscription's real-Poster-order purchase, a subscription plan's real
+// price. Every other order line deliberately omits `price`, so Poster prices it from its own catalog.
 export function cupUzsToPosterPrice(uzs: number): number {
   if (!Number.isInteger(uzs) || uzs < 0) {
     throw new PosterMoneyError(`invalid CUP amount: ${uzs}`);

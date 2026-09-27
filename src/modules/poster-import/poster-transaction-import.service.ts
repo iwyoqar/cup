@@ -3,6 +3,8 @@ import { ConfigService } from '../../common/config/config.service';
 import { addDays, businessDateOf, parseBusinessDate, rangeFor } from '../analytics/analytics-period';
 import { PosterService } from '../poster/poster.service';
 import { PosterTransaction } from '../poster/poster.types';
+import { POSTER_ORDER_PROVIDER } from '../subscriptions/subscription-payments';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { ImportedTransactionData, PosterImportRepository } from './poster-import.repository';
 import { normalizePosterTransaction, NormalizedTransaction } from './poster-transaction-normalizer';
 
@@ -40,6 +42,7 @@ export type ImportCategory =
   | 'TOO_RECENT'
   | 'REFUND_UNVERIFIED'
   | 'SUBSCRIPTION_REDEMPTION' // Coffee Subscription: a receipt whose only lines are CUP-managed subscription coffee (consumption, never a sale)
+  | 'SUBSCRIPTION_PURCHASE' // Coffee Subscription: a receipt whose only line is a real-Poster-order subscription purchase — its own revenue line, never also an independent POS sale
   | 'OTHER';
 
 export const IMPORT_CATEGORIES: ImportCategory[] = [
@@ -54,6 +57,7 @@ export const IMPORT_CATEGORIES: ImportCategory[] = [
   'TOO_RECENT',
   'REFUND_UNVERIFIED',
   'SUBSCRIPTION_REDEMPTION',
+  'SUBSCRIPTION_PURCHASE',
   'OTHER',
 ];
 
@@ -139,12 +143,21 @@ interface Analysis {
   plan: PlannedWrite[];
   newLinks: { incomingOrderId: string; transactionId: string }[];
   reconciliations: SubscriptionReconciliation[];
+  purchaseConfirmations: SubscriptionPurchaseConfirmation[];
 }
 
 // Coffee Subscription: what a closed receipt proved about one redemption (applied only by a real / automatic import, never by a preview).
 interface SubscriptionReconciliation {
   redemptionId: string;
   lineFound: boolean;
+}
+
+// Coffee Subscription — real Poster order purchase: a closed, PAID receipt was found to contain the exact line a PENDING_PAYMENT purchase's
+// line-add resolved — the safety net for whatever the widget's own on-demand check (checkPosterOrderPayment) might have missed.
+interface SubscriptionPurchaseConfirmation {
+  purchaseId: string;
+  posterTransactionId: string;
+  amountMinor: number;
 }
 
 const DEFAULT_LIMIT = 50;
@@ -189,6 +202,8 @@ export function categoryOf(outcome: ImportOutcome, reason?: string): ImportCateg
           return 'POSSIBLE_CUP_ORIGIN';
         case 'SUBSCRIPTION_REDEMPTION':
           return 'SUBSCRIPTION_REDEMPTION';
+        case 'SUBSCRIPTION_PURCHASE':
+          return 'SUBSCRIPTION_PURCHASE';
         default:
           return 'OTHER';
       }
@@ -203,12 +218,13 @@ export class PosterTransactionImportService {
     private readonly poster: PosterService,
     private readonly repository: PosterImportRepository,
     private readonly config: ConfigService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   // PREVIEW when write=false. A real import needs EVERY gate (assertWriteRequest + the two post-analysis gates); if any fails, nothing is written.
   async run(request: ImportRequest): Promise<ImportSummary> {
     if (request.write) this.assertWriteRequest(request);
-    const { summary, plan, newLinks, reconciliations } = await this.analyze(request);
+    const { summary, plan, newLinks, reconciliations, purchaseConfirmations } = await this.analyze(request);
     if (!request.write) return this.finish(summary, request);
 
     // Post-analysis gates — still before the first write.
@@ -219,7 +235,7 @@ export class PosterTransactionImportService {
       throw new BadRequestException(`Import refused: the window now has ${summary.importable} importable receipt(s) but ${request.expectedImportable} were reviewed. Run the preview again (nothing was written).`);
     }
 
-    await this.persist(summary, plan, newLinks, reconciliations);
+    await this.persist(summary, plan, newLinks, reconciliations, purchaseConfirmations);
     return this.finish(summary, request);
   }
 
@@ -231,19 +247,35 @@ export class PosterTransactionImportService {
     const today = new Date().toISOString().slice(0, 10);
     const ordered = [...raws].sort((a, b) => Number(a.transaction_id) - Number(b.transaction_id));
     const summary = this.newSummary({ since: today, until: today }, ordered.length, false, ordered.length, true);
-    const { plan, newLinks, reconciliations } = await this.classify(ordered, summary, [], options.linkLookups);
-    await this.persist(summary, plan, newLinks, reconciliations);
+    const { plan, newLinks, reconciliations, purchaseConfirmations } = await this.classify(ordered, summary, [], options.linkLookups);
+    await this.persist(summary, plan, newLinks, reconciliations, purchaseConfirmations);
     return summary;
   }
 
   // The write phase: the CUP-order link cache, then one atomic write per receipt (a failure is reported FAILED and the rest continue; re-running resumes).
-  private async persist(summary: ImportSummary, plan: PlannedWrite[], newLinks: { incomingOrderId: string; transactionId: string }[], reconciliations: SubscriptionReconciliation[] = []): Promise<void> {
+  private async persist(
+    summary: ImportSummary,
+    plan: PlannedWrite[],
+    newLinks: { incomingOrderId: string; transactionId: string }[],
+    reconciliations: SubscriptionReconciliation[] = [],
+    purchaseConfirmations: SubscriptionPurchaseConfirmation[] = [],
+  ): Promise<void> {
     for (const link of newLinks) await this.repository.saveLink(link.incomingOrderId, link.transactionId);
     for (const r of reconciliations) {
       try {
         await this.repository.reconcileSubscriptionRedemption(r.redemptionId, r.lineFound);
       } catch (err) {
         this.logger.error(`Subscription redemption reconciliation failed for ${r.redemptionId}: ${err instanceof Error ? err.message.split('\n')[0] : 'error'}`);
+      }
+    }
+    // Coffee Subscription — real Poster order purchase: the safety net for whatever the widget's on-demand check might have missed. Reuses
+    // the exact same confirmPaid() the check and the cash-sale path both call — never a second, competing activation path. Idempotent (a
+    // purchase already PAID by the time this runs — e.g. the widget's own check beat the importer to it — is a no-op).
+    for (const c of purchaseConfirmations) {
+      try {
+        await this.subscriptions.confirmPaid(c.purchaseId, { source: 'PAYMENT', provider: POSTER_ORDER_PROVIDER, providerPaymentId: c.posterTransactionId, amountMinor: c.amountMinor, actor: { type: 'SYSTEM', id: 'poster-import' }, note: null });
+      } catch (err) {
+        this.logger.error(`Subscription purchase confirmation failed for ${c.purchaseId}: ${err instanceof Error ? err.message.split('\n')[0] : 'error'}`);
       }
     }
 
@@ -285,8 +317,8 @@ export class PosterTransactionImportService {
 
     const summary = this.newSummary({ since: window.since, until: window.until }, limit, ordered.length > limit, batch.length, !!request.write);
     const deletedIds = await this.readDeleted(window, summary);
-    const { plan, newLinks, reconciliations } = await this.classify(batch, summary, deletedIds);
-    return { summary, plan, newLinks, reconciliations };
+    const { plan, newLinks, reconciliations, purchaseConfirmations } = await this.classify(batch, summary, deletedIds);
+    return { summary, plan, newLinks, reconciliations, purchaseConfirmations };
   }
 
   private newSummary(window: { since: string; until: string }, limit: number, truncated: boolean, scanned: number, write: boolean): ImportSummary {
@@ -323,11 +355,12 @@ export class PosterTransactionImportService {
     summary: ImportSummary,
     deletedIds: string[],
     linkLookups?: { lookbackDays: number; max: number },
-  ): Promise<{ plan: PlannedWrite[]; newLinks: { incomingOrderId: string; transactionId: string }[]; reconciliations: SubscriptionReconciliation[] }> {
+  ): Promise<{ plan: PlannedWrite[]; newLinks: { incomingOrderId: string; transactionId: string }[]; reconciliations: SubscriptionReconciliation[]; purchaseConfirmations: SubscriptionPurchaseConfirmation[] }> {
     const plan: PlannedWrite[] = [];
     const newLinks: { incomingOrderId: string; transactionId: string }[] = [];
     const reconciliations: SubscriptionReconciliation[] = [];
-    if (batch.length === 0) return { plan, newLinks, reconciliations };
+    const purchaseConfirmations: SubscriptionPurchaseConfirmation[] = [];
+    if (batch.length === 0) return { plan, newLinks, reconciliations, purchaseConfirmations };
 
     // 2. Normalise headers; anything malformed is skipped, never repaired.
     const normalized: { raw: PosterTransaction; tx: NormalizedTransaction }[] = [];
@@ -336,7 +369,7 @@ export class PosterTransactionImportService {
       if (result.ok) normalized.push({ raw, tx: result.transaction });
       else this.record(summary, { posterTransactionId: String(raw.transaction_id), outcome: 'SKIPPED', reason: result.reason, category: categoryOf('SKIPPED', result.reason), decision: 'SKIP' });
     }
-    if (normalized.length === 0) return { plan, newLinks, reconciliations };
+    if (normalized.length === 0) return { plan, newLinks, reconciliations, purchaseConfirmations };
 
     // 3. CUP-originated set: cached links + links resolved NOW from Poster for CUP orders still unlinked (read-only; returned, saved only on a real import).
     const ids = normalized.map((n) => n.tx.posterTransactionId);
@@ -352,6 +385,7 @@ export class PosterTransactionImportService {
     ]);
     const products = await this.repository.findProductsByPosterId([...new Set(normalized.flatMap((n) => (n.tx.lines ?? []).map((l) => l.posterProductId)))]);
     const subscriptionRefs = await this.repository.findSubscriptionRedemptionsForTransactions(ids);
+    const subscriptionPurchaseRefs = await this.repository.findPendingSubscriptionPurchasesForTransactions(ids);
     await this.flagDeletedButImported(summary, deletedIds);
 
     const settleMs = this.config.env.POSTER_IMPORT_SETTLE_SECONDS * 1000;
@@ -388,6 +422,21 @@ export class PosterTransactionImportService {
         summary.subscriptionLines += subscriptionLineIdx.size;
       }
 
+      // Coffee Subscription — real Poster order purchase: a line CUP itself added at the plan's real price, recognised through the
+      // purchase's stored transaction id (+ product + the exact price) — never by price alone (this is the one deliberate difference
+      // from the redemption block above, which can key off an unambiguous zero price). Only a CLOSED, PAID receipt confirms a purchase;
+      // an unpaid/still-open one leaves it PENDING_PAYMENT for a later pass (or the widget's own on-demand check) to try again.
+      const purchaseLineIdx = new Set<number>();
+      const purchaseRef = subscriptionPurchaseRefs.get(id);
+      if (purchaseRef && tx.posterStatus === '2' && tx.lines) {
+        const line = tx.lines.find((l) => !subscriptionLineIdx.has(l.lineIndex) && l.posterProductId === purchaseRef.posterProductId && l.posterProductPriceMinor === purchaseRef.amountMinor);
+        if (line) {
+          purchaseLineIdx.add(line.lineIndex);
+          if (tx.posterPayType !== '0' && tx.paidMinor > 0) purchaseConfirmations.push({ purchaseId: purchaseRef.purchaseId, posterTransactionId: id, amountMinor: purchaseRef.amountMinor });
+        }
+        summary.subscriptionLines += purchaseLineIdx.size;
+      }
+
       if (cupLinked.has(id)) {
         this.record(summary, { posterTransactionId: id, outcome: 'CUP_ORIGINATED', category: 'CUP_ORIGINATED', decision: 'CUP_ORIGINATED', ...facts });
         continue;
@@ -400,8 +449,9 @@ export class PosterTransactionImportService {
 
       // Documented meaning only: status 2 = closed; pay_type 0 = closed without payment.
       if (tx.posterStatus !== '2') { skip('NOT_CLOSED'); continue; }
-      // A receipt that is nothing but subscription coffee is consumption only — never a sale, never "unpaid".
-      if (tx.lines && tx.lines.length > 0 && subscriptionLineIdx.size === tx.lines.length) { skip('SUBSCRIPTION_REDEMPTION'); continue; }
+      // A receipt that is nothing but subscription coffee (consumption) is never a sale, never "unpaid"; a receipt that is nothing but a
+      // subscription purchase is its own revenue (already counted via SubscriptionPurchase.amountMinor) — never ALSO independent POS revenue.
+      if (tx.lines && tx.lines.length > 0 && subscriptionLineIdx.size + purchaseLineIdx.size === tx.lines.length) { skip(purchaseLineIdx.size > 0 ? 'SUBSCRIPTION_PURCHASE' : 'SUBSCRIPTION_REDEMPTION'); continue; }
       if (tx.posterPayType === '0' || tx.paidMinor <= 0 || tx.totalMinor <= 0) { skip('NOT_A_PAID_SALE'); continue; }
       // Owner decision (2026-09-24): the settling wait exists ONLY to give Poster time to report a CUP-created order's
       // receipt link before this receipt might otherwise be imported as a bare POS sale and double-counted (see the
@@ -437,7 +487,7 @@ export class PosterTransactionImportService {
         skip('NO_LINES');
         continue;
       } else {
-        items = tx.lines.filter((line) => !subscriptionLineIdx.has(line.lineIndex)).map((line) => ({
+        items = tx.lines.filter((line) => !subscriptionLineIdx.has(line.lineIndex) && !purchaseLineIdx.has(line.lineIndex)).map((line) => ({
           lineIndex: line.lineIndex,
           posterProductId: line.posterProductId,
           productId: products.get(line.posterProductId)?.id ?? null,
@@ -467,7 +517,7 @@ export class PosterTransactionImportService {
       if (tx.paidMinor < tx.totalMinor) summary.partiallyPaid += 1;
       plan.push({ data: { ...header, status: 'IMPORTED', unresolvedReason: null, items }, existingId: already?.id ?? null, detail, audit: false });
     }
-    return { plan, newLinks, reconciliations };
+    return { plan, newLinks, reconciliations, purchaseConfirmations };
   }
 
   // Request-shape gates for a REAL import. Each failure is a 400 raised before Poster is even read.

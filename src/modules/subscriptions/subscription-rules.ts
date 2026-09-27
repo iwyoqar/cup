@@ -128,6 +128,6 @@ export const PLAN_LIMITS = {
   portionCost: { min: 1, max: 5 },
 } as const;
 
-export function termsOf(plan: { name: string; priceMinor: number; durationDays: number; totalPortions: number; dailyPortionLimit: number; cooldownMinutes: number }): PlanTerms {
-  return { planName: plan.name, priceMinor: plan.priceMinor, durationDays: plan.durationDays, totalPortions: plan.totalPortions, dailyPortionLimit: plan.dailyPortionLimit, cooldownMinutes: plan.cooldownMinutes };
+export function termsOf(plan: { name: string; priceMinor: number; durationDays: number; totalPortions: number; dailyPortionLimit: number; cooldownMinutes: number; product?: { posterProductId: string } | null }): PlanTerms {
+  return { planName: plan.name, priceMinor: plan.priceMinor, durationDays: plan.durationDays, totalPortions: plan.totalPortions, dailyPortionLimit: plan.dailyPortionLimit, cooldownMinutes: plan.cooldownMinutes, posterProductId: plan.product?.posterProductId ?? null };
 }

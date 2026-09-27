@@ -21,6 +21,8 @@ export interface PlanView {
   dailyPortionLimit: number;
   cooldownMinutes: number;
   isActive: boolean;
+  // Coffee Subscription — real Poster order purchase. Null when the plan has no mapping yet (cash sale still works; this path does not).
+  posterProduct: { productId: string; posterProductId: string; name: string; isActive: boolean } | null;
 }
 
 export interface PurchaseView {
@@ -283,8 +285,30 @@ export class SubscriptionsService {
   }
 }
 
-export function planView(p: { id: string; name: string; description: string | null; priceMinor: number; durationDays: number; totalPortions: number; dailyPortionLimit: number; cooldownMinutes: number; isActive: boolean }): PlanView {
-  return { id: p.id, name: p.name, description: p.description, priceMinor: p.priceMinor, durationDays: p.durationDays, totalPortions: p.totalPortions, dailyPortionLimit: p.dailyPortionLimit, cooldownMinutes: p.cooldownMinutes, isActive: p.isActive };
+export function planView(p: {
+  id: string;
+  name: string;
+  description: string | null;
+  priceMinor: number;
+  durationDays: number;
+  totalPortions: number;
+  dailyPortionLimit: number;
+  cooldownMinutes: number;
+  isActive: boolean;
+  product?: { id: string; name: string; posterProductId: string; isActive: boolean } | null;
+}): PlanView {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    priceMinor: p.priceMinor,
+    durationDays: p.durationDays,
+    totalPortions: p.totalPortions,
+    dailyPortionLimit: p.dailyPortionLimit,
+    cooldownMinutes: p.cooldownMinutes,
+    isActive: p.isActive,
+    posterProduct: p.product ? { productId: p.product.id, posterProductId: p.product.posterProductId, name: p.product.name, isActive: p.product.isActive } : null,
+  };
 }
 
 export function purchaseView(p: PurchaseRow): PurchaseView {

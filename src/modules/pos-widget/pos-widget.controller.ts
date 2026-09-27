@@ -1,4 +1,4 @@
-import { BadRequestException, Body, CanActivate, Controller, ExecutionContext, ForbiddenException, Get, Injectable, Post, Query, Req, Res, ServiceUnavailableException, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, CanActivate, Controller, ExecutionContext, ForbiddenException, Get, Headers, Injectable, Param, Post, Query, Req, Res, ServiceUnavailableException, UnauthorizedException, UseGuards } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ConfigService } from '../../common/config/config.service';
@@ -7,8 +7,9 @@ import { PosWidgetAuthService } from './pos-widget-auth.service';
 import { OverviewIdentifier, PosWidgetOverviewService } from './pos-widget-overview.service';
 import { RedeemPromotionInputError, PosWidgetPromotionRedemptionService } from './pos-widget-promotion-redemption.service';
 import { RedeemRewardInputError, PosWidgetRewardRedemptionService } from './pos-widget-reward-redemption.service';
-import { PosWidgetSubscriptionService, RedeemSubscriptionInputError } from './pos-widget-subscription.service';
+import { PosWidgetSubscriptionService, PurchaseSubscriptionInputError, RedeemSubscriptionInputError } from './pos-widget-subscription.service';
 import { PosContext } from './pos-widget-signature';
+import { requireKey } from '../subscriptions/subscriptions.controller';
 
 type PosRequest = FastifyRequest & { posContext?: PosContext };
 
@@ -102,6 +103,54 @@ export class PosSubscriptionRedemptionGuard implements CanActivate {
   }
 }
 
+// Coffee Subscription — the SAME verified-signature guard plus its own independent operator interlock (POS_SUBSCRIPTION_CASH_SALE_ENABLED),
+// mirroring PosSubscriptionRedemptionGuard exactly. A completely separate concern from redemption (this guard gates selling a plan for cash; the
+// other gates redeeming a portion) — each write path keeps its own flag, matching how every other POS widget write path is gated in this file.
+@Injectable()
+export class PosSubscriptionCashSaleGuard implements CanActivate {
+  constructor(
+    private readonly auth: PosWidgetAuthService,
+    private readonly config: ConfigService,
+  ) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    if (!this.config.env.POS_SUBSCRIPTION_CASH_SALE_ENABLED) throw new ServiceUnavailableException({ status: 'unavailable', enabled: false, feature: 'subscription-cash-sale' });
+    const req = context.switchToHttp().getRequest<PosRequest>();
+    const result = this.auth.authenticate(req);
+    if (result.ok) {
+      req.posContext = result.context;
+      return true;
+    }
+    if (result.reason === 'DISABLED' || result.reason === 'NOT_CONFIGURED') throw new ServiceUnavailableException({ status: 'unavailable', enabled: this.auth.enabled });
+    if (result.reason === 'WRONG_ACCOUNT') throw new ForbiddenException({ status: 'rejected', reason: 'WRONG_ACCOUNT' });
+    throw new UnauthorizedException({ status: 'rejected', reason: result.reason });
+  }
+}
+
+// Coffee Subscription — the SAME verified-signature guard plus its own independent operator interlock (POS_SUBSCRIPTION_POSTER_PURCHASE_ENABLED),
+// mirroring PosSubscriptionCashSaleGuard exactly. Gates BOTH the purchase-poster-order and check-payment endpoints — one flag for the whole
+// real-Poster-order purchase feature, since check-payment is meaningless without the purchase endpoint having ever run.
+@Injectable()
+export class PosSubscriptionPosterPurchaseGuard implements CanActivate {
+  constructor(
+    private readonly auth: PosWidgetAuthService,
+    private readonly config: ConfigService,
+  ) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    if (!this.config.env.POS_SUBSCRIPTION_POSTER_PURCHASE_ENABLED) throw new ServiceUnavailableException({ status: 'unavailable', enabled: false, feature: 'subscription-poster-purchase' });
+    const req = context.switchToHttp().getRequest<PosRequest>();
+    const result = this.auth.authenticate(req);
+    if (result.ok) {
+      req.posContext = result.context;
+      return true;
+    }
+    if (result.reason === 'DISABLED' || result.reason === 'NOT_CONFIGURED') throw new ServiceUnavailableException({ status: 'unavailable', enabled: this.auth.enabled });
+    if (result.reason === 'WRONG_ACCOUNT') throw new ForbiddenException({ status: 'rejected', reason: 'WRONG_ACCOUNT' });
+    throw new UnauthorizedException({ status: 'rejected', reason: result.reason });
+  }
+}
+
 // Coffee Subscription redemption: the customer is the order's Poster client OR the customer's existing CUP QR/code (exactly one). No price,
 // balance, cooldown or eligibility is ever accepted from the widget — only which customer, which open order, which product.
 const redeemSubscriptionBodySchema = z
@@ -120,6 +169,31 @@ const subscriptionQuerySchema = z
   .object({ posterClientId: z.string().regex(/^\d{1,12}$/).optional(), code: z.string().trim().min(3).max(64).optional() })
   .strict()
   .refine((q) => (q.posterClientId === undefined) !== (q.code === undefined), 'Exactly one identifier is required.');
+
+// Coffee Subscription cash sale: which plan and which customer — never a price, duration, portion count or payment amount (see purchaseCash: the
+// plan is re-read from the DB and the amount comes from it, not from here).
+const purchaseSubscriptionCashBodySchema = z
+  .object({
+    planId: z.string().min(1).max(64),
+    posterClientId: z.string().regex(/^\d{1,12}$/).optional(),
+    code: z.string().trim().min(3).max(64).optional(),
+    employeeIdentifier: z.string().trim().min(1).max(64).nullable().optional(),
+  })
+  .strict()
+  .refine((b) => (b.posterClientId === undefined) !== (b.code === undefined), 'Exactly one of posterClientId / code is required.');
+
+// Coffee Subscription real Poster order purchase: which plan, which customer, and which open order to add it to (resolved server-side —
+// see PosterOrderMutationService — never trusted directly). No price, duration or portion count: those come from the plan in the DB.
+const purchaseSubscriptionPosterOrderBodySchema = z
+  .object({
+    planId: z.string().min(1).max(64),
+    posterClientId: z.string().regex(/^\d{1,12}$/).optional(),
+    code: z.string().trim().min(3).max(64).optional(),
+    posterOrderId: z.string().regex(/^\d{1,20}$/),
+    employeeIdentifier: z.string().trim().min(1).max(64).nullable().optional(),
+  })
+  .strict()
+  .refine((b) => (b.posterClientId === undefined) !== (b.code === undefined), 'Exactly one of posterClientId / code is required.');
 
 // Exactly the shape pos-widget-reward-redemption.types.ts's RedeemRewardRequest expects. .strict(): an unknown field is a 400, same discipline as the
 // overview's query schema.
@@ -243,6 +317,59 @@ export class PosWidgetController {
       if (err instanceof RedeemSubscriptionInputError) throw new BadRequestException({ status: 'rejected', reason: err.reason });
       throw err;
     }
+  }
+
+  // Coffee Subscription — cash sale: a cashier sells a plan for cash, directly inside the POS widget (there is no online payment provider yet). NOT a
+  // Poster mutation of any kind — see PosWidgetSubscriptionService.purchaseCash. Requires the same Idempotency-Key discipline as the customer/admin
+  // purchase endpoints in subscriptions.controller.ts / admin-subscriptions.controller.ts (double-tapping the confirm button must never sell twice).
+  @Post('subscriptions/purchase-cash')
+  @UseGuards(PosSubscriptionCashSaleGuard)
+  async purchaseSubscriptionCash(@Body() rawBody: unknown, @Req() req: PosRequest, @Headers('idempotency-key') idempotencyKey: string | undefined, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = purchaseSubscriptionCashBodySchema.safeParse(rawBody);
+    if (!parsed.success) throw new BadRequestException('Invalid cash purchase request.');
+    const b = parsed.data;
+    try {
+      return await this.subscription.purchaseCash(
+        req.posContext as PosContext,
+        { planId: b.planId, customer: b.posterClientId ? { posterClientId: b.posterClientId } : { code: b.code as string }, employeeIdentifier: b.employeeIdentifier ?? null },
+        requireKey(idempotencyKey),
+      );
+    } catch (err) {
+      if (err instanceof PurchaseSubscriptionInputError) throw new BadRequestException({ status: 'rejected', reason: err.reason });
+      throw err;
+    }
+  }
+
+  // Coffee Subscription — real Poster order purchase: adds the plan's mapped product to the customer's currently open Poster order at its
+  // real price. Still PENDING_PAYMENT after this call returns — Poster, not CUP, takes the payment. Same Idempotency-Key discipline as the
+  // cash endpoint above (a double-tapped confirm button must never add the line twice).
+  @Post('subscriptions/purchase-poster-order')
+  @UseGuards(PosSubscriptionPosterPurchaseGuard)
+  async purchaseSubscriptionPosterOrder(@Body() rawBody: unknown, @Req() req: PosRequest, @Headers('idempotency-key') idempotencyKey: string | undefined, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = purchaseSubscriptionPosterOrderBodySchema.safeParse(rawBody);
+    if (!parsed.success) throw new BadRequestException('Invalid Poster order purchase request.');
+    const b = parsed.data;
+    try {
+      return await this.subscription.purchasePosterOrder(
+        req.posContext as PosContext,
+        { planId: b.planId, customer: b.posterClientId ? { posterClientId: b.posterClientId } : { code: b.code as string }, posterOrderId: b.posterOrderId, employeeIdentifier: b.employeeIdentifier ?? null },
+        requireKey(idempotencyKey),
+      );
+    } catch (err) {
+      if (err instanceof PurchaseSubscriptionInputError) throw new BadRequestException({ status: 'rejected', reason: err.reason });
+      throw err;
+    }
+  }
+
+  // Coffee Subscription — the on-demand fast path: the widget calls this right after the customer pays, instead of only waiting for the
+  // periodic importer safety net. Read-only from the widget's point of view (it may trigger a real Poster read and, if paid, activation).
+  @Post('subscriptions/purchases/:id/check-payment')
+  @UseGuards(PosSubscriptionPosterPurchaseGuard)
+  async checkSubscriptionPosterPayment(@Param('id') id: string, @Req() req: PosRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header('Cache-Control', 'no-store');
+    return this.subscription.checkPosterOrderPayment(req.posContext as PosContext, id);
   }
 
   // Phase 22 — the ONE write route this controller has. Reuses PosWidgetGuard's exact signature verification via PosRewardRedemptionGuard (see above),

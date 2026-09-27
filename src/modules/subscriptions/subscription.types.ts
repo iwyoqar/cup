@@ -55,6 +55,9 @@ export interface PlanTerms {
   totalPortions: number;
   dailyPortionLimit: number;
   cooldownMinutes: number;
+  // Coffee Subscription — real Poster order purchase: a snapshot of which Poster product this purchase was tied to (null for a cash sale,
+  // or a plan bought before it had a mapping). Editing the plan's mapping later never touches this snapshot.
+  posterProductId: string | null;
 }
 
 // Every figure a customer / barista / admin sees about one subscription's usage. All derived.

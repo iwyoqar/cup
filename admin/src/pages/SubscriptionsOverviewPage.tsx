@@ -24,6 +24,8 @@ export function SubscriptionsOverviewPage() {
       {settings.data && (
         <div className="mb-5 flex flex-wrap gap-2 text-xs">
           <span className="rounded-full bg-neutral-bg px-3 py-1 font-semibold text-muted-cream">POS redemption: {settings.data.posRedemptionEnabled ? 'on' : 'off'}</span>
+          <span className="rounded-full bg-neutral-bg px-3 py-1 font-semibold text-muted-cream">POS cash sale: {settings.data.posCashSaleEnabled ? 'on' : 'off'}</span>
+          <span className="rounded-full bg-neutral-bg px-3 py-1 font-semibold text-muted-cream">POS Poster-order purchase: {settings.data.posPosterPurchaseEnabled ? 'on' : 'off'}</span>
           <span className="rounded-full bg-neutral-bg px-3 py-1 font-semibold text-muted-cream">Manual activation: {settings.data.manualActivationEnabled ? 'on' : 'off'}</span>
           <span className="rounded-full bg-neutral-bg px-3 py-1 font-semibold text-muted-cream">Payment providers: {settings.data.paymentProviders.length ? settings.data.paymentProviders.map((p) => p.id).join(', ') : 'none yet'}</span>
           <span className="rounded-full bg-neutral-bg px-3 py-1 font-semibold text-muted-cream">No auto-renew · No refunds · No rollover</span>

@@ -43,7 +43,8 @@ export class SubscriptionPlansService implements OnModuleInit {
     const parsed = planCreateSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     const d = parsed.data;
-    const plan = await this.repository.createPlan({ ...d, description: d.description ?? null, isActive: d.isActive ?? true, sortOrder: d.sortOrder ?? 0 }, adminId);
+    if (d.productId) await this.validateProductMapping(d.productId, d.priceMinor);
+    const plan = await this.repository.createPlan({ ...d, description: d.description ?? null, isActive: d.isActive ?? true, sortOrder: d.sortOrder ?? 0, productId: d.productId ?? null }, adminId);
     await this.audit.record({ type: 'ADMIN', id: adminId }, SUBSCRIPTION_AUDIT.PLAN_CHANGED, `CREATED:${plan.name}`, null);
     return planView(plan);
   }
@@ -52,10 +53,30 @@ export class SubscriptionPlansService implements OnModuleInit {
   async update(id: string, body: unknown, adminId: string) {
     const parsed = planUpdateSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
-    if (!(await this.repository.findPlan(id))) throw new NotFoundException('Plan not found.');
-    const plan = await this.repository.updatePlan(id, parsed.data as z.infer<typeof planUpdateSchema>, adminId);
+    const existing = await this.repository.findPlan(id);
+    if (!existing) throw new NotFoundException('Plan not found.');
+    const data = parsed.data as z.infer<typeof planUpdateSchema>;
+    if (data.productId) await this.validateProductMapping(data.productId, data.priceMinor ?? existing.priceMinor);
+    const plan = await this.repository.updatePlan(id, data, adminId);
     await this.audit.record({ type: 'ADMIN', id: adminId }, SUBSCRIPTION_AUDIT.PLAN_CHANGED, `UPDATED:${plan.name}`, null);
     return planView(plan);
+  }
+
+  // Coffee Subscription — real Poster order purchase. Blocks the save rather than silently overwriting either side (§5 of the spec): the
+  // subscription price is authoritative (it is what confirmPaid checks and what Finance counts as revenue) and the mapped product's Poster
+  // price must already match it, or the admin must fix one of the two first.
+  private async validateProductMapping(productId: string, planPriceMinor: number): Promise<void> {
+    const product = await this.repository.findProduct(productId);
+    if (!product) throw new NotFoundException('Product not found.');
+    if (!product.isActive) throw new BadRequestException({ reason: 'PRODUCT_INACTIVE', message: 'This product is not active in the catalog.' });
+    if (product.priceMinor !== planPriceMinor) {
+      throw new ConflictException({ reason: 'PRICE_MISMATCH', message: "Subscription narxi va Poster product narxi mos emas.", planPriceMinor, productPriceMinor: product.priceMinor, productName: product.name });
+    }
+  }
+
+  // Coffee Subscription — real Poster order purchase. The Admin plan form's "Poster mahsulot" dropdown source.
+  async eligibleProducts() {
+    return (await this.repository.listEligibleProducts()).map((p) => ({ id: p.id, name: p.name, posterProductId: p.posterProductId, priceMinor: p.priceMinor, categoryName: p.category.name }));
   }
 
   async listMappings() {

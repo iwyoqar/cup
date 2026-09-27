@@ -47,6 +47,18 @@ export interface SubPlan {
   dailyPortionLimit: number;
   cooldownMinutes: number;
   isActive: boolean;
+  // Coffee Subscription — real Poster order purchase. Null when the plan has no mapping yet (cash sale still works; a real Poster order
+  // purchase does not until one is set).
+  posterProduct: { productId: string; posterProductId: string; name: string; isActive: boolean } | null;
+}
+
+// The Admin plan form's "Poster mahsulot" dropdown source (GET /admin/subscriptions/eligible-products): every active synced product.
+export interface EligibleProduct {
+  id: string;
+  name: string;
+  posterProductId: string;
+  priceMinor: number;
+  categoryName: string;
 }
 
 export interface SubProductMapping {
@@ -66,6 +78,8 @@ export interface SubProductMapping {
 export interface SubSettings {
   manualActivationEnabled: boolean;
   posRedemptionEnabled: boolean;
+  posCashSaleEnabled: boolean;
+  posPosterPurchaseEnabled: boolean;
   paymentProviders: { id: string }[];
   policy: { autoRenew: boolean; refunds: boolean; rollover: boolean; cashValue: boolean };
 }
@@ -186,6 +200,7 @@ export interface RevenueOverview {
   activeSubscriptions: number;
   manualActivations: { count: number; nominalMinor: number };
   byPlan: { planId: string; planName: string; count: number; revenueMinor: number; manualCount: number }[];
+  byProvider: { provider: string; count: number; revenueMinor: number }[];
   byDay: { date: string; count: number; revenueMinor: number }[];
   paymentProvidersIntegrated: boolean;
   notes: string[];
@@ -233,9 +248,14 @@ function key(): string {
   return `adm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// The plan create/update body: everything SubPlan has except its id and the read-only posterProduct — a plain productId (or null to
+// unmap) goes over the wire instead.
+export type PlanFormBody = Omit<SubPlan, 'id' | 'posterProduct'> & { productId?: string | null };
+
 export const subscriptionsApi = {
-  createPlan: (body: Omit<SubPlan, 'id'>) => apiRequest<SubPlan>('/admin/subscriptions/plans', { method: 'POST', body }),
-  updatePlan: (id: string, body: Partial<Omit<SubPlan, 'id'>>) => apiRequest<SubPlan>(`/admin/subscriptions/plans/${id}`, { method: 'PATCH', body }),
+  createPlan: (body: PlanFormBody) => apiRequest<SubPlan>('/admin/subscriptions/plans', { method: 'POST', body }),
+  updatePlan: (id: string, body: Partial<PlanFormBody>) => apiRequest<SubPlan>(`/admin/subscriptions/plans/${id}`, { method: 'PATCH', body }),
+  eligibleProducts: () => apiRequest<EligibleProduct[]>('/admin/subscriptions/eligible-products'),
   addProduct: (productId: string, portionCost: number) => apiRequest<SubProductMapping[]>('/admin/subscriptions/products', { method: 'POST', body: { productId, portionCost } }),
   updateProduct: (id: string, body: { portionCost?: number; isActive?: boolean }) => apiRequest<SubProductMapping[]>(`/admin/subscriptions/products/${id}`, { method: 'PATCH', body }),
   resolveRedemption: (id: string, outcome: 'CONFIRMED' | 'FAILED', note: string) => apiRequest<RedemptionDetail>(`/admin/subscriptions/redemptions/${id}/resolve`, { method: 'POST', body: { outcome, note } }),

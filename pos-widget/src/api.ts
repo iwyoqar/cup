@@ -1,5 +1,5 @@
 import { cupGet, cupPost } from './poster';
-import type { ErrorKind, Identifier, Overview, RedeemPromotionResult, RedeemRewardResult, RedeemSubscriptionResult } from './types';
+import type { CheckPosterOrderPaymentResult, ErrorKind, Identifier, Overview, PurchaseSubscriptionCashResult, PurchaseSubscriptionPosterOrderResult, RedeemPromotionResult, RedeemRewardResult, RedeemSubscriptionResult } from './types';
 
 // The public CUP backend base URL — the ONLY configuration compiled into the bundle (VITE_CUP_API_URL). No secret, token or credential exists in this file or anywhere in
 // the widget: authentication is done by Poster itself, which signs the proxied request (see docs/PHASE-21-POS-CAPABILITY.md).
@@ -87,4 +87,59 @@ export async function redeemSubscription(body: RedeemSubscriptionBody): Promise<
   const r = res.body as Partial<RedeemSubscriptionResult> | null;
   if (!r || typeof r !== 'object' || typeof r.attemptId !== 'string' || typeof r.status !== 'string') return { kind: 'ERROR', error: 'INVALID' };
   return { kind: 'OK', result: r as RedeemSubscriptionResult };
+}
+
+// Coffee Subscription cash sale — a cashier sells a plan for cash. Same OK/ErrorKind split as every other write call: a REJECTED result (plan turned
+// off, a pending purchase already exists, ...) is a normal OK, never a transport failure. Requires an Idempotency-Key so a double-tapped confirm
+// button can never sell (or charge) the customer twice — same discipline as the customer/admin purchase endpoints.
+export type PurchaseSubscriptionCashApiResult = { kind: 'OK'; result: PurchaseSubscriptionCashResult } | { kind: 'ERROR'; error: ErrorKind };
+
+export interface PurchaseSubscriptionCashBody {
+  planId: string;
+  posterClientId?: string;
+  code?: string;
+  employeeIdentifier?: string | null;
+}
+
+export async function purchaseSubscriptionCash(body: PurchaseSubscriptionCashBody, idempotencyKey: string): Promise<PurchaseSubscriptionCashApiResult> {
+  if (!apiConfigured) return { kind: 'ERROR', error: 'NOT_CONFIGURED' };
+  const res = await cupPost(`${BASE}/pos-widget/subscriptions/purchase-cash`, body, [`Idempotency-Key: ${idempotencyKey}`]);
+  if (res.kind === 'ERROR') return res;
+  const r = res.body as Partial<PurchaseSubscriptionCashResult> | null;
+  if (!r || typeof r !== 'object' || typeof r.status !== 'string') return { kind: 'ERROR', error: 'INVALID' };
+  return { kind: 'OK', result: r as PurchaseSubscriptionCashResult };
+}
+
+// Coffee Subscription — real Poster order purchase. Same OK/ErrorKind split: a REJECTED result is a normal OK, never a transport failure.
+// Same Idempotency-Key discipline as the cash endpoint (a double-tapped confirm must never add the line twice).
+export type PurchaseSubscriptionPosterOrderApiResult = { kind: 'OK'; result: PurchaseSubscriptionPosterOrderResult } | { kind: 'ERROR'; error: ErrorKind };
+
+export interface PurchaseSubscriptionPosterOrderBody {
+  planId: string;
+  posterClientId?: string;
+  code?: string;
+  posterOrderId: string;
+  employeeIdentifier?: string | null;
+}
+
+export async function purchaseSubscriptionPosterOrder(body: PurchaseSubscriptionPosterOrderBody, idempotencyKey: string): Promise<PurchaseSubscriptionPosterOrderApiResult> {
+  if (!apiConfigured) return { kind: 'ERROR', error: 'NOT_CONFIGURED' };
+  const res = await cupPost(`${BASE}/pos-widget/subscriptions/purchase-poster-order`, body, [`Idempotency-Key: ${idempotencyKey}`]);
+  if (res.kind === 'ERROR') return res;
+  const r = res.body as Partial<PurchaseSubscriptionPosterOrderResult> | null;
+  if (!r || typeof r !== 'object' || typeof r.status !== 'string') return { kind: 'ERROR', error: 'INVALID' };
+  return { kind: 'OK', result: r as PurchaseSubscriptionPosterOrderResult };
+}
+
+// The on-demand fast path: called right after the customer pays (and a few times auto-polled), instead of only waiting for the periodic
+// importer safety net. Same OK/ErrorKind split as every write call here.
+export type CheckPosterOrderPaymentApiResult = { kind: 'OK'; result: CheckPosterOrderPaymentResult } | { kind: 'ERROR'; error: ErrorKind };
+
+export async function checkPosterOrderPayment(purchaseId: string): Promise<CheckPosterOrderPaymentApiResult> {
+  if (!apiConfigured) return { kind: 'ERROR', error: 'NOT_CONFIGURED' };
+  const res = await cupPost(`${BASE}/pos-widget/subscriptions/purchases/${encodeURIComponent(purchaseId)}/check-payment`, {});
+  if (res.kind === 'ERROR') return res;
+  const r = res.body as Partial<CheckPosterOrderPaymentResult> | null;
+  if (!r || typeof r !== 'object' || typeof r.status !== 'string') return { kind: 'ERROR', error: 'INVALID' };
+  return { kind: 'OK', result: r as CheckPosterOrderPaymentResult };
 }

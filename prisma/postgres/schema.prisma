@@ -67,6 +67,12 @@ model Customer {
   referralReceived           Referral?                   @relation("ReferredRel")
   referralCode               ReferralCode?
   referralRewards            ReferralReward[]
+  // Coffee Subscription — additive. subscriptionLockVersion exists ONLY as a row lock: activating a paid subscription bumps it first
+  // (an atomic UPDATE), so two concurrent activations for the same customer are serialized and can never compute overlapping periods.
+  subscriptionLockVersion    Int                         @default(0)
+  subscriptions              Subscription[]
+  subscriptionPurchases      SubscriptionPurchase[]
+  subscriptionRedemptions    SubscriptionRedemption[]
 
   @@map("customers")
 }
@@ -107,6 +113,7 @@ model Branch {
   expenses                   Expense[]
   investments                Investment[]
   cashAdjustments            CashAdjustment[]
+  subscriptionRedemptions    SubscriptionRedemption[]
 
   @@map("branches")
 }
@@ -205,6 +212,9 @@ model Product {
   // never hard-deleted — see catalog.repository.ts).
   promotions          Promotion[]
   posterImportedItems PosterImportedTransactionItem[]
+  subscriptionProduct     SubscriptionProduct?
+  subscriptionRedemptions SubscriptionRedemption[]
+  subscriptionPlans       SubscriptionPlan[]
 
   @@map("products")
 }
@@ -1344,4 +1354,213 @@ model CashAdjustment {
 
   @@index([date])
   @@map("cash_adjustments")
+}
+
+// =====================================================================================================================
+// Coffee Subscription (ADDITIVE ONLY). A customer-bound prepaid bundle of drink PORTIONS. Nothing here changes an existing
+// table's meaning. Remaining portions, today's usage and the cooldown are ALWAYS derived from SubscriptionRedemption rows
+// (never a cached counter); the only mutable counter, Subscription.usageVersion, is a lock, not a balance. See
+// docs/SUBSCRIPTIONS.md and src/modules/subscriptions/.
+// =====================================================================================================================
+
+// Admin-configured plan (e.g. "30 Coffee" — 450,000 UZS, 30 days, 30 portions, 3/day, 60 min cooldown). Money is Int minor
+// units like everywhere else. A plan's terms are SNAPSHOTTED onto each Subscription at purchase time, so editing a plan changes
+// what new buyers get, never what an existing customer already bought.
+model SubscriptionPlan {
+  id                String                 @id @default(cuid())
+  name              String
+  description       String?
+  priceMinor        Int
+  durationDays      Int
+  totalPortions     Int
+  dailyPortionLimit Int
+  cooldownMinutes   Int
+  isActive          Boolean                @default(true)
+  sortOrder         Int                    @default(0)
+  // Coffee Subscription — real Poster order purchase. The EXISTING CUP Product this plan sells (never a Poster id duplicated here:
+  // product.posterProductId is the source of truth). Nullable: a plan with no mapping can still be sold via cash, just not through a
+  // real Poster order. product.priceMinor is validated to match this plan's priceMinor when the mapping is set (subscription-plans.service.ts)
+  // — never silently overwritten either direction.
+  productId         String?
+  product           Product?               @relation(fields: [productId], references: [id])
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  subscriptions     Subscription[]
+  purchases         SubscriptionPurchase[]
+
+  @@map("subscription_plans")
+}
+
+// The ONLY authority on which products a subscription can pay for, and how many portions each costs (1 = standard, 2 = double).
+// Explicit per product (hot and iced are separate CUP/Poster products) — never inferred from a product name or modifier.
+// Applies to every plan (no per-plan scope yet). A deactivated mapping, or a deactivated Product, refuses redemption.
+model SubscriptionProduct {
+  id          String   @id @default(cuid())
+  productId   String   @unique
+  product     Product  @relation(fields: [productId], references: [id])
+  portionCost Int
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("subscription_products")
+}
+
+// One customer's subscription. status: PENDING_PAYMENT (created with its purchase, no dates yet) -> ACTIVE (paid; dates set) ->
+// EXPIRED / CANCELLED; PAUSED exists in the model but has no workflow yet. Whether a subscription is USABLE is never decided by
+// `status` alone: redemption also requires startsAt <= now < endsAt (see subscription-rules.ts), so a stale ACTIVE row past its
+// end can never be redeemed even if nothing ever flipped it to EXPIRED.
+//
+// Dates are business-local calendar days (BUSINESS_TIMEZONE_OFFSET_MINUTES, UTC+5): startBusinessDate is day 1, endBusinessDate
+// is the LAST usable day (inclusive); startsAt/endsAt are the exact UTC instants [day 1 00:00 local, day N+1 00:00 local).
+// A renewal bought while another subscription is still running starts exactly at that subscription's endsAt — periods never
+// overlap (enforced when the subscription is activated, under Customer.subscriptionLockVersion).
+//
+// Plan terms are snapshotted here at purchase. usageVersion is the redemption row lock (see SubscriptionRedemption.claimSequence).
+model Subscription {
+  id                String                   @id @default(cuid())
+  customerId        String
+  customer          Customer                 @relation(fields: [customerId], references: [id])
+  planId            String
+  plan              SubscriptionPlan         @relation(fields: [planId], references: [id])
+  status            String
+  planName          String
+  priceMinor        Int
+  durationDays      Int
+  totalPortions     Int
+  dailyPortionLimit Int
+  cooldownMinutes   Int
+  // Coffee Subscription — real Poster order purchase: a snapshot of which Poster product this subscription's purchase was tied to
+  // (mirrors the other plan-term snapshot fields above). Null for a cash-sale purchase, or a plan bought before it had a mapping.
+  posterProductId   String?
+  startsAt          DateTime?
+  endsAt            DateTime?
+  startBusinessDate String?
+  endBusinessDate   String?
+  activatedAt       DateTime?
+  pausedAt          DateTime?
+  cancelledAt       DateTime?
+  cancelReason      String?
+  expiredAt         DateTime?
+  usageVersion      Int                      @default(0)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  purchase          SubscriptionPurchase?
+  redemptions       SubscriptionRedemption[]
+
+  @@index([customerId, status])
+  @@index([status, endsAt])
+  @@index([planId])
+  @@map("subscriptions")
+}
+
+// The purchase / payment lifecycle, provider-agnostic. status: CREATED -> PAYMENT_PENDING -> PAID | FAILED | CANCELLED. Two confirmed
+// payment paths exist today: provider 'CASH' (a cashier confirms cash was received, no Poster mutation) and provider 'POSTER_ORDER'
+// (the plan's mapped product is added to the customer's real Poster order at its real price; confirmed once that order is observed
+// paid/closed — see poster-order-mutation.service.ts and the posterXxx fields below). No card number or payment credential is ever
+// stored. activationSource is 'PAYMENT' (a real payment, either provider) or 'ADMIN_MANUAL' (the protected development/manual
+// activation — NOT a payment; excluded from subscription revenue). A refund status deliberately does not exist (no-refund policy).
+model SubscriptionPurchase {
+  id                String           @id @default(cuid())
+  customerId        String
+  customer          Customer         @relation(fields: [customerId], references: [id])
+  planId            String
+  plan              SubscriptionPlan @relation(fields: [planId], references: [id])
+  subscriptionId    String           @unique
+  subscription      Subscription     @relation(fields: [subscriptionId], references: [id])
+  kind              String
+  status            String
+  amountMinor       Int
+  currency          String           @default("UZS")
+  provider          String?
+  providerPaymentId String?
+  activationSource  String?
+  activatedBy       String?
+  activationNote    String?
+  failureReason     String?
+  idempotencyKey    String           @unique
+  paidAt            DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  // Coffee Subscription — real Poster order purchase (provider 'POSTER_ORDER'). Same shape as SubscriptionRedemption's own Poster
+  // linkage fields, on purpose: posterOrderId is the widget's claim (for traceability only, never trusted for anything); posterTransactionId
+  // is the independently-resolved REST transaction id, set as soon as the line is added (BEFORE payment is confirmed) so a retried
+  // click can detect the line already exists and never add it twice; posterTransactionProductId is the added line's own id, used by
+  // the importer to recognise this exact line on the closed receipt and strip it from ordinary POS-sale revenue.
+  posterAccount              String?
+  posterSpotId               String?
+  posterTabletId             String?
+  posterOrderId              String?
+  posterTransactionId        String?   @unique
+  posterTransactionProductId String?
+  reconciliationStatus       String?
+  reconciledAt               DateTime?
+
+  @@unique([provider, providerPaymentId])
+  @@index([customerId, status])
+  @@index([status, paidAt])
+  @@map("subscription_purchases")
+}
+
+// ONE attempt to redeem subscription portions on a live Poster POS order (from the widget) — and, once CONFIRMED, the durable
+// record of the consumption. status: REQUESTED -> POSTER_MUTATING -> CONFIRMED | FAILED | UNKNOWN. Portions are HELD (they
+// block the balance, the daily limit and the cooldown) while a row is REQUESTED / POSTER_MUTATING / UNKNOWN and CONSUMED once
+// CONFIRMED; FAILED releases them. UNKNOWN (ambiguous Poster result) is never auto-retried: it is resolved from the closed
+// receipt by the importer, or by an admin.
+//
+// attemptId is the widget's idempotency key. claimSequence = the Subscription.usageVersion value this claim took under the row
+// lock — unique per subscription, so two claims can never have been validated against the same state.
+// redeemedForPosterOrderId: one Poster order = at most one subscription redemption (DB backstop, set only when CONFIRMED).
+// posterTransactionId / posterTransactionProductId are the REST receipt id and line id resolved by the mutation itself — the
+// importer uses posterTransactionId to recognise this line as subscription consumption, never as a paid sale.
+// productName / posterProductId / portionCost are snapshots.
+model SubscriptionRedemption {
+  id                         String       @id @default(cuid())
+  attemptId                  String       @unique
+  subscriptionId             String
+  subscription               Subscription @relation(fields: [subscriptionId], references: [id])
+  customerId                 String
+  customer                   Customer     @relation(fields: [customerId], references: [id])
+  productId                  String
+  product                    Product      @relation(fields: [productId], references: [id])
+  posterProductId            String
+  productName                String
+  portionCost                Int
+  branchId                   String?
+  branch                     Branch?      @relation(fields: [branchId], references: [id])
+  posterAccount              String
+  posterSpotId               String?
+  posterTabletId             String?
+  posterOrderId              String
+  posterTransactionId        String?
+  posterTransactionProductId String?
+  employeeIdentifier         String?
+  status                     String
+  failureReason              String?
+  claimSequence              Int?
+  businessDate               String
+  requestedAt                DateTime     @default(now())
+  redeemedAt                 DateTime?
+  redeemedForPosterOrderId   String?      @unique
+  reconciliationStatus       String?
+  reconciledAt               DateTime?
+  resolvedBy                 String?
+  resolutionNote             String?
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+
+  @@unique([subscriptionId, claimSequence])
+  @@index([subscriptionId, status])
+  @@index([customerId, requestedAt])
+  @@index([businessDate])
+  @@index([posterTransactionId])
+  @@index([branchId, requestedAt])
+  @@index([status, requestedAt])
+  @@map("subscription_redemptions")
 }

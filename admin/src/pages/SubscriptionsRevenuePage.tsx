@@ -14,6 +14,13 @@ const planColumns: Column<PlanRow>[] = [
   { key: 'm', header: 'Manual activations', numeric: true, low: true, cell: (r) => num(r.manualCount) },
 ];
 
+type ProviderRow = RevenueOverview['byProvider'][number];
+const providerColumns: Column<ProviderRow>[] = [
+  { key: 'p', header: 'Payment method', cell: (r) => <span className="font-semibold text-black">{r.provider === 'CASH' ? 'Cash (at the register)' : r.provider === 'POSTER_ORDER' ? 'Poster order (real payment)' : r.provider}</span> },
+  { key: 'c', header: 'Sold', numeric: true, cell: (r) => num(r.count) },
+  { key: 'r', header: 'Revenue', numeric: true, cell: (r) => formatSom(r.revenueMinor) },
+];
+
 // Subscription SALES revenue (money received for subscriptions) — never the value of redeemed coffee.
 export function SubscriptionsRevenuePage() {
   const { item } = findNav('subscriptions-revenue');
@@ -32,7 +39,7 @@ export function SubscriptionsRevenuePage() {
           <>
             {!d.paymentProvidersIntegrated && (
               <div className="rounded-md border-l-[3px] border-terracotta bg-cream-soft px-4 py-3 text-sm text-warn">
-                No payment provider (Click, Payme, Uzcard, Humo, Visa, Mastercard) is integrated yet — subscription revenue stays 0 until one is.
+                No ONLINE payment provider (Click, Payme, Uzcard, Humo, Visa, Mastercard) is integrated yet. Subscriptions can be sold for cash at the register (POS widget) when that feature is on — see "By payment method" below.
               </div>
             )}
             <StatGrid>
@@ -48,7 +55,10 @@ export function SubscriptionsRevenuePage() {
             <SectionCard flush title="By plan">
               <DataTable columns={planColumns} empty={<EmptyState text="No subscription was sold in this period." title="Nothing here" variant="inline" />} rowKey={(r) => r.planId} rows={d.byPlan} />
             </SectionCard>
-            <SectionCard description="Provider-confirmed payments per business day (UTC+5)." title="By day">
+            <SectionCard flush title="By payment method">
+              <DataTable columns={providerColumns} empty={<EmptyState text="No subscription was sold in this period." title="Nothing here" variant="inline" />} rowKey={(r) => r.provider} rows={d.byProvider} />
+            </SectionCard>
+            <SectionCard description="Paid subscriptions per business day (UTC+5)." title="By day">
               <BarChart ariaLabel="Subscription revenue per day" data={d.byDay.map((x) => ({ label: x.date.slice(5), value: x.revenueMinor }))} emptyText="No subscription revenue in this period." format={formatSom} />
             </SectionCard>
             <Notes notes={d.notes} />

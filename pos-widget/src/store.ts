@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from 'react';
-import { apiConfigured, fetchOverview, redeemPromotion, redeemReward, redeemSubscription } from './api';
+import { apiConfigured, fetchOverview, purchaseSubscriptionCash, redeemPromotion, redeemReward, redeemSubscription } from './api';
 import { isMobile, poster, posterProbe } from './poster';
 import type { PosterApi } from './poster';
 import type { PosterClient } from './poster';
-import type { EligibleRewardProduct, ErrorKind, Identifier, Overview, PosterClientInfo, RedeemPromotionResult, RedeemRewardResult, RedeemSubscriptionResult, SubscriptionProductView } from './types';
+import { checkPosterOrderPayment, purchaseSubscriptionPosterOrder } from './api';
+import type { CashSaleSubscriptionView, EligibleRewardProduct, ErrorKind, Identifier, Overview, PosterClientInfo, PurchaseSubscriptionCashResult, RedeemPromotionResult, RedeemRewardResult, RedeemSubscriptionResult, SubscriptionPlanView, SubscriptionProductView } from './types';
 
 // The widget's whole behaviour, outside React because Poster's events live outside it. Everything is READ-ONLY and NON-BLOCKING:
 //   * handlers are registered for non-blocking events only (orderOpen, orderClientChange, applicationIconClicked, notificationClick) and never take a `next`;
@@ -55,6 +56,40 @@ export interface SubscriptionRedemptionUiState {
 
 const subscriptionRedemptionIdle: SubscriptionRedemptionUiState = { phase: 'idle', selected: null, result: null, transportError: null };
 
+// Coffee Subscription cash sale — a cashier sells a plan for cash (a separate concept from redemption: this one activates a subscription and takes no
+// Poster order at all, see pos-widget-subscription.service.ts#purchaseCash). Same idle -> confirming -> applying -> done shape, no 'selecting' phase:
+// tapping a plan in the list IS the selection.
+export type CashSalePhase = 'idle' | 'confirming' | 'applying' | 'done';
+
+export interface CashSaleUiState {
+  phase: CashSalePhase;
+  selected: SubscriptionPlanView | null;
+  result: PurchaseSubscriptionCashResult | null;
+  transportError: ErrorKind | null;
+}
+
+const cashSaleIdle: CashSaleUiState = { phase: 'idle', selected: null, result: null, transportError: null };
+
+// Coffee Subscription — real Poster order purchase. A cashier adds the plan's mapped product to the customer's OPEN Poster order at its real
+// price; the customer then pays through Poster itself. Unlike cash sale, this needs a real open order (subscriptionTarget(), same requirement
+// as redemption) and does NOT activate on confirm: 'awaiting_payment' is a distinct phase from 'done' because there is no synchronous "is this
+// paid" check (see pos-widget-subscription.service.ts#checkPosterOrderPayment) — the widget polls a few times, or the cashier taps "check"
+// manually, before this either resolves ACTIVATED or is left for the backend's own reconciliation safety net.
+export type PosterPurchasePhase = 'idle' | 'confirming' | 'applying' | 'awaiting_payment' | 'checking' | 'done';
+
+export type PosterPurchaseFinalResult = { status: 'ACTIVATED'; subscription: CashSaleSubscriptionView } | { status: 'REJECTED'; reason: string };
+
+export interface PosterPurchaseUiState {
+  phase: PosterPurchasePhase;
+  selected: SubscriptionPlanView | null;
+  purchaseId: string | null; // set once the line was added (ADDED_TO_ORDER)
+  pollAttempts: number;
+  result: PosterPurchaseFinalResult | null; // set once phase is 'done'
+  transportError: ErrorKind | null;
+}
+
+const posterPurchaseIdle: PosterPurchaseUiState = { phase: 'idle', selected: null, purchaseId: null, pollAttempts: 0, result: null, transportError: null };
+
 export interface WidgetState {
   phase: Phase;
   source: 'ORDER' | 'MANUAL' | null;
@@ -83,6 +118,8 @@ export interface WidgetState {
   subscriptionRedemption: SubscriptionRedemptionUiState;
   // Coffee Subscription — the order id a subscription coffee was confirmed for (UX only; the backend enforces one per order).
   redeemedSubscriptionOrderId: number | null;
+  cashSale: CashSaleUiState;
+  posterPurchase: PosterPurchaseUiState;
 }
 
 const initial: WidgetState = {
@@ -105,6 +142,8 @@ const initial: WidgetState = {
   redeemedPromotionOrderId: null,
   subscriptionRedemption: subscriptionRedemptionIdle,
   redeemedSubscriptionOrderId: null,
+  cashSale: cashSaleIdle,
+  posterPurchase: posterPurchaseIdle,
 };
 
 let state: WidgetState = initial;
@@ -140,6 +179,11 @@ const safe = <T>(fn: () => T): T | undefined => {
 const nextRedemption = (): RedemptionUiState => (state.redemption.phase === 'applying' ? state.redemption : redemptionIdle);
 const nextPromotionRedemption = (): PromotionRedemptionUiState => (state.promotionRedemption.phase === 'applying' ? state.promotionRedemption : promotionRedemptionIdle);
 const nextSubscriptionRedemption = (): SubscriptionRedemptionUiState => (state.subscriptionRedemption.phase === 'applying' ? state.subscriptionRedemption : subscriptionRedemptionIdle);
+const nextCashSale = (): CashSaleUiState => (state.cashSale.phase === 'applying' ? state.cashSale : cashSaleIdle);
+// Unlike the other flows, 'awaiting_payment'/'checking' also survive a context change here (not just 'applying'): the Poster order already
+// has the line added and the purchase is genuinely waiting on an external event (the customer paying), not a stale in-flight request — losing
+// this from view would strand the cashier with no way to see whether it was ever paid.
+const nextPosterPurchase = (): PosterPurchaseUiState => (['applying', 'awaiting_payment', 'checking'].includes(state.posterPurchase.phase) ? state.posterPurchase : posterPurchaseIdle);
 
 // ---- context changes ---------------------------------------------------------------------------------------------------
 
@@ -147,13 +191,13 @@ const nextSubscriptionRedemption = (): SubscriptionRedemptionUiState => (state.s
 function resetTo(patch: Partial<WidgetState>) {
   generation += 1;
   lastRequest = null;
-  set({ phase: 'IDLE', source: null, overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), subscriptionRedemption: nextSubscriptionRedemption(), ...patch });
+  set({ phase: 'IDLE', source: null, overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), subscriptionRedemption: nextSubscriptionRedemption(), cashSale: nextCashSale(), posterPurchase: nextPosterPurchase(), ...patch });
 }
 
 function loadForOrderCustomer(orderId: number | null, clientId: number) {
   generation += 1;
   const gen = generation;
-  set({ phase: 'LOADING', source: 'ORDER', orderId, clientId, overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), subscriptionRedemption: nextSubscriptionRedemption() });
+  set({ phase: 'LOADING', source: 'ORDER', orderId, clientId, overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), subscriptionRedemption: nextSubscriptionRedemption(), cashSale: nextCashSale(), posterPurchase: nextPosterPurchase() });
   const run = () => {
     const my = ++generation; // a Retry is a new generation too
     set({ phase: 'LOADING', error: null });
@@ -214,7 +258,7 @@ async function onOrderClientChange(data: { clientId?: number | string; orderId?:
     // the customer changed: whatever is in flight for the previous one is now stale, and the old card must not stay on screen while the new one is resolved
     generation += 1;
     lastRequest = null;
-    set({ phase: 'LOADING', source: 'ORDER', overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), subscriptionRedemption: nextSubscriptionRedemption() });
+    set({ phase: 'LOADING', source: 'ORDER', overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), subscriptionRedemption: nextSubscriptionRedemption(), cashSale: nextCashSale(), posterPurchase: nextPosterPurchase() });
   }
   try {
     const active = await poster()?.orders.getActive();
@@ -507,6 +551,156 @@ export function confirmSubscriptionRedeem() {
 export function closeSubscriptionRedemption() {
   if (state.subscriptionRedemption.phase === 'applying') return;
   set({ subscriptionRedemption: subscriptionRedemptionIdle });
+}
+
+// ---- Coffee Subscription cash sale ---------------------------------------------------------------------------------------
+
+// Who the plan is sold to: the order's Poster client (ORDER) or, after a QR / code lookup, the customer's CUP code (MANUAL) — same identity rule as
+// subscriptionTarget() above, but WITHOUT requiring an open order: a cash sale activates a subscription, it never touches an order's lines.
+export function subscriptionCustomerRef(): { posterClientId?: string; code?: string } | null {
+  if (state.source === 'ORDER' && state.clientId !== null) return { posterClientId: String(state.clientId) };
+  const code = state.overview?.customer?.code;
+  if (state.source === 'MANUAL' && code) return { code };
+  return null;
+}
+
+export function startCashSale(plan: SubscriptionPlanView) {
+  set({ cashSale: { phase: 'confirming', selected: plan, result: null, transportError: null } });
+}
+
+export function cancelCashSale() {
+  if (state.cashSale.phase === 'applying') return; // a request already in flight cannot be cancelled from here — see nextCashSale()
+  set({ cashSale: cashSaleIdle });
+}
+
+// Fires the ONE write request this flow makes. Mirrors confirmSubscriptionRedeem: once sent, the result is always shown, however the surrounding
+// customer context moves on in the meantime (a sent POST must never be silently dropped).
+export function confirmCashSale() {
+  const r = state.cashSale;
+  const ref = subscriptionCustomerRef();
+  if (r.phase !== 'confirming' || !r.selected || !ref) return;
+  const idempotencyKey = newAttemptId();
+  const planId = r.selected.id;
+  set({ cashSale: { ...r, phase: 'applying' } });
+  void (async () => {
+    const res = await purchaseSubscriptionCash({ planId, ...ref, employeeIdentifier: state.employee }, idempotencyKey);
+    if (res.kind === 'ERROR') {
+      set({ cashSale: { ...state.cashSale, phase: 'done', transportError: res.error, result: null } });
+      return;
+    }
+    set({ cashSale: { ...state.cashSale, phase: 'done', result: res.result, transportError: null } });
+    // Refresh the figures behind the result — read-only, and only if this customer is still the one on screen.
+    if ((ref.posterClientId && String(state.clientId) === ref.posterClientId) || (ref.code && state.overview?.customer?.code === ref.code)) {
+      const gen = ++generation;
+      const id: Identifier = ref.posterClientId ? { posterClientId: ref.posterClientId } : { code: ref.code as string };
+      void requestOverview(gen, id, ref.posterClientId ? 'ORDER' : 'MANUAL');
+    }
+  })();
+}
+
+export function closeCashSale() {
+  if (state.cashSale.phase === 'applying') return;
+  set({ cashSale: cashSaleIdle });
+}
+
+// ---- Coffee Subscription real Poster order purchase ------------------------------------------------------------------
+
+export function startPosterPurchase(plan: SubscriptionPlanView) {
+  set({ posterPurchase: { phase: 'confirming', selected: plan, purchaseId: null, pollAttempts: 0, result: null, transportError: null } });
+}
+
+export function cancelPosterPurchase() {
+  if (state.posterPurchase.phase === 'applying') return;
+  set({ posterPurchase: posterPurchaseIdle });
+}
+
+let posterPurchasePollTimer: ReturnType<typeof setTimeout> | null = null;
+const POSTER_PURCHASE_POLL_MS = 4000;
+const POSTER_PURCHASE_MAX_AUTO_POLLS = 6; // ~24s of auto-polling before falling back to manual-check-only (the cashier's own button never stops working)
+
+function clearPosterPurchasePoll(): void {
+  if (posterPurchasePollTimer !== null) {
+    clearTimeout(posterPurchasePollTimer);
+    posterPurchasePollTimer = null;
+  }
+}
+
+// Fires the ONE write request that adds the product to the order. Only ever offered from the READY + FOUND view with a real open order
+// (subscriptionTarget(), same requirement as redemption — this feature adds a line to an order, it does not create one).
+export function confirmPosterPurchase() {
+  const r = state.posterPurchase;
+  const target = subscriptionTarget();
+  if (r.phase !== 'confirming' || !r.selected || !target) return;
+  const attemptId = newAttemptId();
+  const planId = r.selected.id;
+  set({ posterPurchase: { ...r, phase: 'applying' } });
+  void (async () => {
+    const res = await purchaseSubscriptionPosterOrder({ planId, posterClientId: target.posterClientId, code: target.code, posterOrderId: String(target.orderId), employeeIdentifier: state.employee }, attemptId);
+    if (res.kind === 'ERROR') {
+      set({ posterPurchase: { ...state.posterPurchase, phase: 'done', transportError: res.error, result: null } });
+      return;
+    }
+    if (res.result.status === 'REJECTED') {
+      set({ posterPurchase: { ...state.posterPurchase, phase: 'done', result: res.result, transportError: null } });
+      return;
+    }
+    // ADDED_TO_ORDER: still PENDING_PAYMENT — the customer has to pay through Poster now. Start waiting for that.
+    const purchaseId = res.result.purchase.id;
+    set({ posterPurchase: { ...state.posterPurchase, phase: 'awaiting_payment', purchaseId, pollAttempts: 0 } });
+    schedulePosterPurchasePoll(purchaseId);
+  })();
+}
+
+function schedulePosterPurchasePoll(purchaseId: string): void {
+  clearPosterPurchasePoll();
+  posterPurchasePollTimer = setTimeout(() => {
+    posterPurchasePollTimer = null;
+    if (state.posterPurchase.purchaseId !== purchaseId || state.posterPurchase.phase !== 'awaiting_payment') return; // stale: cancelled / already resolved elsewhere
+    void runPosterPurchaseCheck(purchaseId, true);
+  }, POSTER_PURCHASE_POLL_MS);
+}
+
+// Shared by the auto-poll timer and the cashier's own "check now" button — same call, same result handling either way. `isAutoPoll` only
+// changes how a TRANSPORT failure is shown: silently retried later for an automatic poll, shown as a real error for a manual tap.
+async function runPosterPurchaseCheck(purchaseId: string, isAutoPoll: boolean): Promise<void> {
+  if (state.posterPurchase.purchaseId !== purchaseId) return; // stale: the flow moved on
+  set({ posterPurchase: { ...state.posterPurchase, phase: 'checking' } });
+  const res = await checkPosterOrderPayment(purchaseId);
+  if (state.posterPurchase.purchaseId !== purchaseId) return; // the flow moved on while this call was in flight
+  if (res.kind === 'ERROR') {
+    if (isAutoPoll) {
+      set({ posterPurchase: { ...state.posterPurchase, phase: 'awaiting_payment' } });
+      maybeScheduleNextPoll(purchaseId);
+      return;
+    }
+    set({ posterPurchase: { ...state.posterPurchase, phase: 'done', transportError: res.error, result: null } });
+    return;
+  }
+  if (res.result.status === 'PENDING_PAYMENT') {
+    set({ posterPurchase: { ...state.posterPurchase, phase: 'awaiting_payment' } });
+    maybeScheduleNextPoll(purchaseId);
+    return;
+  }
+  set({ posterPurchase: { ...state.posterPurchase, phase: 'done', result: res.result, transportError: null } });
+}
+
+function maybeScheduleNextPoll(purchaseId: string): void {
+  const attempts = state.posterPurchase.pollAttempts + 1;
+  set({ posterPurchase: { ...state.posterPurchase, pollAttempts: attempts } });
+  if (attempts < POSTER_PURCHASE_MAX_AUTO_POLLS) schedulePosterPurchasePoll(purchaseId);
+}
+
+export function checkPosterPurchasePayment(): void {
+  const r = state.posterPurchase;
+  if (r.phase !== 'awaiting_payment' || !r.purchaseId) return;
+  clearPosterPurchasePoll();
+  void runPosterPurchaseCheck(r.purchaseId, false);
+}
+
+export function closePosterPurchase(): void {
+  if (state.posterPurchase.phase === 'applying' || state.posterPurchase.phase === 'checking') return;
+  clearPosterPurchasePoll();
+  set({ posterPurchase: posterPurchaseIdle });
 }
 
 // ---- start -------------------------------------------------------------------------------------------------------------
