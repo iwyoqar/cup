@@ -21,6 +21,12 @@ import { ReportsCampaignsPage } from './pages/ReportsCampaignsPage';
 import { ReportsReferralsPage } from './pages/ReportsReferralsPage';
 import { ReportsAbcAnalysisPage } from './pages/ReportsAbcAnalysisPage';
 import { ReportsReceiptsPage } from './pages/ReportsReceiptsPage';
+import { SubscriptionsActivePage } from './pages/SubscriptionsActivePage';
+import { SubscriptionsCustomersPage } from './pages/SubscriptionsCustomersPage';
+import { SubscriptionsOverviewPage } from './pages/SubscriptionsOverviewPage';
+import { SubscriptionsPlansPage } from './pages/SubscriptionsPlansPage';
+import { SubscriptionsRedemptionsPage } from './pages/SubscriptionsRedemptionsPage';
+import { SubscriptionsRevenuePage } from './pages/SubscriptionsRevenuePage';
 import { CustomersPage } from './pages/CustomersPage';
 import { SegmentsPage } from './pages/SegmentsPage';
 import { CampaignsPage } from './pages/CampaignsPage';
@@ -123,6 +129,12 @@ export function App() {
       {page === 'reports-referrals' && <ReportsReferralsPage />}
       {page === 'reports-abc' && <ReportsAbcAnalysisPage />}
       {page === 'reports-receipts' && <ReportsReceiptsPage />}
+      {page === 'subscriptions' && <SubscriptionsOverviewPage />}
+      {page === 'subscriptions-active' && <SubscriptionsActivePage />}
+      {page === 'subscriptions-plans' && <SubscriptionsPlansPage />}
+      {page === 'subscriptions-redemptions' && <SubscriptionsRedemptionsPage />}
+      {page === 'subscriptions-customers' && <SubscriptionsCustomersPage />}
+      {page === 'subscriptions-revenue' && <SubscriptionsRevenuePage />}
       {page === 'customers' && <CustomersPage />}
       {page === 'segments' && <SegmentsPage />}
       {page === 'loyalty' && <LoyaltyPage />}

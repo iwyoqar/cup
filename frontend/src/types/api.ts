@@ -273,3 +273,78 @@ export type ReferralOverview =
       limitReached: boolean;
       myReferral: { status: string; welcomePoints: number | null } | null;
     };
+
+// ---- Coffee Subscription (GET /subscriptions/me, /subscriptions/me/redemptions) --------------------------------------------------
+// Every number is computed by the backend from the subscription's redemptions — the Mini App never calculates a balance itself.
+export interface SubscriptionUsage {
+  totalPortions: number;
+  consumedPortions: number;
+  heldPortions: number;
+  remainingPortions: number;
+  dailyPortionLimit: number;
+  todayUsedPortions: number;
+  todayRemainingPortions: number;
+  lastRedemptionAt: string | null;
+  nextAvailableAt: string | null;
+  cooldownMinutes: number;
+}
+
+export interface SubscriptionView {
+  id: string;
+  planId: string;
+  planName: string;
+  status: string;
+  effectiveStatus: 'PENDING_PAYMENT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED' | 'CANCELLED' | 'SCHEDULED';
+  priceMinor: number;
+  durationDays: number;
+  startBusinessDate: string | null;
+  endBusinessDate: string | null;
+  usage: SubscriptionUsage;
+}
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  description: string | null;
+  priceMinor: number;
+  durationDays: number;
+  totalPortions: number;
+  dailyPortionLimit: number;
+  cooldownMinutes: number;
+}
+
+export interface SubscriptionPurchase {
+  id: string;
+  kind: 'NEW' | 'RENEWAL';
+  status: 'CREATED' | 'PAYMENT_PENDING' | 'PAID' | 'FAILED' | 'CANCELLED';
+  planId: string;
+  planName: string;
+  amountMinor: number;
+  createdAt: string;
+}
+
+export interface SubscriptionSummary {
+  current: SubscriptionView | null;
+  upcoming: SubscriptionView[];
+  pendingPurchase: SubscriptionPurchase | null;
+  plans: SubscriptionPlan[];
+  canRenew: boolean;
+  payment: { available: boolean };
+  policy: { autoRenew: boolean; refunds: boolean; rollover: boolean };
+}
+
+export interface SubscriptionRedemptionItem {
+  id: string;
+  kind: 'SUBSCRIPTION_REDEMPTION';
+  status: string;
+  at: string;
+  productName: string;
+  portionCost: number;
+  planName: string;
+  branchName: string | null;
+}
+
+export interface SubscriptionRedemptionPage {
+  items: SubscriptionRedemptionItem[];
+  nextCursor: string | null;
+}

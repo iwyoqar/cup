@@ -19,6 +19,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   TOO_RECENT: 'Still settling',
   UNPAID: 'Unpaid',
   REFUND_UNVERIFIED: 'Refund-like (excluded)',
+  SUBSCRIPTION_REDEMPTION: 'Subscription coffee only',
   OTHER: 'Other',
 };
 

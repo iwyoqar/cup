@@ -40,7 +40,9 @@ export function FinancePnlPage() {
             <KeyValue
               rows={[
                 line('Revenue', data.revenue),
+                ...(data.revenueBreakdown && data.revenueBreakdown.subscriptionSalesMinor ? [line('  incl. subscription sales', data.revenueBreakdown.subscriptionSalesMinor)] : []),
                 line('COGS', data.cogs.amountMinor, false, true),
+                ...(data.cogs.subscriptionConsumptionMinor ? [line('  incl. subscription coffee (no revenue)', data.cogs.subscriptionConsumptionMinor, false, true)] : []),
                 line('Gross Profit', data.grossProfit, true),
                 ...data.operatingExpenses.byCategory.map((c) => line(`  ${c.categoryName}`, c.amountMinor, false, true)),
                 line('Operating Profit', data.operatingProfit, true),

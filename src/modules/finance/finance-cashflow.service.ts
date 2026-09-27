@@ -13,7 +13,7 @@ export interface CashFlowOverview {
   period: { key: string; startDate: string; endDate: string };
   branch: { id: string; name: string } | null;
   openingBalance: number; // computed cumulative net cash flow before this period — NOT reconciled against a real bank statement (see note)
-  cashIn: { revenue: number; manualAdjustments: number; total: number };
+  cashIn: { revenue: number; subscriptionSales: number; manualAdjustments: number; total: number };
   cashOut: {
     operatingExpensesPaid: number;
     financialExpensesPaid: number;
@@ -53,7 +53,7 @@ export class FinanceCashFlowService {
 
     const [periodTotals, openingBalance] = await Promise.all([this.periodTotals(range.from, range.to, branchId), this.cumulativeNetCashFlow(new Date(0), range.from, branchId)]);
 
-    const cashIn = { revenue: periodTotals.revenue, manualAdjustments: periodTotals.positiveAdjustments, total: periodTotals.revenue + periodTotals.positiveAdjustments };
+    const cashIn = { revenue: periodTotals.revenue, subscriptionSales: periodTotals.subscriptionSales, manualAdjustments: periodTotals.positiveAdjustments, total: periodTotals.revenue + periodTotals.subscriptionSales + periodTotals.positiveAdjustments };
     const cashOut = {
       operatingExpensesPaid: periodTotals.operatingExpensesPaid,
       financialExpensesPaid: periodTotals.financialExpensesPaid,
@@ -83,7 +83,7 @@ export class FinanceCashFlowService {
 
   private async periodTotals(from: Date, to: Date, branchId: string | null) {
     const q: QueryRange = { from, to, branchId };
-    const [cup, pos, expensesByCategory, paidTotal, loanInterest, loanPrincipal, investments, adjustments] = await Promise.all([
+    const [cup, pos, expensesByCategory, paidTotal, loanInterest, loanPrincipal, investments, adjustments, subscriptionSales] = await Promise.all([
       this.analytics.cupTotals(q),
       this.analytics.posTotals(q),
       this.repository.expensesByCategory(from, to, branchId),
@@ -92,6 +92,7 @@ export class FinanceCashFlowService {
       this.repository.loanPrincipalTotal(from, to),
       this.repository.investmentTotal(from, to, branchId),
       this.financeRepository.listCashAdjustments(from, to),
+      branchId ? Promise.resolve(0) : this.repository.subscriptionSalesTotal(from, to), // Coffee Subscription: provider-confirmed payments only
     ]);
     // paidExpenseTotal is PAID expenses of every type; split it operating/financial using the same category-type
     // ratio expensesByCategory reports (both queries share the same date/branch filter, so this split is exact
@@ -107,7 +108,7 @@ export class FinanceCashFlowService {
     const positiveAdjustments = branchAdjustments.filter((a) => a.amountMinor > 0).reduce((s, a) => s + a.amountMinor, 0);
     const negativeAdjustments = branchAdjustments.filter((a) => a.amountMinor < 0).reduce((s, a) => s + -a.amountMinor, 0);
 
-    return { revenue: cup.revenue + pos.revenue, operatingExpensesPaid, financialExpensesPaid, loanInterest, loanPrincipal, investments, positiveAdjustments, negativeAdjustments };
+    return { revenue: cup.revenue + pos.revenue, subscriptionSales, operatingExpensesPaid, financialExpensesPaid, loanInterest, loanPrincipal, investments, positiveAdjustments, negativeAdjustments };
   }
 
   private async cumulativeNetCashFlow(from: Date, to: Date, branchId: string | null): Promise<number> {
@@ -118,7 +119,7 @@ export class FinanceCashFlowService {
   // this view itself reports, never a second one computed differently.
   async netCashFlowForRange(from: Date, to: Date, branchId: string | null): Promise<number> {
     const t = await this.periodTotals(from, to, branchId);
-    const cashIn = t.revenue + t.positiveAdjustments;
+    const cashIn = t.revenue + t.subscriptionSales + t.positiveAdjustments;
     const cashOut = t.operatingExpensesPaid + t.financialExpensesPaid + t.loanPrincipal + t.loanInterest + t.investments + t.negativeAdjustments;
     return cashIn - cashOut;
   }

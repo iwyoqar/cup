@@ -104,6 +104,7 @@ export interface Overview {
   } | null;
   rewards: { availableTotal: number; redemption: { enabled: boolean }; programs: RewardProgramView[] } | null;
   promotions: { redemption: { enabled: boolean }; items: PromotionView[] };
+  subscription?: SubscriptionSummary | null; // Coffee Subscription (absent on an older backend)
   activity: { visits: number; lastVisitAt: string | null } | null;
 }
 
@@ -116,4 +117,48 @@ export interface PosterClientInfo {
   id: number;
   name: string;
   phone: string | null;
+}
+
+// Coffee Subscription — mirrored from the backend's PosWidgetSubscriptionService.summaryFor. Every figure and every "can redeem" decision is the
+// backend's; the widget only displays them and sends which customer / order / product.
+export interface SubscriptionProductView {
+  posterProductId: string;
+  name: string;
+  portionCost: number; // 1 = standard, 2 = double
+  eligible: boolean;
+  reason: string | null;
+}
+
+export interface SubscriptionSummary {
+  redemption: { enabled: boolean };
+  current: {
+    planName: string;
+    status: string;
+    endBusinessDate: string | null;
+    totalPortions: number;
+    consumedPortions: number;
+    heldPortions: number;
+    remainingPortions: number;
+    dailyPortionLimit: number;
+    todayUsedPortions: number;
+    todayRemainingPortions: number;
+    lastRedemptionAt: string | null;
+    nextAvailableAt: string | null;
+    cooldownMinutes: number;
+  } | null;
+  upcoming: { planName: string; startBusinessDate: string | null; endBusinessDate: string | null }[];
+  blockedReason: string | null;
+  products: SubscriptionProductView[];
+  recent: { productName: string; portionCost: number; at: string | null; branchName: string | null }[];
+}
+
+export type SubscriptionRedemptionStatus = 'REQUESTED' | 'POSTER_MUTATING' | 'CONFIRMED' | 'FAILED' | 'UNKNOWN';
+
+export interface RedeemSubscriptionResult {
+  attemptId: string;
+  status: SubscriptionRedemptionStatus;
+  failureReason: string | null;
+  productName: string | null;
+  portionCost: number | null;
+  after: { remainingPortions: number; totalPortions: number; todayRemainingPortions: number; nextAvailableAt: string | null } | null;
 }

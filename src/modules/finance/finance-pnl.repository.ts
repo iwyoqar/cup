@@ -23,6 +23,27 @@ export class FinancePnlRepository {
     return new Map(rows.map((r) => [r.id, { hasRecipe: r.hasRecipe, theoreticalCostMinor: r.theoreticalCostMinor, name: r.name }]));
   }
 
+  // Coffee Subscription — money actually received for subscriptions: purchases PAID through a payment provider, by paidAt (cash basis, the
+  // same basis CUP Finance uses for every sale). Manual admin activations are not payments and never count. Subscriptions are not tied to
+  // a branch, so a branch-filtered view has no subscription sales (see the P&L note).
+  async subscriptionSalesTotal(from: Date, to: Date): Promise<number> {
+    const r = await this.prisma.subscriptionPurchase.aggregate({ where: { status: 'PAID', activationSource: 'PAYMENT', paidAt: { gte: from, lt: to } }, _sum: { amountMinor: true } });
+    return r._sum.amountMinor ?? 0;
+  }
+
+  // Coffee Subscription — what was physically CONSUMED under subscriptions: one unit of the product per CONFIRMED redemption (by redeemedAt,
+  // at the branch it was made). Zero revenue by definition; its theoretical cost is COGS. These units never reach the imported POS sale lines
+  // (the importer keeps them out), so they are counted exactly once — here.
+  async subscriptionConsumption(from: Date, to: Date, branchId: string | null): Promise<{ productId: string; quantity: number; portions: number }[]> {
+    const rows = await this.prisma.subscriptionRedemption.groupBy({
+      by: ['productId'],
+      where: { status: 'CONFIRMED', redeemedAt: { gte: from, lt: to }, ...(branchId ? { branchId } : {}) },
+      _count: { _all: true },
+      _sum: { portionCost: true },
+    });
+    return rows.map((r) => ({ productId: r.productId, quantity: r._count._all, portions: r._sum.portionCost ?? 0 }));
+  }
+
   // Operating expenses grouped by category (the P&L's "Rent / Salaries / Marketing / ..." line
   // items) — an expense counts in the period it was INCURRED (its own `date`), regardless of
   // paymentStatus; Cash Flow (finance-cashflow.service.ts) is the one that cares whether it was

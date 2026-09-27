@@ -7,6 +7,7 @@ import { PosWidgetAuthService } from './pos-widget-auth.service';
 import { OverviewIdentifier, PosWidgetOverviewService } from './pos-widget-overview.service';
 import { RedeemPromotionInputError, PosWidgetPromotionRedemptionService } from './pos-widget-promotion-redemption.service';
 import { RedeemRewardInputError, PosWidgetRewardRedemptionService } from './pos-widget-reward-redemption.service';
+import { PosWidgetSubscriptionService, RedeemSubscriptionInputError } from './pos-widget-subscription.service';
 import { PosContext } from './pos-widget-signature';
 
 type PosRequest = FastifyRequest & { posContext?: PosContext };
@@ -78,6 +79,48 @@ export class PosPromotionRedemptionGuard implements CanActivate {
   }
 }
 
+// Coffee Subscription — the SAME verified-signature guard plus its own independent operator interlock (POS_SUBSCRIPTION_REDEMPTION_ENABLED),
+// mirroring PosRewardRedemptionGuard exactly.
+@Injectable()
+export class PosSubscriptionRedemptionGuard implements CanActivate {
+  constructor(
+    private readonly auth: PosWidgetAuthService,
+    private readonly config: ConfigService,
+  ) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    if (!this.config.env.POS_SUBSCRIPTION_REDEMPTION_ENABLED) throw new ServiceUnavailableException({ status: 'unavailable', enabled: false, feature: 'subscription-redemption' });
+    const req = context.switchToHttp().getRequest<PosRequest>();
+    const result = this.auth.authenticate(req);
+    if (result.ok) {
+      req.posContext = result.context;
+      return true;
+    }
+    if (result.reason === 'DISABLED' || result.reason === 'NOT_CONFIGURED') throw new ServiceUnavailableException({ status: 'unavailable', enabled: this.auth.enabled });
+    if (result.reason === 'WRONG_ACCOUNT') throw new ForbiddenException({ status: 'rejected', reason: 'WRONG_ACCOUNT' });
+    throw new UnauthorizedException({ status: 'rejected', reason: result.reason });
+  }
+}
+
+// Coffee Subscription redemption: the customer is the order's Poster client OR the customer's existing CUP QR/code (exactly one). No price,
+// balance, cooldown or eligibility is ever accepted from the widget — only which customer, which open order, which product.
+const redeemSubscriptionBodySchema = z
+  .object({
+    attemptId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
+    posterClientId: z.string().regex(/^\d{1,12}$/).optional(),
+    code: z.string().trim().min(3).max(64).optional(),
+    posterOrderId: z.string().regex(/^\d{1,20}$/),
+    posterProductId: z.string().regex(/^\d{1,12}$/),
+    employeeIdentifier: z.string().trim().min(1).max(64).nullable().optional(),
+  })
+  .strict()
+  .refine((b) => (b.posterClientId === undefined) !== (b.code === undefined), 'Exactly one of posterClientId / code is required.');
+
+const subscriptionQuerySchema = z
+  .object({ posterClientId: z.string().regex(/^\d{1,12}$/).optional(), code: z.string().trim().min(3).max(64).optional() })
+  .strict()
+  .refine((q) => (q.posterClientId === undefined) !== (q.code === undefined), 'Exactly one identifier is required.');
+
 // Exactly the shape pos-widget-reward-redemption.types.ts's RedeemRewardRequest expects. .strict(): an unknown field is a 400, same discipline as the
 // overview's query schema.
 const redeemBodySchema = z
@@ -128,6 +171,7 @@ export class PosWidgetController {
     private readonly audit: PosWidgetAuditService,
     private readonly rewardRedemption: PosWidgetRewardRedemptionService,
     private readonly promotionRedemption: PosWidgetPromotionRedemptionService,
+    private readonly subscription: PosWidgetSubscriptionService,
     private readonly config: ConfigService,
   ) {}
 
@@ -160,11 +204,45 @@ export class PosWidgetController {
     if (resolved.kind !== 'FOUND') {
       // A typed code / phone that matches nobody is worth an audit line (no identifier is stored); a Poster client id with no mapping is system-driven and is not.
       if (resolved.kind === 'NOT_FOUND' && identifier.kind !== 'posterClientId') await this.audit.record(ctx, null, 'NOT_FOUND');
-      return { ...base, state: resolved.kind, customer: null, linkedToPoster: false, loyalty: null, rewards: null, promotions: { redemption: { enabled: this.config.env.POS_PROMOTION_REDEMPTION_ENABLED }, items: [] }, activity: null };
+      return { ...base, state: resolved.kind, customer: null, linkedToPoster: false, loyalty: null, rewards: null, promotions: { redemption: { enabled: this.config.env.POS_PROMOTION_REDEMPTION_ENABLED }, items: [] }, subscription: null, activity: null };
     }
-    const body = await this.overview.build(resolved.customer);
+    const [body, subscription] = await Promise.all([this.overview.build(resolved.customer), this.subscription.summaryFor(resolved.customer.id)]);
     await this.audit.record(ctx, resolved.customer.id, 'FOUND');
-    return { ...base, state: 'FOUND' as const, ...body };
+    return { ...base, state: 'FOUND' as const, ...body, subscription };
+  }
+
+  // Coffee Subscription — the summary alone (the widget re-reads it after a redemption). Read-only, same guard as the overview.
+  @Get('subscriptions/summary')
+  @UseGuards(PosWidgetGuard)
+  async subscriptionSummary(@Query() query: Record<string, string | undefined>, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = subscriptionQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException('Invalid subscription query.');
+    const customer = await this.subscription.resolveCustomer(parsed.data.posterClientId ? { posterClientId: parsed.data.posterClientId } : { code: parsed.data.code as string });
+    if (!customer) return { state: 'NOT_FOUND' as const, subscription: null };
+    return { state: 'FOUND' as const, subscription: await this.subscription.summaryFor(customer.id) };
+  }
+
+  // Coffee Subscription — the redemption write path. Every rule is decided server-side (PosWidgetSubscriptionService).
+  @Post('subscriptions/redeem')
+  @UseGuards(PosSubscriptionRedemptionGuard)
+  async redeemSubscription(@Body() rawBody: unknown, @Req() req: PosRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = redeemSubscriptionBodySchema.safeParse(rawBody);
+    if (!parsed.success) throw new BadRequestException('Invalid subscription redemption request.');
+    const b = parsed.data;
+    try {
+      return await this.subscription.redeem(req.posContext as PosContext, {
+        attemptId: b.attemptId,
+        customer: b.posterClientId ? { posterClientId: b.posterClientId } : { code: b.code as string },
+        posterOrderId: b.posterOrderId,
+        posterProductId: b.posterProductId,
+        employeeIdentifier: b.employeeIdentifier ?? null,
+      });
+    } catch (err) {
+      if (err instanceof RedeemSubscriptionInputError) throw new BadRequestException({ status: 'rejected', reason: err.reason });
+      throw err;
+    }
   }
 
   // Phase 22 — the ONE write route this controller has. Reuses PosWidgetGuard's exact signature verification via PosRewardRedemptionGuard (see above),

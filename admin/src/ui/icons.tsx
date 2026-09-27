@@ -2,6 +2,13 @@ import { ReactNode } from 'react';
 
 // Line icons in the Mini App's own style (frontend/src/app/icons.tsx): inline SVG, no icon library, no extra request. Stroke/fill are set on the <svg> (Design System 2.0).
 const PATHS = {
+  subscription: (
+    <>
+      <path d="M5 9.5h11v4.5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z" />
+      <path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16" />
+      <path d="M8 4v2.5M11 4v2.5M14 4v2.5" />
+    </>
+  ),
   dashboard: (
     <>
       <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />

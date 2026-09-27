@@ -33,9 +33,10 @@ const CATEGORY_LABELS: Record<PosterImportCategory, string> = {
   UNPAID: 'Unpaid',
   TOO_RECENT: 'Too recent',
   REFUND_UNVERIFIED: 'Refund-like (excluded)',
+  SUBSCRIPTION_REDEMPTION: 'Subscription coffee only (not a sale)',
   OTHER: 'Other',
 };
-const CATEGORY_ORDER: PosterImportCategory[] = ['IMPORTABLE', 'ALREADY_IMPORTED', 'CUP_ORIGINATED', 'POSSIBLE_CUP_ORIGIN', 'UNRESOLVED', 'UNSUPPORTED_LINE', 'UNMAPPED_BRANCH', 'UNPAID', 'TOO_RECENT', 'REFUND_UNVERIFIED', 'OTHER'];
+const CATEGORY_ORDER: PosterImportCategory[] = ['IMPORTABLE', 'ALREADY_IMPORTED', 'CUP_ORIGINATED', 'POSSIBLE_CUP_ORIGIN', 'UNRESOLVED', 'UNSUPPORTED_LINE', 'UNMAPPED_BRANCH', 'UNPAID', 'TOO_RECENT', 'REFUND_UNVERIFIED', 'SUBSCRIPTION_REDEMPTION', 'OTHER'];
 
 const REASON_LABELS: Record<string, string> = {
   BRANCH_NOT_MAPPED: 'Poster spot has no CUP branch',
@@ -52,6 +53,7 @@ const REASON_LABELS: Record<string, string> = {
   REFUND_UNVERIFIED: 'Negative amount / quantity — refund semantics are unverified',
   APPLICATION_ID_UNLINKED: 'Carries an application id but no CUP link (possible CUP order)',
   WRITE_FAILED: 'Write failed and was rolled back — run the import again',
+  SUBSCRIPTION_REDEMPTION: 'Only Coffee Subscription consumption (price 0, linked by CUP) — never imported as a sale',
 };
 
 const DECISION_LABEL: Record<PosterImportDetail['decision'], string> = {

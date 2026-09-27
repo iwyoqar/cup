@@ -181,6 +181,7 @@ export type PosterImportCategory =
   | 'UNPAID'
   | 'TOO_RECENT'
   | 'REFUND_UNVERIFIED'
+  | 'SUBSCRIPTION_REDEMPTION'
   | 'OTHER';
 
 export interface PosterImportDetail {
@@ -923,7 +924,10 @@ export interface FinancePnlOverview {
   branch: { id: string; name: string } | null;
   filters: { branches: { id: string; name: string }[] };
   revenue: number;
-  cogs: { amountMinor: number; complete: boolean; missingRecipeProducts: { name: string; quantity: number }[] };
+  cogs: { amountMinor: number; complete: boolean; missingRecipeProducts: { name: string; quantity: number }[]; subscriptionConsumptionMinor?: number };
+  // Coffee Subscription (optional so an older backend still renders)
+  revenueBreakdown?: { salesMinor: number; subscriptionSalesMinor: number };
+  subscriptions?: { salesRevenueMinor: number; redemptions: number; portionsConsumed: number; consumptionCogsMinor: number; notes: string[] };
   grossProfit: number;
   grossMarginPct: number | null;
   operatingExpenses: { total: number; byCategory: FinanceExpenseLine[] };

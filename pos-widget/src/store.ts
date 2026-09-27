@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
-import { apiConfigured, fetchOverview, redeemPromotion, redeemReward } from './api';
+import { apiConfigured, fetchOverview, redeemPromotion, redeemReward, redeemSubscription } from './api';
 import { isMobile, poster, posterProbe } from './poster';
 import type { PosterApi } from './poster';
 import type { PosterClient } from './poster';
-import type { EligibleRewardProduct, ErrorKind, Identifier, Overview, PosterClientInfo, RedeemPromotionResult, RedeemRewardResult } from './types';
+import type { EligibleRewardProduct, ErrorKind, Identifier, Overview, PosterClientInfo, RedeemPromotionResult, RedeemRewardResult, RedeemSubscriptionResult, SubscriptionProductView } from './types';
 
 // The widget's whole behaviour, outside React because Poster's events live outside it. Everything is READ-ONLY and NON-BLOCKING:
 //   * handlers are registered for non-blocking events only (orderOpen, orderClientChange, applicationIconClicked, notificationClick) and never take a `next`;
@@ -42,6 +42,19 @@ export interface PromotionRedemptionUiState {
 
 const promotionRedemptionIdle: PromotionRedemptionUiState = { phase: 'idle', promotionId: null, promotionName: null, result: null, transportError: null };
 
+// Coffee Subscription — the same small phase machine as rewards: pick a drink -> confirm -> applying -> done. Like the others it never resets while
+// 'applying' (a sent POST always resolves to a shown result).
+export type SubscriptionRedemptionPhase = 'idle' | 'selecting' | 'confirming' | 'applying' | 'done';
+
+export interface SubscriptionRedemptionUiState {
+  phase: SubscriptionRedemptionPhase;
+  selected: SubscriptionProductView | null;
+  result: RedeemSubscriptionResult | null;
+  transportError: ErrorKind | null;
+}
+
+const subscriptionRedemptionIdle: SubscriptionRedemptionUiState = { phase: 'idle', selected: null, result: null, transportError: null };
+
 export interface WidgetState {
   phase: Phase;
   source: 'ORDER' | 'MANUAL' | null;
@@ -67,6 +80,9 @@ export interface WidgetState {
   // Phase 23 — the promotion equivalent of redeemedOrderId. A SEPARATE field on purpose: a reward AND a promotion may each be redeemed once on the same
   // order (two independent invariants, see pos-widget-promotion-redemption.service.ts).
   redeemedPromotionOrderId: number | null;
+  subscriptionRedemption: SubscriptionRedemptionUiState;
+  // Coffee Subscription — the order id a subscription coffee was confirmed for (UX only; the backend enforces one per order).
+  redeemedSubscriptionOrderId: number | null;
 }
 
 const initial: WidgetState = {
@@ -87,6 +103,8 @@ const initial: WidgetState = {
   redeemedOrderId: null,
   promotionRedemption: promotionRedemptionIdle,
   redeemedPromotionOrderId: null,
+  subscriptionRedemption: subscriptionRedemptionIdle,
+  redeemedSubscriptionOrderId: null,
 };
 
 let state: WidgetState = initial;
@@ -121,6 +139,7 @@ const safe = <T>(fn: () => T): T | undefined => {
 // context change resets the redemption panel back to idle, but never while 'applying'.
 const nextRedemption = (): RedemptionUiState => (state.redemption.phase === 'applying' ? state.redemption : redemptionIdle);
 const nextPromotionRedemption = (): PromotionRedemptionUiState => (state.promotionRedemption.phase === 'applying' ? state.promotionRedemption : promotionRedemptionIdle);
+const nextSubscriptionRedemption = (): SubscriptionRedemptionUiState => (state.subscriptionRedemption.phase === 'applying' ? state.subscriptionRedemption : subscriptionRedemptionIdle);
 
 // ---- context changes ---------------------------------------------------------------------------------------------------
 
@@ -128,13 +147,13 @@ const nextPromotionRedemption = (): PromotionRedemptionUiState => (state.promoti
 function resetTo(patch: Partial<WidgetState>) {
   generation += 1;
   lastRequest = null;
-  set({ phase: 'IDLE', source: null, overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), ...patch });
+  set({ phase: 'IDLE', source: null, overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), subscriptionRedemption: nextSubscriptionRedemption(), ...patch });
 }
 
 function loadForOrderCustomer(orderId: number | null, clientId: number) {
   generation += 1;
   const gen = generation;
-  set({ phase: 'LOADING', source: 'ORDER', orderId, clientId, overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption() });
+  set({ phase: 'LOADING', source: 'ORDER', orderId, clientId, overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), subscriptionRedemption: nextSubscriptionRedemption() });
   const run = () => {
     const my = ++generation; // a Retry is a new generation too
     set({ phase: 'LOADING', error: null });
@@ -195,7 +214,7 @@ async function onOrderClientChange(data: { clientId?: number | string; orderId?:
     // the customer changed: whatever is in flight for the previous one is now stale, and the old card must not stay on screen while the new one is resolved
     generation += 1;
     lastRequest = null;
-    set({ phase: 'LOADING', source: 'ORDER', overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption() });
+    set({ phase: 'LOADING', source: 'ORDER', overview: null, error: null, inputError: null, posterClient: null, redemption: nextRedemption(), promotionRedemption: nextPromotionRedemption(), subscriptionRedemption: nextSubscriptionRedemption() });
   }
   try {
     const active = await poster()?.orders.getActive();
@@ -432,6 +451,62 @@ export function confirmPromotionRedeem() {
 export function closePromotionRedemption() {
   if (state.promotionRedemption.phase === 'applying') return;
   set({ promotionRedemption: promotionRedemptionIdle });
+}
+
+// ---- Coffee Subscription redemption ---------------------------------------------------------------------------------------
+
+// Who the subscription coffee is for: the order's Poster client (ORDER) or, after a QR / code lookup, the customer's CUP code (MANUAL). There must be
+// an open order to put the drink on either way. Returns null when a redemption cannot be started (the card shows why).
+export function subscriptionTarget(): { posterClientId?: string; code?: string; orderId: number } | null {
+  if (state.orderId === null) return null;
+  if (state.source === 'ORDER' && state.clientId !== null) return { posterClientId: String(state.clientId), orderId: state.orderId };
+  const code = state.overview?.customer?.code;
+  if (state.source === 'MANUAL' && code) return { code, orderId: state.orderId };
+  return null;
+}
+
+export function startSubscriptionRedeem() {
+  set({ subscriptionRedemption: { phase: 'selecting', selected: null, result: null, transportError: null } });
+}
+
+export function selectSubscriptionProduct(product: SubscriptionProductView) {
+  if (state.subscriptionRedemption.phase !== 'selecting' || !product.eligible) return;
+  set({ subscriptionRedemption: { ...state.subscriptionRedemption, phase: 'confirming', selected: product } });
+}
+
+export function cancelSubscriptionRedeem() {
+  if (state.subscriptionRedemption.phase === 'applying') return;
+  set({ subscriptionRedemption: subscriptionRedemptionIdle });
+}
+
+export function confirmSubscriptionRedeem() {
+  const r = state.subscriptionRedemption;
+  const target = subscriptionTarget();
+  if (r.phase !== 'confirming' || !r.selected || !target) return;
+  const attemptId = newAttemptId();
+  const posterOrderId = String(target.orderId);
+  const posterProductId = r.selected.posterProductId;
+  set({ subscriptionRedemption: { ...r, phase: 'applying' } });
+  void (async () => {
+    const res = await redeemSubscription({ attemptId, posterClientId: target.posterClientId, code: target.code, posterOrderId, posterProductId, employeeIdentifier: state.employee });
+    if (res.kind === 'ERROR') {
+      set({ subscriptionRedemption: { ...state.subscriptionRedemption, phase: 'done', transportError: res.error, result: null } });
+      return;
+    }
+    if (res.result.status === 'CONFIRMED' || res.result.failureReason === 'ALREADY_REDEEMED_FOR_ORDER') set({ redeemedSubscriptionOrderId: target.orderId });
+    set({ subscriptionRedemption: { ...state.subscriptionRedemption, phase: 'done', result: res.result, transportError: null } });
+    // Refresh the figures behind the result — only if this customer / order is still the one on screen.
+    if (String(state.orderId) === posterOrderId) {
+      const gen = ++generation;
+      const id: Identifier = target.posterClientId ? { posterClientId: target.posterClientId } : { code: target.code as string };
+      void requestOverview(gen, id, target.posterClientId ? 'ORDER' : 'MANUAL');
+    }
+  })();
+}
+
+export function closeSubscriptionRedemption() {
+  if (state.subscriptionRedemption.phase === 'applying') return;
+  set({ subscriptionRedemption: subscriptionRedemptionIdle });
 }
 
 // ---- start -------------------------------------------------------------------------------------------------------------

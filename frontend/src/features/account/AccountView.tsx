@@ -10,6 +10,7 @@ import { LoyaltyTransactionsList } from './LoyaltyTransactionsList';
 import { PromotionsSection } from './PromotionsSection';
 import { ReferralSection } from './ReferralSection';
 import { RewardProgressSection } from './RewardProgressSection';
+import { SubscriptionSection } from './SubscriptionSection';
 
 interface AccountViewProps {
   onOpenOrder: (orderId: string) => void;
@@ -75,6 +76,8 @@ export function AccountView({ onOpenOrder, onBack }: AccountViewProps) {
         </section>
 
         <IdentitySection />
+
+        <SubscriptionSection />
 
         <LoyaltyHub onOpenTransactions={() => setShowLoyaltyTransactions(true)} />
 

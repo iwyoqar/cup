@@ -50,10 +50,12 @@ interface RequestOptions {
   body?: unknown;
   /** Optional AbortSignal (Reports Phase H): lets a superseded filter request be cancelled in the browser. */
   signal?: AbortSignal;
+  /** Extra request headers (e.g. Idempotency-Key). Never Authorization — that is always set from the stored session below. */
+  headers?: Record<string, string>;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...options.headers };
   if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json';
   }

@@ -14,10 +14,16 @@ import {
   startPromotionRedeem,
   startRedeem,
   useWidget,
+  cancelSubscriptionRedeem,
+  closeSubscriptionRedemption,
+  confirmSubscriptionRedeem,
+  selectSubscriptionProduct,
+  startSubscriptionRedeem,
+  subscriptionTarget,
 } from './store';
 import type { Phase } from './store';
 import { cx } from './cx';
-import type { EligibleRewardProduct, ErrorKind, Overview, PromotionRedemptionFailureReason, PromotionView, RedemptionFailureReason, RewardProgramView } from './types';
+import type { EligibleRewardProduct, ErrorKind, Overview, PromotionRedemptionFailureReason, PromotionView, RedemptionFailureReason, RewardProgramView, SubscriptionSummary } from './types';
 
 // Header status dot per widget phase — #4caf50 is the one "ready" green the widget uses (a colour Poster staff read at a glance).
 const PHASE_DOT: Record<Phase, string> = {
@@ -67,7 +73,9 @@ export function App() {
         {w.phase === 'IDLE' && <Idle />}
         {w.phase === 'LOADING' && <Loading />}
         {w.phase === 'ERROR' && w.error && <ErrorView kind={w.error} />}
-        {w.phase === 'READY' && w.overview && w.redemption.phase !== 'idle' ? (
+        {w.phase === 'READY' && w.overview && w.subscriptionRedemption.phase !== 'idle' ? (
+          <SubscriptionRedemptionFlow overview={w.overview} />
+        ) : w.phase === 'READY' && w.overview && w.redemption.phase !== 'idle' ? (
           <RedemptionFlow />
         ) : w.phase === 'READY' && w.overview && w.promotionRedemption.phase !== 'idle' ? (
           <PromotionRedemptionFlow />
@@ -184,6 +192,8 @@ function Found({ overview }: { overview: Overview }) {
           {!overview.linkedToPoster && <span className="ml-2 inline-block rounded-full border border-terracotta bg-terracotta px-[9px] py-px text-[12px] font-semibold text-white">Poster bilan bog‘lanmagan</span>}
         </div>
       </div>
+
+      {overview.subscription !== undefined && <SubscriptionCard summary={overview.subscription ?? null} />}
 
       {availableProgram && rewards ? (
         <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
@@ -631,6 +641,261 @@ function Notice({ tone, title, hint }: { tone: 'warn' | 'muted'; title: string; 
     <div className={cx('rounded-xl px-3.5 py-3', tone === 'warn' ? 'border border-l-4 border-transparent border-l-terracotta bg-cream' : 'border border-line bg-white')} role={tone === 'warn' ? 'alert' : 'status'}>
       <div className="mb-0.5 font-bold">{title}</div>
       <div className="text-[14px] text-muted [overflow-wrap:anywhere]">{hint}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------- Coffee Subscription
+
+const BTN = 'min-h-12 cursor-pointer appearance-none rounded-[10px] px-5 font-[inherit] leading-[inherit] font-bold';
+const BTN_PRIMARY = `${BTN} border-0 bg-terracotta text-black active:bg-terracotta-deep disabled:cursor-not-allowed disabled:opacity-45`;
+const BTN_GHOST = `${BTN} border-[1.5px] border-black bg-transparent text-black active:bg-terracotta-deep`;
+const LABEL = 'text-[11px] font-bold tracking-[0.14em] text-muted uppercase';
+
+function minutesUntil(iso: string | null): number {
+  if (!iso) return 0;
+  return Math.max(1, Math.ceil((new Date(iso).getTime() - Date.now()) / 60_000));
+}
+
+function timeText(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function dateText(ymd: string | null): string {
+  if (!ymd) return '—';
+  const [y, m, d] = ymd.split('-');
+  return `${d}.${m}.${y}`;
+}
+
+// Why the button is disabled, in the barista's words. The reason codes come from the backend; this only phrases them.
+function subscriptionReasonText(reason: string | null, s: SubscriptionSummary): string | null {
+  const c = s.current;
+  switch (reason) {
+    case null:
+      return null;
+    case 'NO_ACTIVE_SUBSCRIPTION':
+      return 'Faol abonement yo‘q';
+    case 'SUBSCRIPTION_PENDING_PAYMENT':
+      return 'Abonement to‘lovi hali tasdiqlanmagan';
+    case 'SUBSCRIPTION_NOT_STARTED':
+      return s.upcoming[0] ? `Abonement ${dateText(s.upcoming[0].startBusinessDate)} dan boshlanadi` : 'Abonement hali boshlanmagan';
+    case 'SUBSCRIPTION_EXPIRED':
+      return 'Abonement muddati tugagan';
+    case 'SUBSCRIPTION_PAUSED':
+      return 'Abonement to‘xtatilgan';
+    case 'SUBSCRIPTION_CANCELLED':
+      return 'Abonement bekor qilingan';
+    case 'NO_REMAINING_PORTIONS':
+      return 'Abonementda porsiya qolmagan';
+    case 'DAILY_LIMIT_REACHED':
+      return `Bugungi ${c?.dailyPortionLimit ?? ''} porsiya limiti tugagan`;
+    case 'COOLDOWN_ACTIVE':
+      return `Keyingi kofeni ${minutesUntil(c?.nextAvailableAt ?? null)} daqiqadan keyin olishingiz mumkin`;
+    case 'PRODUCT_NOT_ALLOWED':
+      return 'Bu ichimlik abonementga kirmaydi';
+    case 'PRODUCT_INACTIVE':
+      return 'Bu ichimlik hozir sotuvda emas';
+    case 'CUSTOMER_MISMATCH':
+      return 'Ochiq buyurtma boshqa mijozga tegishli';
+    case 'REDEMPTION_CONFLICT':
+      return 'Boshqa so‘rov hali tugallanmagan — birozdan so‘ng qayta urinib ko‘ring';
+    case 'ALREADY_REDEEMED_FOR_ORDER':
+      return 'Bu buyurtmada abonement kofesi allaqachon berilgan';
+    case 'POSTER_TRANSACTION_UNAVAILABLE':
+      return 'Ochiq buyurtmani tasdiqlab bo‘lmadi — buyurtma o‘zgartirilmadi';
+    case 'POSTER_MUTATION_FAILED':
+      return 'Poster ichimlikni qo‘shmadi — buyurtma o‘zgartirilmadi';
+    default:
+      return 'Hozir abonementdan foydalanib bo‘lmaydi';
+  }
+}
+
+function SubscriptionCard({ summary }: { summary: SubscriptionSummary | null }) {
+  const w = useWidget();
+  if (!summary) return null;
+  const c = summary.current;
+  if (!c) {
+    const reason = subscriptionReasonText(summary.blockedReason, summary);
+    return (
+      <div className="rounded-xl border border-line bg-white px-3.5 py-3">
+        <div className={LABEL}>Coffee abonement</div>
+        <div className="text-[14px] text-muted [overflow-wrap:anywhere]">{reason}</div>
+      </div>
+    );
+  }
+  const target = subscriptionTarget();
+  const orderUsed = w.redeemedSubscriptionOrderId !== null && w.redeemedSubscriptionOrderId === w.orderId;
+  const disabledReason = !summary.redemption.enabled
+    ? 'Bu yerda abonement kofesi hali berilmaydi (o‘chirilgan).'
+    : orderUsed
+      ? subscriptionReasonText('ALREADY_REDEEMED_FOR_ORDER', summary)
+      : !target
+        ? 'Avval Poster buyurtmasini oching'
+        : summary.blockedReason
+          ? subscriptionReasonText(summary.blockedReason, summary)
+          : summary.products.every((p) => !p.eligible)
+            ? summary.products.length === 0
+              ? 'Abonement uchun ichimliklar sozlanmagan'
+              : subscriptionReasonText(summary.products[0]?.reason ?? null, summary)
+            : null;
+  return (
+    <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className={LABEL}>Coffee abonement</div>
+        <span className="rounded-full bg-black px-2 py-px text-[11px] font-bold text-cream">{c.status === 'ACTIVE' ? 'FAOL' : c.status}</span>
+      </div>
+      <div className="mt-1 text-[22px] font-bold">{c.planName}</div>
+      <div className="mt-2 grid grid-cols-2 gap-x-3.5 gap-y-2">
+        <Fact label="Qolgan porsiya" value={`${c.remainingPortions} / ${c.totalPortions}`} />
+        <Fact label="Bugun" value={`${c.todayUsedPortions} / ${c.dailyPortionLimit}`} />
+        <Fact label="Oxirgi kofe" value={timeText(c.lastRedemptionAt)} />
+        <Fact label="Keyingisi" value={c.nextAvailableAt ? timeText(c.nextAvailableAt) : 'Hozir'} />
+        <Fact label="Muddati" value={dateText(c.endBusinessDate)} />
+        <Fact label="Kunlik qoldiq" value={`${c.todayRemainingPortions} porsiya`} />
+      </div>
+      <div className="mt-2.5 flex flex-col gap-1.5">
+        <button className={BTN_PRIMARY} disabled={disabledReason !== null} onClick={startSubscriptionRedeem} type="button">
+          Obuna kofe olish
+        </button>
+        {disabledReason && <p className="m-0 text-[13px] font-semibold text-terracotta-deep">{disabledReason}</p>}
+      </div>
+    </div>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[10px] font-bold tracking-[0.12em] text-muted-cream uppercase">{label}</div>
+      <div className="text-[17px] font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function SubscriptionRedemptionFlow({ overview }: { overview: Overview }) {
+  const w = useWidget();
+  const r = w.subscriptionRedemption;
+  const summary = overview.subscription ?? null;
+  if (r.phase === 'applying') {
+    return (
+      <div className="flex flex-col gap-2.5" aria-busy="true">
+        <div className="rounded-xl border border-black bg-black px-3.5 py-3 text-white">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-cream uppercase">Coffee abonement</div>
+          <div className="my-1 text-[24px] leading-[1.15] font-semibold">Qo‘shilmoqda…</div>
+        </div>
+        <div className="h-[52px] animate-cw-pulse rounded-xl bg-[#ece6da]" />
+      </div>
+    );
+  }
+  if (r.phase === 'done') return <SubscriptionDone overview={overview} />;
+  if (!summary || !summary.current) {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <Notice tone="warn" title="Faol abonement yo‘q" hint="Buyurtma o‘zgartirilmadi." />
+        <button className={BTN_GHOST} onClick={cancelSubscriptionRedeem} type="button">Orqaga</button>
+      </div>
+    );
+  }
+  if (r.phase === 'confirming' && r.selected) {
+    const p = r.selected;
+    const after = summary.current.remainingPortions - p.portionCost;
+    return (
+      <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3">
+        <div className={LABEL}>Tasdiqlang</div>
+        <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{p.name}</div>
+        <div className="grid grid-cols-2 gap-x-3.5 gap-y-2">
+          <Fact label="Mijoz" value={overview.customer?.displayName ?? '—'} />
+          <Fact label="Porsiya" value={`−${p.portionCost}`} />
+          <Fact label="Keyin qoladi" value={`${after} / ${summary.current.totalPortions}`} />
+          <Fact label="Filial" value={w.where || '—'} />
+        </div>
+        <p className="mx-0 mt-2 mb-0 text-[12px] text-muted-cream">Ichimlik buyurtmaga 0 so‘m narxda qo‘shiladi.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button className={BTN_GHOST} onClick={cancelSubscriptionRedeem} type="button">Bekor qilish</button>
+          <button className={BTN_PRIMARY} onClick={confirmSubscriptionRedeem} type="button">Tasdiqlash</button>
+        </div>
+      </div>
+    );
+  }
+  const groups = [
+    { title: 'Standart', items: summary.products.filter((p) => p.portionCost === 1) },
+    { title: 'Double', items: summary.products.filter((p) => p.portionCost > 1) },
+  ].filter((g) => g.items.length > 0);
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="rounded-xl border border-line bg-white px-3.5 py-3">
+        <div className={LABEL}>Coffee abonement</div>
+        <div className="my-1 text-[22px] leading-[1.15] font-semibold">Ichimlikni tanlang</div>
+        <div className="text-[14px] text-muted">
+          Qolgan: {summary.current.remainingPortions} · Bugun: {summary.current.todayRemainingPortions} porsiya
+        </div>
+      </div>
+      {groups.map((g) => (
+        <div className="flex flex-col gap-1.5" key={g.title}>
+          <div className={LABEL}>{g.title}</div>
+          {g.items.map((p) => (
+            <button className={cx(BTN_GHOST, 'flex items-center justify-between text-left disabled:cursor-not-allowed disabled:opacity-45')} disabled={!p.eligible} key={p.posterProductId} onClick={() => selectSubscriptionProduct(p)} type="button">
+              <span>{p.name}</span>
+              <span className="text-[13px] font-semibold text-muted">{p.eligible ? `${p.portionCost} porsiya` : subscriptionReasonText(p.reason, summary)}</span>
+            </button>
+          ))}
+        </div>
+      ))}
+      <button className={BTN_GHOST} onClick={cancelSubscriptionRedeem} type="button">Bekor qilish</button>
+    </div>
+  );
+}
+
+function SubscriptionDone({ overview }: { overview: Overview }) {
+  const w = useWidget();
+  const r = w.subscriptionRedemption;
+  const summary = overview.subscription ?? null;
+  const close = (
+    <button className={BTN_PRIMARY} onClick={closeSubscriptionRedemption} type="button">
+      Yopish
+    </button>
+  );
+  if (r.transportError) {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <Notice tone="warn" title="So‘rovni yuborib bo‘lmadi." hint="Buyurtma holatini Poster ekranida tekshiring. Qayta bosishdan oldin mijoz kartasini yangilang." />
+        {close}
+      </div>
+    );
+  }
+  const res = r.result;
+  if (res?.status === 'CONFIRMED') {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="rounded-xl border border-transparent bg-cream px-3.5 py-3" role="status">
+          <div className={LABEL}>✓ Coffee berildi</div>
+          <div className="my-1 text-[24px] leading-[1.15] font-semibold [overflow-wrap:anywhere]">{res.productName ?? ''}</div>
+          <div className="grid grid-cols-2 gap-x-3.5 gap-y-2">
+            <Fact label="Porsiya" value={`−${res.portionCost ?? ''}`} />
+            <Fact label="Qolgan" value={res.after ? `${res.after.remainingPortions} / ${res.after.totalPortions}` : '—'} />
+            <Fact label="Keyingisi" value={res.after?.nextAvailableAt ? timeText(res.after.nextAvailableAt) : 'Hozir'} />
+            <Fact label="Bugun qoldi" value={res.after ? `${res.after.todayRemainingPortions} porsiya` : '—'} />
+          </div>
+        </div>
+        {close}
+      </div>
+    );
+  }
+  if (res?.status === 'UNKNOWN') {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <Notice tone="warn" title="Natijani aniqlab bo‘lmadi." hint="Qayta bosmang. Poster ekranida ichimlik qo‘shilganini tekshiring — CUP chek yopilganda o‘zi tekshiradi." />
+        {close}
+      </div>
+    );
+  }
+  const text = summary ? subscriptionReasonText(res?.failureReason ?? null, summary) : null;
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Notice tone="warn" title="Abonement kofesi berilmadi." hint={text ?? 'Buyurtma o‘zgartirilmadi.'} />
+      {close}
     </div>
   );
 }

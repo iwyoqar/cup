@@ -1,5 +1,5 @@
 import { cupGet, cupPost } from './poster';
-import type { ErrorKind, Identifier, Overview, RedeemPromotionResult, RedeemRewardResult } from './types';
+import type { ErrorKind, Identifier, Overview, RedeemPromotionResult, RedeemRewardResult, RedeemSubscriptionResult } from './types';
 
 // The public CUP backend base URL — the ONLY configuration compiled into the bundle (VITE_CUP_API_URL). No secret, token or credential exists in this file or anywhere in
 // the widget: authentication is done by Poster itself, which signs the proxied request (see docs/PHASE-21-POS-CAPABILITY.md).
@@ -65,4 +65,26 @@ export async function redeemPromotion(body: RedeemPromotionBody): Promise<Redeem
   const r = res.body as Partial<RedeemPromotionResult> | null;
   if (!r || typeof r !== 'object' || typeof r.attemptId !== 'string' || typeof r.status !== 'string') return { kind: 'ERROR', error: 'INVALID' };
   return { kind: 'OK', result: r as RedeemPromotionResult };
+}
+
+// Coffee Subscription — the redemption call. Same transport/business split as redeemReward: an ErrorKind means the call itself failed; a completed
+// FAILED / UNKNOWN attempt is a normal OK result. The customer is the order's Poster client OR the customer's CUP code (from a QR scan) — never both.
+export type RedeemSubscriptionApiResult = { kind: 'OK'; result: RedeemSubscriptionResult } | { kind: 'ERROR'; error: ErrorKind };
+
+export interface RedeemSubscriptionBody {
+  attemptId: string;
+  posterClientId?: string;
+  code?: string;
+  posterOrderId: string;
+  posterProductId: string;
+  employeeIdentifier?: string | null;
+}
+
+export async function redeemSubscription(body: RedeemSubscriptionBody): Promise<RedeemSubscriptionApiResult> {
+  if (!apiConfigured) return { kind: 'ERROR', error: 'NOT_CONFIGURED' };
+  const res = await cupPost(`${BASE}/pos-widget/subscriptions/redeem`, body);
+  if (res.kind === 'ERROR') return res;
+  const r = res.body as Partial<RedeemSubscriptionResult> | null;
+  if (!r || typeof r !== 'object' || typeof r.attemptId !== 'string' || typeof r.status !== 'string') return { kind: 'ERROR', error: 'INVALID' };
+  return { kind: 'OK', result: r as RedeemSubscriptionResult };
 }

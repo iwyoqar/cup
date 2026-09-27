@@ -155,6 +155,21 @@ export const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  // Coffee Subscription — two independent operator interlocks, both OFF by default.
+  // POS_SUBSCRIPTION_REDEMPTION_ENABLED gates POST /pos-widget/subscriptions/redeem (on top of the POS widget signature guard, exactly like the
+  // reward/promotion flags). It reuses the verified addTransactionProduct price-0 mutation (docs/PHASE-22-AUDIT.md §15) — turn it on only after
+  // a supervised verification on a disposable test order, as was done for rewards.
+  POS_SUBSCRIPTION_REDEMPTION_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  // SUBSCRIPTIONS_MANUAL_ACTIVATION_ENABLED lets an ADMIN-role account mark a pending subscription purchase as activated WITHOUT a payment
+  // provider (development / manual initialization only, until a real provider exists). Audited; never counted as subscription revenue.
+  SUBSCRIPTIONS_MANUAL_ACTIVATION_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  SUBSCRIPTION_EXPIRY_INTERVAL_MS: z.coerce.number().int().min(60_000).default(15 * 60_000),
 });
 
 export type Env = z.infer<typeof envSchema>;

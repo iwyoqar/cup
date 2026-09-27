@@ -10,6 +10,8 @@ import { PosterImportModule } from '../poster-import/poster-import.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { RewardsModule } from '../rewards/reward-programs.module';
 import { StaffModule } from '../staff/staff.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { PosWidgetSubscriptionService } from './pos-widget-subscription.service';
 import { PosWidgetAuditService } from './pos-widget-audit.service';
 import { PosWidgetAuthService } from './pos-widget-auth.service';
 import { PosWidgetOverviewService } from './pos-widget-overview.service';
@@ -19,7 +21,7 @@ import { PosWidgetRewardRedemptionRepository } from './pos-widget-reward-redempt
 import { PosWidgetRewardRedemptionService } from './pos-widget-reward-redemption.service';
 import { PosterPromotionMutationService } from './poster-promotion-mutation.service';
 import { PosterRewardMutationService } from './poster-reward-mutation.service';
-import { PosPromotionRedemptionGuard, PosRewardRedemptionGuard, PosWidgetController, PosWidgetGuard } from './pos-widget.controller';
+import { PosPromotionRedemptionGuard, PosRewardRedemptionGuard, PosSubscriptionRedemptionGuard, PosWidgetController, PosWidgetGuard } from './pos-widget.controller';
 
 // Phase 21 — the Poster POS widget backend. Composes existing READ services only (customers, loyalty, Loyalty 2.0, rewards, promotions, customer metrics, imported
 // POS activity, the catalog) and reuses staff_scan_events for the audit.
@@ -37,7 +39,7 @@ import { PosPromotionRedemptionGuard, PosRewardRedemptionGuard, PosWidgetControl
 // Composes PromotionsModule's existing eligibility/redemption logic (no second promotion engine) and PosterPromotionMutationService — reward and
 // promotion redemption remain separate concepts throughout (separate attempt tables, separate flags, separate audit actions, separate per-order rules).
 @Module({
-  imports: [CustomersModule, LoyaltyModule, Loyalty2Module, RewardsModule, PromotionsModule, CustomerMetricsModule, PosterImportModule, CatalogModule, BranchModule, StaffModule, PosterModule],
+  imports: [CustomersModule, LoyaltyModule, Loyalty2Module, RewardsModule, PromotionsModule, CustomerMetricsModule, PosterImportModule, CatalogModule, BranchModule, StaffModule, PosterModule, SubscriptionsModule],
   controllers: [PosWidgetController],
   providers: [
     PosWidgetAuthService,
@@ -52,6 +54,9 @@ import { PosPromotionRedemptionGuard, PosRewardRedemptionGuard, PosWidgetControl
     PosWidgetPromotionRedemptionService,
     PosterPromotionMutationService,
     PosPromotionRedemptionGuard,
+    // Coffee Subscription: summary (read-only) + redemption behind POS_SUBSCRIPTION_REDEMPTION_ENABLED, reusing PosterRewardMutationService.
+    PosWidgetSubscriptionService,
+    PosSubscriptionRedemptionGuard,
   ],
 })
 export class PosWidgetModule {}

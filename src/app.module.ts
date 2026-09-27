@@ -30,6 +30,7 @@ import { RewardsModule } from './modules/rewards/reward-programs.module';
 import { SegmentsModule } from './modules/segments/segments.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
 
 @Module({
@@ -58,6 +59,7 @@ import { TelegramModule } from './modules/telegram/telegram.module';
     PosterImportModule,
     PosterSyncModule,
     PosWidgetModule,
+    SubscriptionsModule,
     AnalyticsModule,
     Loyalty2Module,
     AutomationsModule,

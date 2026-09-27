@@ -21,6 +21,13 @@ import { PosterTransactionLine } from '../poster/poster.types';
 export interface PosterRewardMutationOutcome {
   kind: 'blocked' | 'confirmed' | 'rejected' | 'ambiguous';
   reason: string;
+  // Coffee Subscription additions (additive; the reward/promotion callers ignore them):
+  // mutationAttempted = whether addTransactionProduct was actually called. `false` means Poster was provably NOT changed (the order could not
+  // even be confirmed, or a pre-mutation check refused), so a caller may safely release what it reserved instead of treating it as unknown.
+  mutationAttempted?: boolean; // absent = treat as attempted (the conservative reading)
+  code?: 'ORDER_NOT_CONFIRMED' | 'CLIENT_MISMATCH' | 'INVALID_CONTEXT';
+  transactionId?: string; // the REST transaction_id the claimed order resolved to (set once resolved, even on an ambiguous outcome)
+  transactionProductId?: string; // Poster's own id of the added line (addTransactionProduct's documented `transaction_product`)
 }
 
 // A generous but bounded window: open orders are a same-day, same-shift phenomenon; "yesterday through today" absorbs a
@@ -56,16 +63,19 @@ export class PosterRewardMutationService {
     posterTabletId: string | null;
     posterOrderId: string; // the widget's claim: orders.getActive().order.id, a millisecond timestamp
     posterProductId: string;
+    // Coffee Subscription: when set, the resolved open order's client must be this Poster client (or, if allowNoClient, carry no client at
+    // all) — checked BEFORE the mutation, so a redemption can never land on another customer's order. Rewards/promotions do not pass it.
+    expectedClient?: { posterClientId: string | null; allowNoClient: boolean };
   }): Promise<PosterRewardMutationOutcome> {
     if (!args.posterSpotId || !args.posterTabletId) {
       // Should be unreachable — the signature guard always populates these — but a missing verified spot/tablet is exactly the kind of thing this
       // method must refuse to guess past, not default to spot 1 or similar.
-      return { kind: 'ambiguous', reason: 'No verified spot/tablet in the request context; refusing to guess which register to mutate.' };
+      return { kind: 'ambiguous', reason: 'No verified spot/tablet in the request context; refusing to guess which register to mutate.', mutationAttempted: false, code: 'INVALID_CONTEXT' };
     }
     const spotId = Number(args.posterSpotId);
     const spotTabletId = Number(args.posterTabletId);
     if (!Number.isInteger(spotId) || !Number.isInteger(spotTabletId)) {
-      return { kind: 'ambiguous', reason: `Non-numeric verified spot/tablet (${args.posterSpotId}/${args.posterTabletId}).` };
+      return { kind: 'ambiguous', reason: `Non-numeric verified spot/tablet (${args.posterSpotId}/${args.posterTabletId}).`, mutationAttempted: false, code: 'INVALID_CONTEXT' };
     }
 
     // ---- 1. Independently resolve the widget's claimed order to a REST transaction_id. Never trust a transaction_id the caller might have supplied.
@@ -74,17 +84,26 @@ export class PosterRewardMutationService {
       const { dateFrom, dateTo } = openOrderSearchWindow();
       openTransactions = await this.poster.getOpenTransactions(dateFrom, dateTo);
     } catch (err) {
-      return { kind: 'ambiguous', reason: `Could not list open transactions to resolve the current order: ${errMessage(err)}` };
+      return { kind: 'ambiguous', reason: `Could not list open transactions to resolve the current order: ${errMessage(err)}`, mutationAttempted: false, code: 'ORDER_NOT_CONFIRMED' };
     }
     const match = openTransactions.find((t) => t.date_start === args.posterOrderId && t.spot_id === String(spotId));
     if (!match) {
       // The order the widget says is open could not be independently confirmed open on this spot right now — the order may have just closed, the
       // widget's context may be stale, or the claim may simply be wrong. Refused, not guessed.
-      return { kind: 'ambiguous', reason: `Could not independently confirm posterOrderId ${args.posterOrderId} as a currently open order on spot ${spotId}.` };
+      return { kind: 'ambiguous', reason: `Could not independently confirm posterOrderId ${args.posterOrderId} as a currently open order on spot ${spotId}.`, mutationAttempted: false, code: 'ORDER_NOT_CONFIRMED' };
     }
     const transactionId = Number(match.transaction_id);
     if (!Number.isInteger(transactionId)) {
-      return { kind: 'ambiguous', reason: `Resolved transaction_id "${match.transaction_id}" is not a usable integer.` };
+      return { kind: 'ambiguous', reason: `Resolved transaction_id "${match.transaction_id}" is not a usable integer.`, mutationAttempted: false, code: 'ORDER_NOT_CONFIRMED' };
+    }
+    const resolvedTransactionId = String(transactionId);
+    if (args.expectedClient) {
+      const orderClient = String(match.client_id ?? '0').trim();
+      const hasClient = orderClient !== '' && orderClient !== '0';
+      const ok = hasClient ? args.expectedClient.posterClientId !== null && orderClient === args.expectedClient.posterClientId : args.expectedClient.allowNoClient;
+      if (!ok) {
+        return { kind: 'rejected', reason: 'The open order belongs to a different Poster client than the customer being redeemed for — nothing was changed.', mutationAttempted: false, code: 'CLIENT_MISMATCH', transactionId: resolvedTransactionId };
+      }
     }
     const beforeLines = match.products ?? [];
     const beforeSum = match.sum;
@@ -92,16 +111,19 @@ export class PosterRewardMutationService {
     // ---- 2. Mutate: add the reward product at price 0. This is the one call in this method that can change a real order.
     const productId = Number(args.posterProductId);
     if (!Number.isInteger(productId)) {
-      return { kind: 'ambiguous', reason: `posterProductId "${args.posterProductId}" is not a usable integer.` };
+      return { kind: 'ambiguous', reason: `posterProductId "${args.posterProductId}" is not a usable integer.`, mutationAttempted: false, code: 'INVALID_CONTEXT', transactionId: resolvedTransactionId };
     }
     const addResult = await this.poster.addTransactionProduct({ spot_id: spotId, spot_tablet_id: spotTabletId, transaction_id: transactionId, product_id: productId, price: 0 });
     if (addResult.kind === 'definite_failure') {
-      return { kind: 'rejected', reason: addResult.reason };
+      return { kind: 'rejected', reason: addResult.reason, mutationAttempted: true, transactionId: resolvedTransactionId };
     }
     if (addResult.kind === 'ambiguous_failure') {
       // Poster may or may not have applied the mutation. Never retried, never treated as success.
-      return { kind: 'ambiguous', reason: addResult.reason };
+      return { kind: 'ambiguous', reason: addResult.reason, mutationAttempted: true, transactionId: resolvedTransactionId };
     }
+
+    const transactionProductId = String(addResult.transactionProductId);
+    const done = { mutationAttempted: true, transactionId: resolvedTransactionId, transactionProductId };
 
     // ---- 3. Verify: re-read the SAME order and confirm the zero-priced line genuinely exists, the total didn't move, and nothing pre-existing changed.
     let after;
@@ -109,15 +131,15 @@ export class PosterRewardMutationService {
       after = await this.poster.getTransactionById(String(transactionId));
     } catch (err) {
       // The mutation call itself succeeded, but we cannot confirm what it actually did — this is exactly the shape of "unknown", not "confirmed".
-      return { kind: 'ambiguous', reason: `Mutation call succeeded but the order could not be re-read to verify it: ${errMessage(err)}` };
+      return { kind: 'ambiguous', reason: `Mutation call succeeded but the order could not be re-read to verify it: ${errMessage(err)}`, ...done };
     }
     if (!after) {
-      return { kind: 'ambiguous', reason: 'Mutation call succeeded but the order disappeared on re-read.' };
+      return { kind: 'ambiguous', reason: 'Mutation call succeeded but the order disappeared on re-read.', ...done };
     }
     const afterLines = after.products ?? [];
     const newLine = afterLines.find((l) => l.product_id === String(productId) && l.product_price === '0');
     if (!newLine) {
-      return { kind: 'ambiguous', reason: 'Mutation call succeeded but no matching zero-priced line was found on the verification read.' };
+      return { kind: 'ambiguous', reason: 'Mutation call succeeded but no matching zero-priced line was found on the verification read.', ...done };
     }
     const beforeKeys = beforeLines.map(lineKey);
     const afterKeys = afterLines.map(lineKey);
@@ -126,14 +148,14 @@ export class PosterRewardMutationService {
       // A pre-existing line changed or vanished. Even though the reward line itself looks right, this order is no longer provably "only" the
       // intended change — never mark this confirmed.
       this.logger.error(`Reward mutation verification found a changed pre-existing line on transaction ${transactionId} — treating as ambiguous, not confirmed.`);
-      return { kind: 'ambiguous', reason: 'An existing order line changed unexpectedly during verification.' };
+      return { kind: 'ambiguous', reason: 'An existing order line changed unexpectedly during verification.', ...done };
     }
     if (after.sum !== beforeSum) {
       this.logger.error(`Reward mutation verification found the order total moved (${beforeSum} -> ${after.sum}) on transaction ${transactionId} — treating as ambiguous, not confirmed.`);
-      return { kind: 'ambiguous', reason: `Order total changed unexpectedly during verification (${beforeSum} -> ${after.sum}).` };
+      return { kind: 'ambiguous', reason: `Order total changed unexpectedly during verification (${beforeSum} -> ${after.sum}).`, ...done };
     }
 
-    return { kind: 'confirmed', reason: `Verified: product ${productId} present at price 0 on transaction ${transactionId}; total unchanged (${after.sum}); no other line changed.` };
+    return { kind: 'confirmed', reason: `Verified: product ${productId} present at price 0 on transaction ${transactionId}; total unchanged (${after.sum}); no other line changed.`, ...done };
   }
 }
 

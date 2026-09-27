@@ -39,6 +39,7 @@ export type ImportCategory =
   | 'UNPAID'
   | 'TOO_RECENT'
   | 'REFUND_UNVERIFIED'
+  | 'SUBSCRIPTION_REDEMPTION' // Coffee Subscription: a receipt whose only lines are CUP-managed subscription coffee (consumption, never a sale)
   | 'OTHER';
 
 export const IMPORT_CATEGORIES: ImportCategory[] = [
@@ -52,6 +53,7 @@ export const IMPORT_CATEGORIES: ImportCategory[] = [
   'UNPAID',
   'TOO_RECENT',
   'REFUND_UNVERIFIED',
+  'SUBSCRIPTION_REDEMPTION',
   'OTHER',
 ];
 
@@ -108,6 +110,9 @@ export interface ImportSummary {
     importedButDeletedInPoster: string[]; // already-imported receipts Poster now lists as deleted: reported, never reversed automatically
   };
   posterReads: { transactions: number; deletedTransactions: number; incomingOrderLinks: number };
+  // Coffee Subscription: lines recognised as subscription consumption (by the redemption's stored Poster transaction id) and therefore kept
+  // out of the imported sale lines.
+  subscriptionLines: number;
   details: ImportDetail[];
 }
 
@@ -133,6 +138,13 @@ interface Analysis {
   summary: ImportSummary;
   plan: PlannedWrite[];
   newLinks: { incomingOrderId: string; transactionId: string }[];
+  reconciliations: SubscriptionReconciliation[];
+}
+
+// Coffee Subscription: what a closed receipt proved about one redemption (applied only by a real / automatic import, never by a preview).
+interface SubscriptionReconciliation {
+  redemptionId: string;
+  lineFound: boolean;
 }
 
 const DEFAULT_LIMIT = 50;
@@ -175,6 +187,8 @@ export function categoryOf(outcome: ImportOutcome, reason?: string): ImportCateg
           return 'REFUND_UNVERIFIED';
         case 'APPLICATION_ID_UNLINKED':
           return 'POSSIBLE_CUP_ORIGIN';
+        case 'SUBSCRIPTION_REDEMPTION':
+          return 'SUBSCRIPTION_REDEMPTION';
         default:
           return 'OTHER';
       }
@@ -194,7 +208,7 @@ export class PosterTransactionImportService {
   // PREVIEW when write=false. A real import needs EVERY gate (assertWriteRequest + the two post-analysis gates); if any fails, nothing is written.
   async run(request: ImportRequest): Promise<ImportSummary> {
     if (request.write) this.assertWriteRequest(request);
-    const { summary, plan, newLinks } = await this.analyze(request);
+    const { summary, plan, newLinks, reconciliations } = await this.analyze(request);
     if (!request.write) return this.finish(summary, request);
 
     // Post-analysis gates — still before the first write.
@@ -205,7 +219,7 @@ export class PosterTransactionImportService {
       throw new BadRequestException(`Import refused: the window now has ${summary.importable} importable receipt(s) but ${request.expectedImportable} were reviewed. Run the preview again (nothing was written).`);
     }
 
-    await this.persist(summary, plan, newLinks);
+    await this.persist(summary, plan, newLinks, reconciliations);
     return this.finish(summary, request);
   }
 
@@ -217,14 +231,21 @@ export class PosterTransactionImportService {
     const today = new Date().toISOString().slice(0, 10);
     const ordered = [...raws].sort((a, b) => Number(a.transaction_id) - Number(b.transaction_id));
     const summary = this.newSummary({ since: today, until: today }, ordered.length, false, ordered.length, true);
-    const { plan, newLinks } = await this.classify(ordered, summary, [], options.linkLookups);
-    await this.persist(summary, plan, newLinks);
+    const { plan, newLinks, reconciliations } = await this.classify(ordered, summary, [], options.linkLookups);
+    await this.persist(summary, plan, newLinks, reconciliations);
     return summary;
   }
 
   // The write phase: the CUP-order link cache, then one atomic write per receipt (a failure is reported FAILED and the rest continue; re-running resumes).
-  private async persist(summary: ImportSummary, plan: PlannedWrite[], newLinks: { incomingOrderId: string; transactionId: string }[]): Promise<void> {
+  private async persist(summary: ImportSummary, plan: PlannedWrite[], newLinks: { incomingOrderId: string; transactionId: string }[], reconciliations: SubscriptionReconciliation[] = []): Promise<void> {
     for (const link of newLinks) await this.repository.saveLink(link.incomingOrderId, link.transactionId);
+    for (const r of reconciliations) {
+      try {
+        await this.repository.reconcileSubscriptionRedemption(r.redemptionId, r.lineFound);
+      } catch (err) {
+        this.logger.error(`Subscription redemption reconciliation failed for ${r.redemptionId}: ${err instanceof Error ? err.message.split('\n')[0] : 'error'}`);
+      }
+    }
 
     for (const item of plan) {
       try {
@@ -264,8 +285,8 @@ export class PosterTransactionImportService {
 
     const summary = this.newSummary({ since: window.since, until: window.until }, limit, ordered.length > limit, batch.length, !!request.write);
     const deletedIds = await this.readDeleted(window, summary);
-    const { plan, newLinks } = await this.classify(batch, summary, deletedIds);
-    return { summary, plan, newLinks };
+    const { plan, newLinks, reconciliations } = await this.classify(batch, summary, deletedIds);
+    return { summary, plan, newLinks, reconciliations };
   }
 
   private newSummary(window: { since: string; until: string }, limit: number, truncated: boolean, scanned: number, write: boolean): ImportSummary {
@@ -290,6 +311,7 @@ export class PosterTransactionImportService {
       importedTransactionIds: [],
       refundPolicy: { status: 'REFUND_UNVERIFIED', note: REFUND_NOTE, excludedReceipts: 0, deletedInPosterWindow: null, importedButDeletedInPoster: [] },
       posterReads: { transactions: 1, deletedTransactions: 0, incomingOrderLinks: 0 },
+      subscriptionLines: 0,
       details: [],
     };
   }
@@ -301,10 +323,11 @@ export class PosterTransactionImportService {
     summary: ImportSummary,
     deletedIds: string[],
     linkLookups?: { lookbackDays: number; max: number },
-  ): Promise<{ plan: PlannedWrite[]; newLinks: { incomingOrderId: string; transactionId: string }[] }> {
+  ): Promise<{ plan: PlannedWrite[]; newLinks: { incomingOrderId: string; transactionId: string }[]; reconciliations: SubscriptionReconciliation[] }> {
     const plan: PlannedWrite[] = [];
     const newLinks: { incomingOrderId: string; transactionId: string }[] = [];
-    if (batch.length === 0) return { plan, newLinks };
+    const reconciliations: SubscriptionReconciliation[] = [];
+    if (batch.length === 0) return { plan, newLinks, reconciliations };
 
     // 2. Normalise headers; anything malformed is skipped, never repaired.
     const normalized: { raw: PosterTransaction; tx: NormalizedTransaction }[] = [];
@@ -313,7 +336,7 @@ export class PosterTransactionImportService {
       if (result.ok) normalized.push({ raw, tx: result.transaction });
       else this.record(summary, { posterTransactionId: String(raw.transaction_id), outcome: 'SKIPPED', reason: result.reason, category: categoryOf('SKIPPED', result.reason), decision: 'SKIP' });
     }
-    if (normalized.length === 0) return { plan, newLinks };
+    if (normalized.length === 0) return { plan, newLinks, reconciliations };
 
     // 3. CUP-originated set: cached links + links resolved NOW from Poster for CUP orders still unlinked (read-only; returned, saved only on a real import).
     const ids = normalized.map((n) => n.tx.posterTransactionId);
@@ -328,6 +351,7 @@ export class PosterTransactionImportService {
       this.repository.findBranchesBySpotId([...new Set(normalized.map((n) => n.tx.posterSpotId))]),
     ]);
     const products = await this.repository.findProductsByPosterId([...new Set(normalized.flatMap((n) => (n.tx.lines ?? []).map((l) => l.posterProductId)))]);
+    const subscriptionRefs = await this.repository.findSubscriptionRedemptionsForTransactions(ids);
     await this.flagDeletedButImported(summary, deletedIds);
 
     const settleMs = this.config.env.POSTER_IMPORT_SETTLE_SECONDS * 1000;
@@ -351,6 +375,19 @@ export class PosterTransactionImportService {
       };
       const skip = (reason: string) => this.record(summary, { posterTransactionId: id, outcome: 'SKIPPED', reason, category: categoryOf('SKIPPED', reason), decision: 'SKIP', ...facts });
 
+      // Coffee Subscription: lines CUP itself added as subscription consumption, recognised through the redemption's stored transaction id
+      // (+ product + a zero paid amount) — never by price alone. Only a CLOSED receipt proves anything (and is reconciled).
+      const subscriptionLineIdx = new Set<number>();
+      const refs = subscriptionRefs.get(id) ?? [];
+      if (refs.length > 0 && tx.posterStatus === '2' && tx.lines) {
+        for (const ref of refs) {
+          const line = tx.lines.find((l) => !subscriptionLineIdx.has(l.lineIndex) && l.posterProductId === ref.posterProductId && l.posterPayedSumMinor === 0 && l.posterProductPriceMinor === 0);
+          if (line) subscriptionLineIdx.add(line.lineIndex);
+          if (!line || ref.status === 'UNKNOWN' || ref.reconciliationStatus === null) reconciliations.push({ redemptionId: ref.id, lineFound: !!line });
+        }
+        summary.subscriptionLines += subscriptionLineIdx.size;
+      }
+
       if (cupLinked.has(id)) {
         this.record(summary, { posterTransactionId: id, outcome: 'CUP_ORIGINATED', category: 'CUP_ORIGINATED', decision: 'CUP_ORIGINATED', ...facts });
         continue;
@@ -363,6 +400,8 @@ export class PosterTransactionImportService {
 
       // Documented meaning only: status 2 = closed; pay_type 0 = closed without payment.
       if (tx.posterStatus !== '2') { skip('NOT_CLOSED'); continue; }
+      // A receipt that is nothing but subscription coffee is consumption only — never a sale, never "unpaid".
+      if (tx.lines && tx.lines.length > 0 && subscriptionLineIdx.size === tx.lines.length) { skip('SUBSCRIPTION_REDEMPTION'); continue; }
       if (tx.posterPayType === '0' || tx.paidMinor <= 0 || tx.totalMinor <= 0) { skip('NOT_A_PAID_SALE'); continue; }
       // Owner decision (2026-09-24): the settling wait exists ONLY to give Poster time to report a CUP-created order's
       // receipt link before this receipt might otherwise be imported as a bare POS sale and double-counted (see the
@@ -398,7 +437,7 @@ export class PosterTransactionImportService {
         skip('NO_LINES');
         continue;
       } else {
-        items = tx.lines.map((line) => ({
+        items = tx.lines.filter((line) => !subscriptionLineIdx.has(line.lineIndex)).map((line) => ({
           lineIndex: line.lineIndex,
           posterProductId: line.posterProductId,
           productId: products.get(line.posterProductId)?.id ?? null,
@@ -428,7 +467,7 @@ export class PosterTransactionImportService {
       if (tx.paidMinor < tx.totalMinor) summary.partiallyPaid += 1;
       plan.push({ data: { ...header, status: 'IMPORTED', unresolvedReason: null, items }, existingId: already?.id ?? null, detail, audit: false });
     }
-    return { plan, newLinks };
+    return { plan, newLinks, reconciliations };
   }
 
   // Request-shape gates for a REAL import. Each failure is a 400 raised before Poster is even read.

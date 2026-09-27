@@ -30,7 +30,10 @@ export interface PnlOverview {
   filters: { branches: { id: string; name: string }[] };
 
   revenue: number;
-  cogs: { amountMinor: number; complete: boolean; missingRecipeProducts: { name: string; quantity: number }[] };
+  // Coffee Subscription: revenue = sales (CUP orders + imported POS, unchanged) + subscription sales (provider-confirmed payments, cash basis).
+  revenueBreakdown: { salesMinor: number; subscriptionSalesMinor: number };
+  cogs: { amountMinor: number; complete: boolean; missingRecipeProducts: { name: string; quantity: number }[]; subscriptionConsumptionMinor: number };
+  subscriptions: { salesRevenueMinor: number; redemptions: number; portionsConsumed: number; consumptionCogsMinor: number; notes: string[] };
   grossProfit: number;
   grossMarginPct: number | null;
 
@@ -74,7 +77,7 @@ export class FinancePnlService {
     if (query.branchId && !branch) throw new BadRequestException('Unknown branch.');
     const q: QueryRange = { from: range.from, to: range.to, branchId: branch ? branch.id : null };
 
-    const [branches, cup, pos, cupProducts, posProducts, expenseCategories, interest, taxRules] = await Promise.all([
+    const [branches, cup, pos, cupProducts, posProducts, expenseCategories, interest, taxRules, subscriptionSales, subscriptionConsumption] = await Promise.all([
       this.financeRepository.findActiveBranches(),
       this.analytics.cupTotals(q),
       this.analytics.posTotals(q),
@@ -83,9 +86,12 @@ export class FinancePnlService {
       this.repository.expensesByCategory(range.from, range.to, q.branchId),
       this.repository.loanInterestTotal(range.from, range.to),
       this.financeRepository.findActiveTaxRulesOverlapping(range.from, range.to),
+      q.branchId ? Promise.resolve(0) : this.repository.subscriptionSalesTotal(range.from, range.to),
+      this.repository.subscriptionConsumption(range.from, range.to, q.branchId),
     ]);
 
-    const revenue = cup.revenue + pos.revenue;
+    const salesRevenue = cup.revenue + pos.revenue;
+    const revenue = salesRevenue + subscriptionSales;
 
     // ---- COGS: quantity (from Analytics' own per-product aggregates) x theoreticalCostMinor (from Product, read
     // live from Poster's recipe). A product with no recipe contributes 0 and is listed in missingRecipeProducts —
@@ -96,7 +102,7 @@ export class FinancePnlService {
       quantityByProduct.set(row.productId, (quantityByProduct.get(row.productId) ?? 0) + row.quantity);
       revenueByProduct.set(row.productId, (revenueByProduct.get(row.productId) ?? 0) + row.revenue);
     }
-    const costs = await this.repository.productCosts([...quantityByProduct.keys()]);
+    const costs = await this.repository.productCosts([...new Set([...quantityByProduct.keys(), ...subscriptionConsumption.map((c) => c.productId)])]);
     let cogsMinor = 0;
     let cogsComplete = true;
     const missingRecipeProducts: { name: string; quantity: number }[] = [];
@@ -113,6 +119,18 @@ export class FinancePnlService {
       cogsMinor += costMinor;
       productGrossProfits.push({ name: cost.name, quantity, revenueMinor: productRevenue, costMinor, grossProfitMinor: productRevenue - costMinor });
     }
+    // Coffee Subscription consumption: its own COGS line (zero revenue), never mixed into per-product gross profit above.
+    let subscriptionCogsMinor = 0;
+    for (const c of subscriptionConsumption) {
+      const cost = costs.get(c.productId);
+      if (!cost || !cost.hasRecipe || cost.theoreticalCostMinor === null) {
+        cogsComplete = false;
+        missingRecipeProducts.push({ name: `${cost?.name ?? '—'} (subscription)`, quantity: c.quantity });
+        continue;
+      }
+      subscriptionCogsMinor += cost.theoreticalCostMinor * c.quantity;
+    }
+    cogsMinor += subscriptionCogsMinor;
     productGrossProfits.sort((a, b) => b.grossProfitMinor - a.grossProfitMinor);
     missingRecipeProducts.sort((a, b) => b.quantity - a.quantity);
 
@@ -145,7 +163,20 @@ export class FinancePnlService {
       branch,
       filters: { branches },
       revenue,
-      cogs: { amountMinor: cogsMinor, complete: cogsComplete, missingRecipeProducts },
+      revenueBreakdown: { salesMinor: salesRevenue, subscriptionSalesMinor: subscriptionSales },
+      cogs: { amountMinor: cogsMinor, complete: cogsComplete, missingRecipeProducts, subscriptionConsumptionMinor: subscriptionCogsMinor },
+      subscriptions: {
+        salesRevenueMinor: subscriptionSales,
+        redemptions: subscriptionConsumption.reduce((s, c) => s + c.quantity, 0),
+        portionsConsumed: subscriptionConsumption.reduce((s, c) => s + c.portions, 0),
+        consumptionCogsMinor: subscriptionCogsMinor,
+        notes: [
+          'Subscription sales are recognized when paid (cash basis); deferred recognition over the subscription period is not supported yet.',
+          'No payment provider is integrated yet, so subscription sales are 0; manual admin activations are never revenue.',
+          'Subscription coffee adds no revenue; its theoretical cost is included in COGS.',
+          ...(q.branchId ? ['Subscription sales are not branch-bound and are excluded from a branch-filtered P&L.'] : []),
+        ],
+      },
       grossProfit,
       grossMarginPct: revenue > 0 ? round2((grossProfit / revenue) * 100) : null,
       operatingExpenses: { total: operatingTotal, byCategory: operatingLines },

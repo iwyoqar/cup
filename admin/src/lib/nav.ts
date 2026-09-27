@@ -13,6 +13,12 @@ export type AdminPage =
   | 'rewards'
   | 'rewards-5plus1'
   | 'promotions'
+  | 'subscriptions'
+  | 'subscriptions-active'
+  | 'subscriptions-plans'
+  | 'subscriptions-redemptions'
+  | 'subscriptions-customers'
+  | 'subscriptions-revenue'
   | 'referrals'
   | 'campaigns'
   | 'crm-automation'
@@ -88,6 +94,18 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'rewards-5plus1', label: '5+1 Coffee', icon: 'rewards', description: 'Participation, free coffees redeemed, top customers and redemption history.', path: '/admin/rewards/5-plus-1' },
       { id: 'promotions', label: 'Promotions', icon: 'promotions', description: 'Discounts and benefits: who is eligible and how they are used.', path: '/admin/promotions' },
       { id: 'referrals', label: 'Referrals', icon: 'referrals', description: 'Referral program rules, attribution and rewards.', path: '/admin/referrals' },
+    ],
+  },
+  {
+    id: 'subscriptions',
+    label: 'Subscriptions',
+    items: [
+      { id: 'subscriptions', label: 'Overview', icon: 'subscription', description: 'Coffee subscriptions at a glance: active, sold, consumed and unused portions.', path: '/admin/subscriptions' },
+      { id: 'subscriptions-active', label: 'Active', icon: 'subscription', description: 'Running and scheduled subscriptions with their live usage.', path: '/admin/subscriptions/active' },
+      { id: 'subscriptions-plans', label: 'Plans', icon: 'subscription', description: 'Plans (price, duration, portions, limits) and the drinks a subscription covers.', path: '/admin/subscriptions/plans' },
+      { id: 'subscriptions-redemptions', label: 'Redemptions', icon: 'subscription', description: 'Every subscription coffee given at the register, with its Poster audit trail.', path: '/admin/subscriptions/redemptions' },
+      { id: 'subscriptions-customers', label: 'Customers', icon: 'customers', description: 'Customers with subscriptions: current plan, history, portions and purchases.', path: '/admin/subscriptions/customers' },
+      { id: 'subscriptions-revenue', label: 'Revenue', icon: 'finance', description: 'Subscription sales revenue (payments), by plan and day — never redemption value.', path: '/admin/subscriptions/revenue' },
     ],
   },
   {

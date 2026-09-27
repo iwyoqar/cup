@@ -60,6 +60,10 @@ services:
         value: "false" # left OFF by this phase, per explicit instruction — do not flip without separate authorization
       - key: REWARD_CHECKOUT_ENABLED
         value: "false"
+      - key: POS_SUBSCRIPTION_REDEMPTION_ENABLED
+        value: "false" # Coffee Subscription widget redemption — off until a supervised verification order
+      - key: SUBSCRIPTIONS_MANUAL_ACTIVATION_ENABLED
+        value: "false" # admin-only manual activation (no payment provider yet) — enable deliberately, never counted as revenue
       - key: CRM_AUTOMATION_SEND_ENABLED
         value: "false"
       - key: ADMIN_BOOTSTRAP_EMAIL

@@ -26,6 +26,13 @@ export interface ImportedTransactionData {
 
 // Phase 11.2 — persistence + the bulk read lookups the import needs. Reads Customer/Branch/Product/Order directly
 // (one bounded query each, never per row) so the import stays a handful of queries regardless of window size.
+export interface SubscriptionLineRef {
+  id: string;
+  posterProductId: string;
+  status: string;
+  reconciliationStatus: string | null;
+}
+
 @Injectable()
 export class PosterImportRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -56,6 +63,49 @@ export class PosterImportRepository {
   }
 
   // --- CUP-originated dedupe --------------------------------------------------------------------------------
+
+  // Coffee Subscription — the CUP-managed subscription consumption lines on these receipts: every redemption whose verified mutation
+  // resolved to one of these Poster transaction ids and that is either CONFIRMED or still UNKNOWN (ambiguous). The importer uses this
+  // explicit link — never a zero price alone — to keep those lines out of the imported SALE lines and to reconcile the redemption.
+  async findSubscriptionRedemptionsForTransactions(posterTransactionIds: string[]): Promise<Map<string, SubscriptionLineRef[]>> {
+    const map = new Map<string, SubscriptionLineRef[]>();
+    if (posterTransactionIds.length === 0) return map;
+    const rows = await this.prisma.subscriptionRedemption.findMany({
+      where: { posterTransactionId: { in: posterTransactionIds }, status: { in: ['CONFIRMED', 'UNKNOWN'] } },
+      select: { id: true, posterTransactionId: true, posterProductId: true, status: true, reconciliationStatus: true },
+      orderBy: { requestedAt: 'asc' },
+    });
+    for (const r of rows) {
+      const key = r.posterTransactionId as string;
+      map.set(key, [...(map.get(key) ?? []), { id: r.id, posterProductId: r.posterProductId, status: r.status, reconciliationStatus: r.reconciliationStatus }]);
+    }
+    return map;
+  }
+
+  // Applies what a CLOSED receipt proves about a subscription redemption. A CONFIRMED one is only labelled (MATCHED / LINE_MISSING — a missing
+  // line is flagged for an admin, never auto-reversed). An UNKNOWN (ambiguous) one is resolved: its line on the closed receipt means the coffee
+  // was really given (CONFIRMED); a closed receipt without it means nothing was added (FAILED, portions released). Idempotent.
+  async reconcileSubscriptionRedemption(id: string, lineFound: boolean): Promise<void> {
+    const now = new Date();
+    await this.prisma.runTransaction(async (tx) => {
+      const row = await tx.subscriptionRedemption.findUnique({ where: { id }, select: { status: true, requestedAt: true, posterOrderId: true, subscriptionId: true, reconciliationStatus: true } });
+      if (!row) return;
+      const label = lineFound ? 'MATCHED' : 'LINE_MISSING';
+      if (row.status === 'CONFIRMED') {
+        if (row.reconciliationStatus !== label) await tx.subscriptionRedemption.update({ where: { id }, data: { reconciliationStatus: label, reconciledAt: now } });
+        return;
+      }
+      if (row.status !== 'UNKNOWN') return;
+      await tx.subscription.update({ where: { id: row.subscriptionId }, data: { usageVersion: { increment: 1 } }, select: { id: true } }); // same lock as a redemption claim
+      if (lineFound) {
+        const clash = await tx.subscriptionRedemption.findFirst({ where: { redeemedForPosterOrderId: row.posterOrderId }, select: { id: true } });
+        if (clash) return; // leave UNKNOWN for an admin rather than double-consume
+        await tx.subscriptionRedemption.update({ where: { id }, data: { status: 'CONFIRMED', redeemedAt: row.requestedAt, redeemedForPosterOrderId: row.posterOrderId, reconciliationStatus: label, reconciledAt: now, resolvedBy: 'system:poster-import', resolutionNote: 'Line found on the closed Poster receipt.' } });
+      } else {
+        await tx.subscriptionRedemption.update({ where: { id }, data: { status: 'FAILED', failureReason: 'POSTER_MUTATION_FAILED', reconciliationStatus: label, reconciledAt: now, resolvedBy: 'system:poster-import', resolutionNote: 'The closed Poster receipt has no such line — nothing was given; portions released.' } });
+      }
+    });
+  }
 
   async findKnownLinkedTransactionIds(posterTransactionIds: string[]): Promise<Set<string>> {
     const rows = await this.prisma.posterIncomingOrderLink.findMany({ where: { posterTransactionId: { in: posterTransactionIds } }, select: { posterTransactionId: true } });
