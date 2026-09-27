@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '../../common/config/config.service';
 import { PosterSyncProcessorService } from './poster-sync-processor.service';
 import { PosterSyncRepository } from './poster-sync.repository';
-import { parsePosterWebhook, verifyPosterWebhookSignature, webhookDedupeKey } from './poster-webhook-signature';
+import { parsePosterWebhook, POSTER_WEBHOOK_TEST_ACTION, verifyPosterWebhookSignature, webhookDedupeKey } from './poster-webhook-signature';
 
 export interface WebhookReply {
   httpStatus: number;
@@ -17,11 +17,14 @@ export const HANDLED_OBJECT = 'transaction';
 // wake the processor, and acknowledge. It never calls Poster, never touches the import tables and never blocks on business logic, so a slow Poster, a slow
 // import or a burst of retries can never slow the POS down. The acknowledgement is sent only AFTER the row is committed: if the database is down the request
 // fails (HTTP 500) and Poster's own retry delivers it again — that is what makes the queue lossless.
+// One exception to "persist + wake the processor": action="test" (Poster's dashboard test-send/Check sentinel) is signature-verified like every other
+// event but is a pure no-op past that — see the check below, placed after signature/account verification and before persistence.
 @Injectable()
 export class PosterWebhookService {
   private readonly logger = new Logger(PosterWebhookService.name);
   private ignored = 0;
   private rejected = 0;
+  private verifiedTest = 0;
 
   constructor(
     private readonly config: ConfigService,
@@ -30,7 +33,7 @@ export class PosterWebhookService {
   ) {}
 
   counters() {
-    return { ignoredOtherObjects: this.ignored, rejectedSinceStart: this.rejected };
+    return { ignoredOtherObjects: this.ignored, rejectedSinceStart: this.rejected, verifiedTestEvents: this.verifiedTest };
   }
 
   async receive(body: unknown): Promise<WebhookReply> {
@@ -55,6 +58,8 @@ export class PosterWebhookService {
         this.ignored += 1;
         return { httpStatus: 200, body: { status: 'accept' } };
       }
+      // Safe operational logging only — shape, never content: a malformed delivery is rare enough to be worth one line.
+      this.logger.warn(`Poster webhook rejected: malformed body (keys=${document && typeof document === 'object' ? JSON.stringify(Object.keys(document as object)) : 'n/a'}).`);
       this.rejected += 1;
       return { httpStatus: 400, body: { status: 'rejected' } };
     }
@@ -70,6 +75,16 @@ export class PosterWebhookService {
       this.rejected += 1;
       this.logger.warn('Poster webhook rejected: unexpected Poster account.');
       return { httpStatus: 401, body: { status: 'rejected' } };
+    }
+
+    // Poster's dashboard "send test webhook" / Check feature: action="test" is verified above exactly like any real event (same signature
+    // check, same account pin), but it carries no real business data — never persisted (no recordDelivery), never triggers the processor,
+    // never touches import/reconciliation/customer/loyalty/finance. Checked BEFORE the object-type branch so it short-circuits regardless of
+    // what `object` a test event happens to carry.
+    if (payload.action === POSTER_WEBHOOK_TEST_ACTION) {
+      this.verifiedTest += 1;
+      this.logger.log(`Poster webhook test event verified (account=${payload.account}, object=${payload.object}) — acknowledged, not processed.`);
+      return { httpStatus: 200, body: { status: 'accept' } };
     }
 
     if (payload.object !== HANDLED_OBJECT) {

@@ -33,6 +33,7 @@
     "bcryptjs": "^3.0.3",
     "fastify": "^4.29.1",
     "grammy": "^1.46.0",
+    "qs": "^6.16.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^4.6.5"
@@ -42,6 +43,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.3",
+    "@types/qs": "^6.15.1",
     "@types/supertest": "^7.2.1",
     "jest": "^30.5.1",
     "nock": "^14.0.17",

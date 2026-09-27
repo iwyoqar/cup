@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import qs from 'qs';
 import { AppModule } from './app.module';
 import { ConfigService } from './common/config/config.service';
 
@@ -29,18 +30,31 @@ async function bootstrap(): Promise<void> {
   // Phase 22: the same uncertainty applies to POST /pos-widget/rewards/redeem — Poster.makeRequest proxies this POST too, and its real Content-Type has
   // never been observed (docs/PHASE-22-AUDIT.md §7). A normal `application/json` POST is unaffected either way (Fastify's own default JSON parser handles
   // it before this wildcard ever runs); this only matters if Poster mislabels the body, exactly the class of problem Phase 20 already hit.
+  //
+  // 2026-09-28 (confirmed with a real Poster request): Poster's dashboard "send test webhook" tool posts
+  // Content-Type: application/x-www-form-urlencoded with bracket-notation fields (data[account]=..., data[object]=..., ...) instead of JSON — the JSON-only
+  // assumption above was wrong for this case. Content-type now decides how the raw string is parsed: form-urlencoded goes through `qs` (which expands
+  // bracket notation into a real nested object, e.g. `{ url, data: { account, object, ... } }`), everything else keeps the original JSON.parse behaviour
+  // unchanged. poster-webhook-signature.ts's parsePosterWebhook() normalizes either resulting shape before validation.
   const JSON_TOLERANT_PATHS = ['/webhooks/poster', '/pos-widget/rewards/redeem', '/pos-widget/promotions/redeem'];
-  app.getHttpAdapter().getInstance().addContentTypeParser('*', { parseAs: 'string' }, (request: { url: string }, body: string, done: (err: Error | null, value?: unknown) => void) => {
-    if (!JSON_TOLERANT_PATHS.includes(request.url.split('?')[0])) {
+  const webhookLogger = new Logger('PosterWebhook');
+  app.getHttpAdapter().getInstance().addContentTypeParser('*', { parseAs: 'string' }, (request: { url: string; headers?: Record<string, unknown> }, body: string, done: (err: Error | null, value?: unknown) => void) => {
+    const path = request.url.split('?')[0];
+    if (!JSON_TOLERANT_PATHS.includes(path)) {
       const err = Object.assign(new Error('Unsupported Media Type'), { statusCode: 415 });
       done(err);
       return;
     }
+    const contentType = String(request.headers?.['content-type'] ?? '').toLowerCase();
+    const isFormUrlEncoded = contentType.startsWith('application/x-www-form-urlencoded');
     try {
-      done(null, body.length === 0 ? {} : JSON.parse(body));
-    } catch {
-      const err = Object.assign(new Error('Invalid JSON'), { statusCode: 400 });
-      done(err);
+      if (body.length === 0) return done(null, {});
+      done(null, isFormUrlEncoded ? qs.parse(body) : JSON.parse(body));
+    } catch (err) {
+      // Safe operational logging only (no secret, no token, no raw body): a malformed webhook delivery is rare enough to be worth one line.
+      if (path === '/webhooks/poster') webhookLogger.warn(`Body parse failed (content-type=${contentType || 'none'}): ${err instanceof Error ? err.message : String(err)}`);
+      const wrapped = Object.assign(new Error(isFormUrlEncoded ? 'Invalid form body' : 'Invalid JSON'), { statusCode: 400 });
+      done(wrapped);
     }
   });
   // Temporary Phase 1.7 tunnel-debugging aid: there is otherwise zero visibility into whether
