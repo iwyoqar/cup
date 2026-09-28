@@ -42,9 +42,15 @@ const OBJECT_ID = /^[A-Za-z0-9_-]{1,40}$/;
 const TIME = /^\d{9,12}$/;
 
 // The form-envelope shape (see the header comment) nests the real fields one level down, under a `data` OBJECT, alongside a sibling `url` field that
-// carries no signal for us. The documented flat JSON shape has these fields directly on the body (its own optional `data` field, when present, is the
-// entity-specific STRING the signature formula folds in — never an object, so the two `data` meanings can never be confused with each other).
+// carries no signal for us. The documented flat JSON shape has these fields directly on the body — and its own optional `data` field is normally the
+// entity-specific STRING the signature formula folds in, but a real `transaction` event's `data` can apparently also be a non-string value (observed
+// live, 2026-09-28: a real webhook with `account`/`object`/... all present at the top level, alongside a `data` key, was misclassified as the
+// form-envelope shape below and rejected as MALFORMED — because the OLD version of this function keyed off `data`'s type alone, ignoring the fact
+// that the real fields were already sitting right there at the top level). Prefer the top level whenever it already has its own `account`/`object`
+// — regardless of what `data` happens to contain — and fall back to unwrapping `data` only when the top level has neither (the ONLY shape that is
+// true for: the dashboard test-webhook envelope, `{ url, data: { account, object, ... } }`).
 function candidateFields(body: Record<string, unknown>): Record<string, unknown> {
+  if (body.account !== undefined || body.object !== undefined) return body;
   if (body.data && typeof body.data === 'object' && !Array.isArray(body.data)) return body.data as Record<string, unknown>;
   return body;
 }

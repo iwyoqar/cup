@@ -58,8 +58,14 @@ export class PosterWebhookService {
         this.ignored += 1;
         return { httpStatus: 200, body: { status: 'accept' } };
       }
-      // Safe operational logging only — shape, never content: a malformed delivery is rare enough to be worth one line.
-      this.logger.warn(`Poster webhook rejected: malformed body (keys=${document && typeof document === 'object' ? JSON.stringify(Object.keys(document as object)) : 'n/a'}).`);
+      // Safe operational logging only — never the secret or the raw verify value. account/object/object_id/action/time are Poster's own
+      // routing metadata (not credentials), logged here because a bare "keys=[...]" line was NOT enough to diagnose the previous MALFORMED
+      // regression (2026-09-28): the keys can look perfectly correct while candidateFields() was still resolving the wrong nested object.
+      const d = document && typeof document === 'object' ? (document as Record<string, unknown>) : {};
+      this.logger.warn(
+        `Poster webhook rejected: malformed body. account=${String(d.account)} object=${String(d.object)} object_id=${String(d.object_id)} action=${String(d.action)} time=${String(d.time)} ` +
+          `hasVerify=${typeof d.verify === 'string'} dataType=${d.data === undefined ? 'undefined' : Array.isArray(d.data) ? 'array' : typeof d.data} keys=${JSON.stringify(Object.keys(d))}`,
+      );
       this.rejected += 1;
       return { httpStatus: 400, body: { status: 'rejected' } };
     }
